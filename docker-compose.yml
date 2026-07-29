@@ -1,0 +1,30 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: wms
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-wms_password}
+    ports: ["3306:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  wms-server:
+    build: ./wms-server
+    ports: ["8088:8088"]
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/wms?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-wms_password}
+      DB_DRIVER: com.mysql.cj.jdbc.Driver
+    depends_on:
+      mysql:
+        condition: service_healthy
+  wms-web:
+    build: ./wms-web
+    ports: ["3000:80"]
+    depends_on: [wms-server]
+volumes:
+  mysql-data:

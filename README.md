@@ -1,6 +1,3 @@
-好的，我为你整理一份**完整的仓库进销存管理系统文档**，涵盖需求、架构、数据库、接口、业务流程和部署方案。
-
----
 
 # 仓库进销存管理系统 - 完整设计文档
 
@@ -626,7 +623,7 @@ CREATE TABLE `operation_logs` (
 | PUT | /stock-in/orders/:id | 编辑入库单 |
 | PUT | /stock-in/orders/:id/confirm | **确认入库(核心)** |
 | PUT | /stock-in/orders/:id/cancel | 取消入库单 |
-| POST | /stock-in/scan | **小程序扫码入库** |
+| POST | /stock/in/scan | **小程序扫码入库** |
 
 #### 出库管理
 | 方法 | 路径 | 说明 |
@@ -637,7 +634,7 @@ CREATE TABLE `operation_logs` (
 | PUT | /stock-out/orders/:id | 编辑出库单 |
 | PUT | /stock-out/orders/:id/confirm | **确认出库(核心)** |
 | PUT | /stock-out/orders/:id/cancel | 取消出库单 |
-| POST | /stock-out/scan | **小程序扫码出库** |
+| POST | /stock/out/scan | **小程序扫码出库** |
 
 #### 库存管理
 | 方法 | 路径 | 说明 |
@@ -669,7 +666,7 @@ CREATE TABLE `operation_logs` (
 
 #### 5.3.1 扫码入库接口
 
-**请求**：`POST /stock-in/scan`
+**请求**：`POST /stock/in/scan`
 ```json
 {
     "item_code": "ITEM-001",
@@ -703,7 +700,7 @@ CREATE TABLE `operation_logs` (
 
 #### 5.3.2 扫码出库接口
 
-**请求**：`POST /stock-out/scan`
+**请求**：`POST /stock/out/scan`
 ```json
 {
     "item_code": "ITEM-001",
@@ -969,7 +966,7 @@ pages/
 #### 扫码入库完整流程
 
 ```javascript
-// pages/stock-in/scan.js
+// pages/stock/in/scan.js
 Page({
   data: {
     item: null,
@@ -1036,7 +1033,7 @@ Page({
     }
 
     wx.request({
-      url: 'https://api.xxx.com/v1/stock-in/scan',
+      url: 'https://api.xxx.com/v1/stock/in/scan',
       method: 'POST',
       data: {
         item_code: item.code,
@@ -1273,7 +1270,7 @@ services:
       dockerfile: Dockerfile
     container_name: wms-server
     ports:
-      - "8080:8080"
+      - "8088:8088"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/wms?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
       - SPRING_DATASOURCE_USERNAME=root
@@ -1357,7 +1354,7 @@ mysql -u root -p < sql/init.sql
 docker-compose up -d
 
 # 5. 检查服务
-curl http://localhost:8080/api/health
+curl http://localhost:8088/api/health
 ```
 
 ---

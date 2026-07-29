@@ -1,0 +1,6 @@
+package com.wms.repository;
+import com.wms.model.entity.StockDocument; import org.springframework.data.jpa.repository.*; import org.springframework.data.repository.query.Param; import java.util.*;
+public interface StockDocumentRepository extends JpaRepository<StockDocument,Long> {
+ @Query("select distinct d from StockDocument d join fetch d.warehouse left join fetch d.partner left join fetch d.lines l left join fetch l.item order by d.createdAt desc") List<StockDocument> findAllDetailed();
+ @Query("select distinct d from StockDocument d join fetch d.warehouse left join fetch d.partner left join fetch d.lines l left join fetch l.item where d.id=:id") Optional<StockDocument> findDetailedById(@Param("id") Long id);
+}

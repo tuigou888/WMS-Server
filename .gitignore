@@ -1,0 +1,24 @@
+# Java
+wms-server/target/
+*.class
+wms-server/node_modules/
+
+# Node
+wms-web/node_modules/
+wms-web/dist/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Test artifacts
+test-artifacts/__pycache__/
+test-artifacts/*.png
+test-artifacts/api-results*.json
+test-artifacts/ui-results*.json

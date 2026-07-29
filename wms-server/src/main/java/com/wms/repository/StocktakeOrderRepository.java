@@ -1,0 +1,3 @@
+package com.wms.repository;
+import com.wms.model.entity.StocktakeOrder; import org.springframework.data.jpa.repository.*; import org.springframework.data.repository.query.Param; import java.util.*;
+public interface StocktakeOrderRepository extends JpaRepository<StocktakeOrder,Long> { @Query("select distinct s from StocktakeOrder s join fetch s.warehouse left join fetch s.lines l left join fetch l.item order by s.createdAt desc") List<StocktakeOrder> findAllDetailed(); @Query("select distinct s from StocktakeOrder s join fetch s.warehouse left join fetch s.lines l left join fetch l.item where s.id=:id") Optional<StocktakeOrder> findDetailedById(@Param("id") Long id); }

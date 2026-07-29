@@ -1,0 +1,3 @@
+package com.wms.service;
+import static org.junit.jupiter.api.Assertions.assertEquals; import java.math.BigDecimal; import org.junit.jupiter.api.Test;
+class InventoryCostCalculatorTest { @Test void calculatesMovingWeightedAverage(){BigDecimal amount=InventoryCostCalculator.amount(new BigDecimal("200"),new BigDecimal("12"));assertEquals(new BigDecimal("2400.00"),amount);assertEquals(new BigDecimal("11.3333"),InventoryCostCalculator.averageCost(new BigDecimal("100"),new BigDecimal("1000"),new BigDecimal("200"),amount));} @Test void transferIntoEmptyInventoryKeepsSourceAverageCost(){assertEquals(new BigDecimal("13.5417"),InventoryCostCalculator.transferAverageCost(BigDecimal.ZERO,BigDecimal.ZERO,new BigDecimal("4"),new BigDecimal("13.5417")));} }
