@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/reports")
@@ -363,6 +364,120 @@ public class ReportController {
                 .map(m -> Map.of("itemCode", m.get("itemCode"), "itemName", m.get("itemName"),
                         "unit", m.get("unit"), "value", m.get("value"), "quantity", m.get("quantity")))
                 .toList();
+    }
+
+    /** 库龄分析（G7）：按物品/仓库统计库存分布在 0-30/30-60/60-90/>90 天的批次，识别呆滞料。 */
+    @GetMapping("/inventory-age")
+    public ApiResponse<List<Map<String, Object>>> inventoryAge() {
+        List<Inventory> all = inventories.findAllDetailed();
+        List<InventoryTransaction> txns = transactions.findRecentDetailed();
+        LocalDate today = LocalDate.now();
+
+        // 仅看入库类流水，按物品+仓库+批次聚合最早入库日
+        Map<String, List<InventoryTransaction>> byStock = txns.stream()
+                .filter(t -> Set.of("in", "transfer_in", "return_in", "gain_in", "adjust_in").contains(t.getTransactionType()))
+                .collect(Collectors.groupingBy(t -> stockKey(t.getItem().getId(), t.getWarehouse().getId(),
+                        t.getLocation() == null ? null : t.getLocation().getId(), null)));
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Inventory inv : all) {
+            if (inv.getQuantity() == null || inv.getQuantity().signum() <= 0) continue;
+            LocalDate earliestIn = byStock.entrySet().stream()
+                    .filter(e -> matchesInventory(e.getKey(), inv))
+                    .flatMap(e -> e.getValue().stream())
+                    .map(t -> t.getTransactionAt().toLocalDate())
+                    .min(LocalDate::compareTo)
+                    .orElse(inv.getUpdatedAt() == null ? today : inv.getUpdatedAt().toLocalDate());
+            long days = java.time.temporal.ChronoUnit.DAYS.between(earliestIn, today);
+            String bucket = days < 30 ? "0-30" : days < 60 ? "30-60" : days < 90 ? "60-90" : ">90";
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("itemCode", inv.getItem().getCode());
+            m.put("itemName", inv.getItem().getName());
+            m.put("unit", inv.getItem().getUnit());
+            m.put("warehouseName", inv.getWarehouse().getName());
+            m.put("locationCode", inv.getLocation() == null ? null : inv.getLocation().getCode());
+            m.put("batchNo", inv.getBatchNo());
+            m.put("quantity", inv.getQuantity());
+            m.put("amount", inv.getTotalAmount());
+            m.put("earliestInDate", earliestIn);
+            m.put("ageDays", days);
+            m.put("bucket", bucket);
+            result.add(m);
+        }
+        result.sort((a, b) -> Long.compare((long) b.get("ageDays"), (long) a.get("ageDays")));
+        return ApiResponse.ok(result);
+    }
+
+    /** 收发存汇总（G8）：按物品聚合期初/入库/出库/期末（数量+金额）；period 例如 2026-07。 */
+    @GetMapping("/in-out-summary")
+    public ApiResponse<List<Map<String, Object>>> inOutSummary(@RequestParam(required = false) String period) {
+        LocalDate today = LocalDate.now();
+        LocalDate monthStart = period == null || period.isBlank()
+                ? today.withDayOfMonth(1) : LocalDate.parse(period + "-01");
+        LocalDate monthEnd = monthStart.plusMonths(1);
+        LocalDate prevEnd = monthStart.minusDays(1);
+
+        List<InventoryTransaction> allTx = transactions.findDetailedBetween(
+                prevEnd.minusMonths(1).atStartOfDay(), monthEnd.atStartOfDay());
+        Map<String, List<InventoryTransaction>> byItem = allTx.stream()
+                .collect(Collectors.groupingBy(t -> t.getItem().getCode()));
+
+        List<Inventory> lastSnapshot = inventories.findAllDetailed();
+        BigDecimal endingQty, endingAmt;
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<String, List<InventoryTransaction>> e : byItem.entrySet()) {
+            String itemCode = e.getKey();
+            List<InventoryTransaction> txns = e.getValue();
+            InventoryTransaction sample = txns.get(0);
+            BigDecimal openingQty = txns.stream()
+                    .filter(t -> t.getTransactionAt().toLocalDate().isBefore(monthStart))
+                    .map(InventoryTransaction::getBalanceQuantity)
+                    .reduce(BigDecimal.ZERO, (a, b) -> b);
+            BigDecimal inQty = BigDecimal.ZERO, inAmt = BigDecimal.ZERO;
+            BigDecimal outQty = BigDecimal.ZERO, outAmt = BigDecimal.ZERO;
+            for (InventoryTransaction t : txns) {
+                LocalDate d = t.getTransactionAt().toLocalDate();
+                if (d.isBefore(monthStart) || !d.isBefore(monthEnd)) continue;
+                switch (t.getTransactionType()) {
+                    case "in", "transfer_in", "return_in", "gain_in", "adjust_in" -> {
+                        inQty = inQty.add(t.getQuantity());
+                        inAmt = inAmt.add(t.getTotalCostAmount());
+                    }
+                    case "out", "transfer_out", "return_out", "loss_out", "adjust_out", "reverse" -> {
+                        outQty = outQty.add(t.getQuantity().abs());
+                        outAmt = outAmt.add(t.getSaleAmount().signum() > 0 ? t.getSaleAmount() : t.getTotalCostAmount());
+                    }
+                    default -> {}
+                }
+            }
+            BigDecimal finalQty = lastSnapshot.stream()
+                    .filter(x -> x.getItem().getCode().equals(itemCode))
+                    .map(Inventory::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal finalAmt = lastSnapshot.stream()
+                    .filter(x -> x.getItem().getCode().equals(itemCode))
+                    .map(Inventory::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("itemCode", itemCode);
+            m.put("itemName", sample.getItem().getName());
+            m.put("unit", sample.getItem().getUnit());
+            m.put("openingQuantity", openingQty);
+            m.put("inQuantity", inQty);
+            m.put("inAmount", inAmt);
+            m.put("outQuantity", outQty);
+            m.put("outAmount", outAmt);
+            m.put("endingQuantity", finalQty);
+            m.put("endingAmount", finalAmt);
+            result.add(m);
+        }
+        return ApiResponse.ok(result);
+    }
+
+    private String stockKey(Long itemId, Long warehouseId, Long locationId, String batchNo) {
+        return itemId + "@" + warehouseId + "@" + locationId + "@";
+    }
+    private boolean matchesInventory(String key, Inventory inv) {
+        return key.startsWith(inv.getItem().getId() + "@" + inv.getWarehouse().getId() + "@");
     }
 
     /** 增强的库存流水视图（含变动前库存） */

@@ -18,4 +18,7 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
 
     @Query("select t from InventoryTransaction t where t.transactionAt >= :since and t.transactionAt < :until order by t.transactionAt")
     List<InventoryTransaction> findByTransactionAtBetween(@Param("since") LocalDateTime since, @Param("until") LocalDateTime until);
+
+    @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location where t.transactionAt >= :since and t.transactionAt < :until order by t.transactionAt")
+    List<InventoryTransaction> findDetailedBetween(@Param("since") LocalDateTime since, @Param("until") LocalDateTime until);
 }

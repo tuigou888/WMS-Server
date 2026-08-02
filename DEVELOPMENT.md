@@ -12,7 +12,13 @@
 - **基础资料**：物品、分类、供应商/客户/双向往来单位、仓库维护。
 - **入库/出库单**：草稿、管理员审核（通过/驳回）、执行、取消；入库单仅允许选择供应商，出库单仅允许选择客户，`BOTH` 可用于两种单据。
 - **库存业务**：扫码入库/出库、跨仓跨库位调拨、盘点快照与差异调整。
-- **成本与报表**：移动加权平均成本、库存流水、库存预警、利润报表与仪表盘。
+- **成本与报表**：移动加权平均成本、库存流水、库存预警、利润报表与仪表盘、**库龄分析**、**收发存汇总**。
+- **报损/报溢**：独立的 `AdjustmentOrder`，支持 `LOSS`（报损）与 `GAIN`（报溢），走草稿→审核→执行流程。
+- **退货单**：`RETURN_IN`（客户退货入库）与 `RETURN_OUT`（退回供应商出库），独立单据号前缀 `THI`/`THO`。
+- **反审与红冲**：已 `COMPLETED` 单据可反审（`COMPLETED→APPROVED`，自动生成反向库存流水）或红冲（复制一张反向单据，原单据保留执行记录）。
+- **单据号持久化**：基于 `document_sequences` 表 + 行锁取号，重启不重置。
+- **操作日志**：AOP 切面自动记录所有控制器操作到 `operation_logs` 表，管理员可在 `/logs` 页面查询。
+- **盘点过滤**：创建盘点单时可指定 `itemCodes` / `locationCodes` 进行部分盘点。
 - **工具**：物品二维码（PNG 或 Base64 Data URL）、物品档案 Excel 导入/导出。
 
 ## 本地启动
@@ -137,7 +143,11 @@ DRAFT -> REJECTED
 | 仓库 | `GET /warehouses`、`POST /warehouses`、`PUT /warehouses/{id}`；`includeDisabled=true` 可查看停用仓库 |
 | 扫码出入库 | `POST /stock/in/scan`、`POST /stock/out/scan` |
 | 库存 | `GET /inventory`、`GET /inventory/transactions`、`GET /inventory/warehouses` |
-| 报表 | `GET /reports/dashboard`、`GET /reports/stock-alert`、`GET /reports/profit` |
+| 报表 | `GET /reports/dashboard`、`GET /reports/stock-alert`、`GET /reports/profit`、`GET /reports/inventory-age`、`GET /reports/in-out-summary` |
+| 报损/报溢 | `GET/POST /adjustments`、`POST /adjustments/{id}/review`、`POST /adjustments/{id}/complete` |
+| 退货单 | `POST /documents`（type=`RETURN_IN`/`RETURN_OUT`） |
+| 反审/红冲 | `POST /documents/{id}/uncomplete`、`POST /documents/{id}/reverse` |
+| 操作日志 | `GET /logs` |
 | 二维码 | `GET /qrcodes/items/{code}`、`GET /qrcodes/items/{code}/png` |
 | Excel | `GET /excel/items/export`、`POST /excel/items/import` |
 
