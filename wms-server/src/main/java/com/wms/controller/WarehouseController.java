@@ -5,9 +5,10 @@ import com.wms.common.BusinessException;
 import com.wms.dto.WarehouseRequest;
 import com.wms.model.entity.Warehouse;
 import com.wms.repository.WarehouseRepository;
-import com.wms.security.TokenService;
+import com.wms.security.Permissions;
+import com.wms.security.SecurityUtils;
 import jakarta.validation.Valid;
-import org.springframework.security.core.context.SecurityContextHolder; import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -31,8 +32,9 @@ public class WarehouseController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('warehouse:manage')")
     public ApiResponse<Map<String, Object>> create(@Valid @RequestBody WarehouseRequest request) {
-        ensureAdmin();
+        SecurityUtils.require(Permissions.WAREHOUSE_MANAGE);
         String code = request.code().trim();
         if (warehouses.existsByCode(code)) {
             throw new BusinessException("仓库编码已存在");
@@ -43,8 +45,9 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('warehouse:manage')")
     public ApiResponse<Map<String, Object>> update(@PathVariable Long id, @Valid @RequestBody WarehouseRequest request) {
-        ensureAdmin();
+        SecurityUtils.require(Permissions.WAREHOUSE_MANAGE);
         Warehouse warehouse = warehouses.findById(id).orElseThrow(() -> new BusinessException("仓库不存在"));
         String code = request.code().trim();
         if (!warehouse.getCode().equals(code) && warehouses.existsByCode(code)) {
@@ -61,10 +64,7 @@ public class WarehouseController {
     }
 
     private void ensureAdmin() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (!(principal instanceof TokenService.Principal user) || !"ADMIN".equals(user.role())) {
-            throw new AccessDeniedException("仅管理员可维护仓库");
-        }
+        SecurityUtils.require(Permissions.WAREHOUSE_MANAGE);
     }
 
     public static Map<String, Object> view(Warehouse warehouse) {

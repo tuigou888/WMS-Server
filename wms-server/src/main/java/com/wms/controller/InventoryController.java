@@ -46,7 +46,7 @@ public class InventoryController {
     public ApiResponse<List<Map<String, Object>>> transactionList(
             @RequestParam(defaultValue = "100") int limit) {
         return ApiResponse.ok(transactions.findRecentDetailed().stream()
-                .limit(Math.min(limit, 500))
+                .limit(Math.min(Math.max(limit, 0), 500))
                 .map(this::transactionView)
                 .toList());
     }

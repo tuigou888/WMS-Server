@@ -34,6 +34,13 @@ client.interceptors.response.use(
     if (data.code !== 200) return Promise.reject(new Error(data.message || '请求失败'))
     return data.data
   },
-  (error) => Promise.reject(new Error(error.response?.data?.message || (error.response?.status === 401 ? '登录已失效，请重新登录' : error.message) || '网络异常')),
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('wms_token')
+      localStorage.removeItem('wms_user')
+      if (!window.location.pathname.includes('login')) window.location.reload()
+    }
+    return Promise.reject(new Error(error.response?.data?.message || (error.response?.status === 401 ? '登录已失效，请重新登录' : error.message) || '网络异常'))
+  },
 )
 export default client

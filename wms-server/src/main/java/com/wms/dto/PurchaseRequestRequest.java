@@ -1,0 +1,2 @@
+package com.wms.dto; import jakarta.validation.Valid; import jakarta.validation.constraints.*; import java.math.BigDecimal; import java.time.LocalDate; import java.util.List;
+public record PurchaseRequestRequest(Long supplierId,@NotNull Long warehouseId,LocalDate requiredDate,String source,String remark,@NotEmpty List<@Valid Line> lines){ public record Line(@NotBlank String itemCode,@NotNull @DecimalMin("0.0001") BigDecimal quantity,@NotNull @DecimalMin("0") BigDecimal suggestedQuantity,BigDecimal currentStock,BigDecimal unitPrice,String remark){} }

@@ -3,6 +3,7 @@ import { App, Button, Card, Descriptions, Drawer, Form, Input, InputNumber, Moda
 import { PlusOutlined } from '@ant-design/icons'
 import { api } from '../api/wms'
 import { dateTime, number } from '../utils/format'
+import { hasPerm } from '../utils/permission'
 
 const statuses={DRAFT:['草稿','default'],APPROVED:['已审核','blue'],REJECTED:['已驳回','red'],COMPLETED:['已执行','green']}
 
@@ -46,7 +47,7 @@ export default function AdjustmentsPage({ user }){
       {title:'创建时间',dataIndex:'createdAt',render:dateTime},
       {title:'操作',render:(_,r)=><Space>
         <Button type="link" onClick={()=>setDetail(r)}>详情</Button>
-        {r.status==='DRAFT'&&user.role==='ADMIN'&&<>
+        {r.status==='DRAFT'&&hasPerm(user,'adjustment:review')&&<>
           <Button type="link" onClick={()=>review(r,'APPROVE')}>审核通过</Button>
           <Button type="link" danger onClick={()=>review(r,'REJECT')}>驳回</Button>
         </>}

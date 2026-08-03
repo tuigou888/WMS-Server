@@ -3,6 +3,7 @@ import { App, Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select,
 import { PlusOutlined } from '@ant-design/icons'
 import { api } from '../api/wms'
 import { dateTime, number } from '../utils/format'
+import { hasPerm } from '../utils/permission'
 
 const statusLabels = {
   DRAFT: ['草稿', 'default'],
@@ -86,7 +87,7 @@ export default function TransfersPage({ user }) {
         <Typography.Text type="secondary">跨仓库、跨库位调拨，审核通过后才会同步扣减与转入库存</Typography.Text>
       </div>
       <Space>
-        {user.role === 'ADMIN' && <Button onClick={() => { warehouseForm.resetFields(); setWarehouseOpen(true) }}>新增仓库</Button>}
+        {hasPerm(user,'warehouse:manage') && <Button onClick={() => { warehouseForm.resetFields(); setWarehouseOpen(true) }}>新增仓库</Button>}
         <Button type="primary" icon={<PlusOutlined />} onClick={openTransfer} disabled={warehouses.length < 2}>新建调拨</Button>
       </Space>
     </div>
@@ -107,7 +108,7 @@ export default function TransfersPage({ user }) {
           {
             title: '操作',
             render: (_, record) => <Space>
-              {record.status === 'DRAFT' && user.role === 'ADMIN' && <><Button type="link" onClick={() => act(() => api.reviewTransfer(record.id, { action: 'APPROVE' }))}>审核通过</Button><Button type="link" danger onClick={() => act(() => api.reviewTransfer(record.id, { action: 'REJECT' }))}>驳回</Button></>}
+              {record.status === 'DRAFT' && hasPerm(user,'transfer:review') && <><Button type="link" onClick={() => act(() => api.reviewTransfer(record.id, { action: 'APPROVE' }))}>审核通过</Button><Button type="link" danger onClick={() => act(() => api.reviewTransfer(record.id, { action: 'REJECT' }))}>驳回</Button></>}
               {record.status === 'APPROVED' && <Popconfirm title="确认执行调拨？" onConfirm={() => act(() => api.completeTransfer(record.id))}><Button type="primary">执行</Button></Popconfirm>}
             </Space>,
           },

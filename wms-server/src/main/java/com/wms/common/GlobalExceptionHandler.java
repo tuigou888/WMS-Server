@@ -34,6 +34,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
     }
 
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class,
+            java.time.format.DateTimeParseException.class,
+            java.lang.NumberFormatException.class, java.lang.ArithmeticException.class})
+    public ResponseEntity<ApiResponse<Void>> badInput(Exception e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "参数格式错误"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> unknown(Exception e) {
         log.error("未处理异常", e);

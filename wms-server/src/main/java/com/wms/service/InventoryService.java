@@ -8,16 +8,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.*; import java.time.*; import java.time.format.DateTimeFormatter; import java.util.*; import java.util.concurrent.atomic.AtomicLong;
+import java.math.*; import java.time.*; import java.util.*;
 
 @Service
 public class InventoryService {
  private static final Logger log = LoggerFactory.getLogger(InventoryService.class);
- private final ItemRepository items; private final WarehouseRepository warehouses; private final LocationRepository locations; private final InventoryRepository inventories; private final InventoryTransactionRepository transactions; private final AtomicLong sequence=new AtomicLong();
- public InventoryService(ItemRepository items,WarehouseRepository warehouses,LocationRepository locations,InventoryRepository inventories,InventoryTransactionRepository transactions){this.items=items;this.warehouses=warehouses;this.locations=locations;this.inventories=inventories;this.transactions=transactions;}
+  private final ItemRepository items; private final WarehouseRepository warehouses; private final LocationRepository locations; private final InventoryRepository inventories; private final InventoryTransactionRepository transactions; private final DocumentNumberService numbers;
+  public InventoryService(ItemRepository items,WarehouseRepository warehouses,LocationRepository locations,InventoryRepository inventories,InventoryTransactionRepository transactions,DocumentNumberService numbers){this.items=items;this.warehouses=warehouses;this.locations=locations;this.inventories=inventories;this.transactions=transactions;this.numbers=numbers;}
 
- @Transactional public Map<String,Object> stockIn(StockInRequest request){return stockIn(request,null,TransactionType.IN);}
- @Transactional public Map<String,Object> stockIn(StockInRequest request,String referenceNo,String type){
+ @Transactional public Map<String,Object> stockIn(StockInRequest request){return stockIn(request,null,TransactionType.IN);} @Transactional public Map<String,Object> stockIn(StockInRequest request,String referenceNo,String type){
   Item item=item(request.itemCode()); Warehouse warehouse=warehouse(request.warehouseId()); Location location=location(warehouse,request.locationCode(),true); String batchNo=request.batchNo()==null||request.batchNo().isBlank()?null:request.batchNo(); Inventory inventory=inventory(item,warehouse,location,batchNo,true);
   BigDecimal amount=InventoryCostCalculator.amount(request.quantity(),request.unitCost()); BigDecimal quantity=inventory.getQuantity().add(request.quantity()); BigDecimal total=inventory.getTotalAmount().add(amount); BigDecimal avg=InventoryCostCalculator.averageCost(inventory.getQuantity(),inventory.getTotalAmount(),request.quantity(),amount);
   inventory.setQuantity(quantity);inventory.setTotalAmount(total);inventory.setAvgCost(avg);inventory.setLastInCost(request.unitCost());inventories.save(inventory);
@@ -50,5 +49,5 @@ public class InventoryService {
  private Inventory inventory(Item item,Warehouse warehouse,Location location,String batchNo,boolean create){return inventories.findForUpdate(item.getId(),warehouse.getId(),location.getId(),batchNo).orElseGet(()->{if(!create)throw new BusinessException("该库位没有库存");return new Inventory(item,warehouse,location,batchNo);});}
  private void transaction(Item item,Warehouse warehouse,Location location,String type,String ref,String remark,BigDecimal quantity,BigDecimal unit,BigDecimal cost,BigDecimal salePrice,BigDecimal saleAmount,BigDecimal profit,BigDecimal balanceQty,BigDecimal balanceAmount,BigDecimal avg){InventoryTransaction t=new InventoryTransaction();t.setItem(item);t.setWarehouse(warehouse);t.setLocation(location);t.setTransactionType(type);t.setReferenceNo(ref);t.setRemark(remark);t.setQuantity(quantity);t.setUnitCost(unit);t.setTotalCostAmount(cost);t.setSalePrice(salePrice);t.setSaleAmount(saleAmount);t.setProfit(profit);t.setBalanceQuantity(balanceQty);t.setBalanceAmount(balanceAmount);t.setAvgCostAfter(avg);transactions.save(t);}
  private Map<String,Object> movementResult(String no,Item item,BigDecimal qty,BigDecimal amount,BigDecimal avg,BigDecimal stock,BigDecimal stockAmount,Map<String,Object> extra){Map<String,Object> r=new LinkedHashMap<>();r.put("orderNo",no);r.put("itemCode",item.getCode());r.put("itemName",item.getName());r.put("quantity",qty);r.put("totalAmount",amount);r.put("newAvgCost",avg);r.put("newStockQuantity",stock);r.put("newStockAmount",stockAmount);r.putAll(extra);return r;}
- private String nextOrderNo(String prefix){return prefix+"-"+LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)+"-"+String.format("%04d",sequence.incrementAndGet());}
+  private String nextOrderNo(String prefix){return numbers.next(prefix);}
 }
