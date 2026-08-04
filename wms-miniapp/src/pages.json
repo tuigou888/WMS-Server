@@ -1,0 +1,143 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "disableScroll": true
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "仓库管理",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/scan/scan",
+      "style": {
+        "navigationBarTitleText": "扫码"
+      }
+    },
+    {
+      "path": "pages/stock-in/stock-in",
+      "style": {
+        "navigationBarTitleText": "扫码入库"
+      }
+    },
+    {
+      "path": "pages/stock-out/stock-out",
+      "style": {
+        "navigationBarTitleText": "扫码出库"
+      }
+    },
+    {
+      "path": "pages/inventory/inventory",
+      "style": {
+        "navigationBarTitleText": "库存查询",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/item-list/item-list",
+      "style": {
+        "navigationBarTitleText": "物品查询",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/item-detail/item-detail",
+      "style": {
+        "navigationBarTitleText": "物品详情"
+      }
+    },
+    {
+      "path": "pages/check/check",
+      "style": {
+        "navigationBarTitleText": "盘点任务",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/check-count/check-count",
+      "style": {
+        "navigationBarTitleText": "盘点录入"
+      }
+    },
+    {
+      "path": "pages/document-list/document-list",
+      "style": {
+        "navigationBarTitleText": "单据列表",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/document-detail/document-detail",
+      "style": {
+        "navigationBarTitleText": "单据详情"
+      }
+    },
+    {
+      "path": "pages/transactions/transactions",
+      "style": {
+        "navigationBarTitleText": "库存流水",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/reports/reports",
+      "style": {
+        "navigationBarTitleText": "报表中心"
+      }
+    },
+    {
+      "path": "pages/mine/mine",
+      "style": {
+        "navigationBarTitleText": "我的"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "仓库管理",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F5F5F5"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#1677ff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/tabbar/home.png",
+        "selectedIconPath": "static/tabbar/home-active.png"
+      },
+      {
+        "pagePath": "pages/scan/scan",
+        "text": "扫码",
+        "iconPath": "static/tabbar/scan.png",
+        "selectedIconPath": "static/tabbar/scan-active.png"
+      },
+      {
+        "pagePath": "pages/inventory/inventory",
+        "text": "库存",
+        "iconPath": "static/tabbar/inventory.png",
+        "selectedIconPath": "static/tabbar/inventory-active.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "static/tabbar/mine.png",
+        "selectedIconPath": "static/tabbar/mine-active.png"
+      }
+    ]
+  },
+  "condition": {
+    "current": 0,
+    "list": []
+  }
+}
