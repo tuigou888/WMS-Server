@@ -42,7 +42,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> {
-                    authz.requestMatchers("/auth/login", "/health").permitAll();
+                    authz.requestMatchers("/auth/login", "/auth/wx-login", "/auth/wx-bind", "/health").permitAll();
                     if (isDev) {
                         authz.requestMatchers("/h2-console/**").permitAll();
                     }

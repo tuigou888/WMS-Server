@@ -7,7 +7,7 @@ import com.wms.common.ApiResponse; import com.wms.dto.*; import com.wms.service.
  @PostMapping("/documents") public ApiResponse<Map<String,Object>> createDocument(@Valid @RequestBody DocumentRequest r){return ApiResponse.ok("草稿单创建成功",service.createDocument(r));}
   @PostMapping("/documents/{id}/review") @PreAuthorize("hasAuthority('document:review')") public ApiResponse<Map<String,Object>> reviewDocument(@PathVariable Long id,@Valid @RequestBody ReviewRequest r){return ApiResponse.ok("审核完成",service.reviewDocument(id,r));}
   @PostMapping("/documents/{id}/complete") public ApiResponse<Map<String,Object>> completeDocument(@PathVariable Long id){return ApiResponse.ok("单据执行完成",service.completeDocument(id));}
-  @PostMapping("/documents/{id}/cancel") public ApiResponse<Map<String,Object>> cancelDocument(@PathVariable Long id){return ApiResponse.ok("单据已取消",service.cancelDocument(id));}
+  @PostMapping("/documents/{id}/cancel") @PreAuthorize("hasAuthority('document:review')") public ApiResponse<Map<String,Object>> cancelDocument(@PathVariable Long id){return ApiResponse.ok("单据已取消",service.cancelDocument(id));}
   @PostMapping("/documents/{id}/uncomplete") @PreAuthorize("hasAuthority('document:review')") public ApiResponse<Map<String,Object>> uncompleteDocument(@PathVariable Long id){return ApiResponse.ok("单据已反审",service.uncompleteDocument(id));}
   @PostMapping("/documents/{id}/reverse") @PreAuthorize("hasAuthority('document:review')") public ApiResponse<Map<String,Object>> reverseDocument(@PathVariable Long id){return ApiResponse.ok("红冲单据已生成",service.reverseDocument(id));}
   @GetMapping("/transfers") public ApiResponse<List<Map<String,Object>>> transfers(){return ApiResponse.ok(service.transferList());}

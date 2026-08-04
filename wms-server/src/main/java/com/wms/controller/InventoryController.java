@@ -7,6 +7,7 @@ import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.LocationRepository;
 import com.wms.repository.WarehouseRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -32,6 +33,7 @@ public class InventoryController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "1000") int pageSize) {
@@ -43,6 +45,7 @@ public class InventoryController {
     }
 
     @GetMapping("/transactions")
+    @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> transactionList(
             @RequestParam(defaultValue = "100") int limit) {
         return ApiResponse.ok(transactions.findRecentDetailed().stream()
@@ -52,6 +55,7 @@ public class InventoryController {
     }
 
     @GetMapping("/warehouses")
+    @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> warehouseList() {
         return ApiResponse.ok(warehouses.findByStatusTrueOrderByNameAsc().stream()
                 .map(w -> Map.<String, Object>of("id", w.getId(), "code", w.getCode(), "name", w.getName()))
@@ -59,6 +63,7 @@ public class InventoryController {
     }
 
     @GetMapping("/{itemId}")
+    @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> byItem(@PathVariable Long itemId) {
         return ApiResponse.ok(inventories.findByItemId(itemId).stream()
                 .map(this::inventoryView)

@@ -7,6 +7,7 @@ import com.wms.model.entity.Item;
 import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.ItemRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -33,6 +34,7 @@ public class ReportController {
     }
 
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<Map<String, Object>> dashboard() {
         List<Inventory> all = inventories.findAllDetailed();
         List<Map<String, Object>> alerts = smartAlerts(all);
@@ -73,16 +75,19 @@ public class ReportController {
     }
 
     @GetMapping("/stock-alert")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> stockAlert() {
         return ApiResponse.ok(smartAlerts(inventories.findAllDetailed()));
     }
 
     @GetMapping("/profit")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> profit() {
         return ApiResponse.ok(transactions.findByTransactionType("out").stream().map(this::tx).toList());
     }
 
     @GetMapping("/anomalies")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> anomalies() {
         List<Inventory> all = inventories.findAllDetailed();
         List<InventoryTransaction> recentTxns = transactions.findRecentDetailed();
@@ -313,6 +318,9 @@ public class ReportController {
         List<InventoryTransaction> txns = transactions.findByTransactionAtBetween(
                 start.atStartOfDay(), today.plusDays(1).atStartOfDay());
 
+        Set<String> inboundTypes = Set.of("in", "transfer_in", "return_in", "gain_in", "adjust_in");
+        Set<String> outboundTypes = Set.of("out", "transfer_out", "return_out", "loss_out", "adjust_out", "reverse");
+
         Map<LocalDate, Map<String, BigDecimal>> grouped = new LinkedHashMap<>();
         for (int i = 0; i < 14; i++) {
             grouped.put(start.plusDays(i), new HashMap<>(Map.of("in", BigDecimal.ZERO, "out", BigDecimal.ZERO)));
@@ -321,10 +329,10 @@ public class ReportController {
             LocalDate d = t.getTransactionAt().toLocalDate();
             if (grouped.containsKey(d)) {
                 String type = t.getTransactionType();
-                if ("in".equals(type)) {
+                if (inboundTypes.contains(type)) {
                     grouped.get(d).merge("in", t.getTotalCostAmount(), BigDecimal::add);
-                } else if ("out".equals(type)) {
-                    grouped.get(d).merge("out", t.getSaleAmount(), BigDecimal::add);
+                } else if (outboundTypes.contains(type)) {
+                    grouped.get(d).merge("out", t.getSaleAmount().signum() > 0 ? t.getSaleAmount() : t.getTotalCostAmount(), BigDecimal::add);
                 }
             }
         }
@@ -368,6 +376,7 @@ public class ReportController {
 
     /** 库龄分析（G7）：按物品/仓库统计库存分布在 0-30/30-60/60-90/>90 天的批次，识别呆滞料。 */
     @GetMapping("/inventory-age")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> inventoryAge() {
         List<Inventory> all = inventories.findAllDetailed();
         List<InventoryTransaction> txns = transactions.findRecentDetailed();
@@ -410,6 +419,7 @@ public class ReportController {
 
     /** 收发存汇总（G8）：按物品聚合期初/入库/出库/期末（数量+金额）；period 例如 2026-07。 */
     @GetMapping("/in-out-summary")
+    @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> inOutSummary(@RequestParam(required = false) String period) {
         LocalDate today = LocalDate.now();
         LocalDate monthStart = period == null || period.isBlank()

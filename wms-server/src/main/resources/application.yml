@@ -22,6 +22,12 @@ server:
   port: ${SERVER_PORT:8088}
   servlet:
     context-path: /api/v1
+
+wechat:
+  appid: ${WECHAT_APPID:}
+  secret: ${WECHAT_SECRET:}
+  mock: ${WECHAT_MOCK:false}
+
 logging:
   level:
     com.wms: INFO
