@@ -596,7 +596,11 @@ CREATE TABLE `operation_logs` (
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /auth/login | 用户名密码登录 |
-| POST | /auth/wx-login | 微信小程序登录 |
+| POST | /auth/wx-login | 微信登录：未绑定返回 `{needBind:true, openid}`，已绑定直接返回 token |
+| POST | /auth/wx-bind | 微信绑定账号 `{openid, username, password}`，绑定后签发 token |
+| GET | /auth/me | 当前用户信息 |
+| POST | /auth/logout | 退出登录 |
+| GET | /auth/permissions | 角色权限矩阵 |
 | POST | /auth/refresh | 刷新token |
 
 #### 物品管理
@@ -850,27 +854,33 @@ public class StockServiceImpl implements StockService {
 
 ### 7.1 页面结构
 
+实际实现位于 `wms-miniapp/`（uni-app + Vue 3 + Pinia，可编译微信小程序 / H5）：
+
 ```
-pages/
-├── index/                  # 首页（功能菜单）
-├── login/                  # 登录页
-├── scan/                   # 通用扫码页
-├── item/
-│   ├── detail/             # 物品详情
-│   └── list/               # 物品列表
-├── stock-in/
-│   ├── scan/               # 扫码入库
-│   └── confirm/            # 入库确认页
-├── stock-out/
-│   ├── scan/               # 扫码出库
-│   └── confirm/            # 出库确认页
-├── inventory/
-│   ├── query/              # 库存查询
-│   └── detail/             # 库存详情（库位分布）
-├── check/
-│   ├── task/               # 盘点任务列表
-│   └── scan/               # 扫码盘点
-└── mine/                   # 我的（操作记录、设置）
+wms-miniapp/src/
+├── main.js                  # 入口（挂载 Pinia，401 拦截跳登录）
+├── pages.json               # 15 个页面 + 4 个 tabBar（首页/扫码/库存/我的）
+├── api/
+│   ├── request.js           # 统一请求封装：token 注入、401 跳转、ApiResponse 解壳
+│   └── (全量业务接口)
+├── store/user.js            # 用户/token/权限/当前仓库
+├── utils/format.js          # 金额/数量/日期格式化
+└── pages/
+    ├── login/               # 登录（微信一键登录 / 账号密码，含首次绑定流程）
+    ├── index/               # 首页（快捷入口 + 今日汇总 + 预警提示）
+    ├── scan/                # 通用扫码页（扫描物品码 → 物品详情）
+    ├── stock-in/            # 扫码入库（仅 ADMIN，显示"仅管理员"提示条）
+    ├── stock-out/           # 扫码出库（仅 ADMIN，实时计算利润）
+    ├── inventory/           # 库存查询（按仓库/关键字过滤，库位分布）
+    ├── item-list/           # 物品列表（分页 + 库存摘要）
+    ├── item-detail/         # 物品详情（信息 + 库存分布 + 二维码）
+    ├── check/               # 盘点任务列表（草稿可进入录入）
+    ├── check-count/         # 盘点录入（扫码或手动填实盘数量）
+    ├── document-list/       # 单据列表（单据/调拨/盘点，类型+状态筛选）
+    ├── document-detail/     # 单据/调拨/盘点详情（前端自算汇总金额）
+    ├── transactions/        # 库存流水（类型筛选 + 搜索）
+    ├── reports/             # 报表中心（看板 + 预警 + 分类分布 + 利润趋势）
+    └── mine/                # 我的（仓库切换、功能菜单、操作记录、退出）
 ```
 
 ### 7.2 首页功能菜单
@@ -1055,6 +1065,24 @@ Page({
   }
 });
 ```
+
+### 7.6 微信登录与账号绑定
+
+- 后端 `wechat.mock=true`（默认）：code 直接作为 openid 使用，本地联调无需真实 appid/secret；生产置 `false` 并注入 `WECHAT_APPID` / `WECHAT_SECRET` 环境变量。
+- 绑定关系存于 `user_accounts.openid`（唯一约束），同一 openid 不可绑定多个账号。
+- 登录流程：
+
+```
+小程序 uni.login() 取 code
+  → POST /auth/wx-login {code}
+    ├─ 已绑定  → 返回 {token, username, role, permissions}（同账号密码登录壳）
+    └─ 未绑定  → 返回 {needBind: true, openid}
+                   → POST /auth/wx-bind {openid, username, password}
+                   → 返回 {token, ...}
+```
+
+- 前端统一请求封装（`src/api/request.js`）：token 注入 `Authorization: Bearer`，401 清 token 跳登录页，仅在 `code === 200` 时 resolve `data`。
+- 角色差异：ADMIN 可扫码直接出入库（`POST /stock/in/scan`、`/stock/out/scan` 强制 `hasRole('ADMIN')`）；WAREHOUSE 页面显示"仅管理员"提示，走单据流程与盘点录入；操作日志 `GET /logs` 仅 ADMIN 可见。
 
 ---
 

@@ -1,20 +1,21 @@
 # AGENTS.md
 
-仓库进销存系统 (WMS) — Spring Boot 3 + JPA 后端 + React/Vite/Ant Design 前端。
+WMS 仓库进销存系统 — Spring Boot 3.3 / Java 21 / JPA 后端 + Vue 3 / Vite 6 / Ant Design Vue 4 前端。
 完整业务/接口契约见 `README.md` 与 `DEVELOPMENT.md`；本文只列必踩坑与速查。
 
 ## 仓库结构
 
-- `wms-server/` — Spring Boot 3.3.12 / Java 21 / JPA。**不要删** `package.json`（`recharts` 是后端给 H2/报表后端视图内嵌前端 widget 留的依赖占位，但未启用）。
-- `wms-web/` — React 18 + Vite 6 + Ant Design 5 + axios + dayjs + recharts。Vite 入口 `src/main.jsx`，API 封装 `src/api/wms.js`，HTTP 拦截 `src/api/client.js`。
-- `test-artifacts/` — Python 烟测脚本（依赖 `requests`、`openpyxl`），输出 `api-results-current.json` / `ui-results-current.json`，截图 `ui-admin-dashboard-current.png`。
+- `wms-server/` — Spring Boot 3.3.12 / Java 21 / JPA。**不要删** `package.json`（`recharts` 占位依赖，未启用）。
+- `wms-web/` — Vue 3 + Vite 6 + Ant Design Vue 4 + axios + dayjs + echarts。入口 `src/main.js`，API 封装 `src/api/wms.js`，HTTP 拦截 `src/api/client.js`。
+- `wms-miniapp/` — uni-app + Vue 3 + Pinia 微信小程序端。入口 `src/main.js`，API 封装 `src/api/request.js`（统一 token/401/解壳），编译产物 `dist/build/mp-weixin`。
+- `test-artifacts/` — Python 烟测脚本（依赖 `requests`、`openpyxl`），输出 `api-results-current.json` / `ui-results-current.json`。
 
 ## 后端起步 / 验证
 
 ```bash
 cd wms-server
 mvn spring-boot:run        # http://localhost:8088/api/v1
-mvn test                   # 唯一单测：InventoryCostCalculatorTest
+mvn test                   # 4 个测试类：InventoryCostCalculatorTest、AdjustmentIntegrationTest、DocumentNumberServiceTest、AuthControllerWxTest
 mvn -DskipTests package    # 构建 jar
 ```
 
@@ -34,6 +35,21 @@ npm run build    # 产物到 dist/；antd 主包体积警告可忽略
 
 - `vite.config.js` 代理：`/api/v1 -> http://localhost:8088`。
 - `wms-web/nginx.conf`（Docker 镜像内已嵌入）反向代理 `/api/v1 -> wms-server:8088`，并通过 `try_files` 兜底 SPA 路由。
+
+## 小程序端起步 / 验证
+
+```bash
+cd wms-miniapp
+npm install
+npm run build:mp-weixin   # 产物 dist/build/mp-weixin，用微信开发者工具导入（勾选"不校验合法域名"）
+npm run dev:h5            # 或 H5 调试（需后端 CORS 放行，见 DEVELOPMENT.md）
+```
+
+- **微信登录须 mock 或配置真实 appid/secret**：`application.yml` 中 `wechat.mock` 默认 `true`（code 直接当 openid 用，方便本地联调：登录传任意 code 如 `test-openid-123`）；生产置 `false` 并从环境变量注入 `WECHAT_APPID/WECHAT_SECRET`。
+- 登录流程：`POST /auth/wx-login {code}` → 未绑定返回 `{needBind:true, openid}` → `POST /auth/wx-bind {openid,username,password}` → 返回 token（与账号密码登录同壳）；已绑定直接返回 token。绑定关系存在 `user_accounts.openid`。
+- **权限注意**：`POST /stock/in/scan`、`/stock/out/scan` 仅 ADMIN（`hasRole('ADMIN')`）；WAREHOUSE 扫码出入库页会显示"仅管理员"提示条，实际只能走单据流程与盘点录入。`GET /logs` 需 `log:view`（仅 ADMIN）。
+- 小程序页面字段与 API 对齐要点：盘点单 `stocktakeNo/createdAt/lines[].bookQuantity`；单据 `businessDate`、line 用 `unitPrice`、无汇总字段（前端自算）；调拨字段 `sourceWarehouseId/sourceLocationCode/targetLocationCode`；`GET /items` 返回 `{total,records}` 分页对象而非数组。
+- 调拨单无 `GET /transfers/{id}` 详情接口，小程序详情页从列表缓存（storage `wms_transfer_detail`）读取。
 
 ## 演示账号
 
@@ -89,7 +105,7 @@ npm run build    # 产物到 dist/；antd 主包体积警告可忽略
 
 - 后端文件**一行业务代码**风格（大量类/方法压成一行），新增逻辑请遵循 `XXService.java` 既有写法，不要把它"展开"重排。
 - 货币用 `BigDecimal`，必传 `RoundingMode.HALF_UP`；不使用 double。
-- 前端页面位于 `src/pages/*Page.jsx`，用 Ant Design 组件；菜单/路由集中在 `src/main.jsx` 的 `Workspace` 组件里。
+- 前端页面位于 `src/pages/*Page.vue`，用 Ant Design Vue 组件；菜单/路由集中在 `src/router/index.js`。
 - 后端禁用 Profile 名为 `dev`（默认无 profile 也是 dev），H2 console 与开发放行逻辑依赖这个判断。
 
 ## 验证脚本
@@ -102,11 +118,11 @@ python3 test-artifacts/run_api_regression.py http://localhost:8088/api/v1
 python3 test-artifacts/run_ui_regression.py http://localhost:5173/
 ```
 
-注意：`data/api-results.json` 与 `data/ui-results.json` 是历史快照，会被 `run_*_regression.py` 覆盖；写报告时优先用 `-current.json`。
+注意：`test-artifacts/api-results.json` 与 `test-artifacts/ui-results.json` 是历史快照，会被 `run_*_regression.py` 覆盖；写报告时优先用 `-current.json`。
 
 ## 部署
 
-- `docker-compose.yml` 仅 MySQL + `wms-server` + `wms-web` 三个服务（Web 3000:80，API 8088:8088，MySQL 3306）。**README.md 描述的 Redis/MinIO/Nginx 在仓库里没有对应服务或 pom 依赖**，要按需自行补；不要假设它们已生效。
+- `docker-compose.yml` 仅 MySQL + `wms-server` + `wms-web` 三个服务（Web 3000:80，API 8088:8088，MySQL 3306）。**README.md 描述的 Redis/MinIO/Nginx/微信小程序 在仓库里没有对应服务或 pom 依赖**，要按需自行补；不要假设它们已生效。
 - `wms-server/Dockerfile` 多阶段：maven 3.9 + temurin-21 构建 → `eclipse-temurin:21-jre` 运行。
 - `wms-web/Dockerfile` 多阶段：node 20-alpine 构建 → nginx:alpine，使用 `wms-web/nginx.conf`。
 - MySQL root 密码默认 `wms_password`（compose 内），通过 `MYSQL_ROOT_PASSWORD` 环境变量覆盖。
