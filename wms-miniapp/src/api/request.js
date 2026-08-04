@@ -1,5 +1,8 @@
 // API 基础配置与拦截器
-const BASE_URL = 'http://localhost:8088/api/v1'
+// 部署时可注入环境变量 VITE_API_BASE（H5 构建）或修改 VITE_MAIN_BASE（小程序本地存储覆盖，优先级最高），默认本地联调地址
+const ENV_BASE = import.meta.env.VITE_API_BASE || ''
+const STORED_BASE = uni.getStorageSync('wms_api_base')
+const BASE_URL = STORED_BASE || ENV_BASE || 'http://localhost:8088/api/v1'
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
 const WAREHOUSE_KEY = 'wms_warehouse'

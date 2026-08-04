@@ -45,9 +45,11 @@ npm run build:mp-weixin   # 产物 dist/build/mp-weixin，用微信开发者工�
 npm run dev:h5            # 或 H5 调试（需后端 CORS 放行，见 DEVELOPMENT.md）
 ```
 
-- **微信登录须 mock 或配置真实 appid/secret**：`application.yml` 中 `wechat.mock` 默认 `true`（code 直接当 openid 用，方便本地联调：登录传任意 code 如 `test-openid-123`）；生产置 `false` 并从环境变量注入 `WECHAT_APPID/WECHAT_SECRET`。
+- **微信登录须 mock 或配置真实 appid/secret**：`application.yml` 中 `wechat.mock` 默认 `true`（code 直接当 openid 用，方便本地联调：登录传任意 code 如 `test-openid-123`）；生产置 `false` 并从环境变量注入 `WECHAT_APPID/WECHAT_SECRET`。**生产环境（非 dev/test profile）误开 mock 会被拒绝（400）**。
 - 登录流程：`POST /auth/wx-login {code}` → 未绑定返回 `{needBind:true, openid}` → `POST /auth/wx-bind {openid,username,password}` → 返回 token（与账号密码登录同壳）；已绑定直接返回 token。绑定关系存在 `user_accounts.openid`。
-- **权限注意**：`POST /stock/in/scan`、`/stock/out/scan` 仅 ADMIN（`hasRole('ADMIN')`）；WAREHOUSE 扫码出入库页会显示"仅管理员"提示条，实际只能走单据流程与盘点录入。`GET /logs` 需 `log:view`（仅 ADMIN）。
+- **登录/绑定限速**：`LoginRateLimiter` 按 `IP|用户名` 统计，窗口 10 分钟失败 5 次后返回 HTTP `429`（`RateLimitedException`），成功登录或绑定即清零。测试/脚本注意别触发。
+- **演示数据仅 dev/test 播种**：`DemoDataConfig` 无 active profile 时视为 dev；生产（如 `prod` profile）不创建 `admin/admin123` 与演示物品，否则被审计判为默认口令风险。
+- **权限注意**：`POST /stock/in/scan`、`/stock/out/scan` 仅 ADMIN（`hasRole('ADMIN')`）；WAREHOUSE 扫码出入库页会显示"仅管理员"提示条，实际只能走单据流程与盘点录入。`GET /logs` 需 `log:view`（仅 ADMIN），日志只由 `OperationLogAspect` 写入，无手动写入端点（防审计伪造）；单据取消/反审/红冲仅 ADMIN。
 - 小程序页面字段与 API 对齐要点：盘点单 `stocktakeNo/createdAt/lines[].bookQuantity`；单据 `businessDate`、line 用 `unitPrice`、无汇总字段（前端自算）；调拨字段 `sourceWarehouseId/sourceLocationCode/targetLocationCode`；`GET /items` 返回 `{total,records}` 分页对象而非数组。
 - 调拨单无 `GET /transfers/{id}` 详情接口，小程序详情页从列表缓存（storage `wms_transfer_detail`）读取。
 

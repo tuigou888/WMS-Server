@@ -24,8 +24,10 @@ public class DocumentNumberService {
 
     @Transactional
     public String next(String prefix) {
+        // 原子插入序号行（并发首次取号也不会重复建行），随后行锁取号递增
+        sequences.insertIfAbsent(prefix);
         DocumentSequence seq = sequences.findForUpdate(prefix)
-                .orElseGet(() -> sequences.save(new DocumentSequence(prefix, 0L)));
+                .orElseThrow(() -> new IllegalStateException("序号行创建失败: " + prefix));
         seq.setCounter(seq.getCounter() + 1);
         sequences.save(seq);
         return prefix + "-" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + "-" + String.format("%04d", seq.getCounter());

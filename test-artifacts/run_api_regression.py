@@ -146,13 +146,14 @@ record("仓库管理", "查询启用仓库", lambda: f"仓库数={len(call(admin
 stock_in={"itemCode":item_code,"quantity":10,"unitCost":12.5,"warehouseId":None,"locationCode":"A-TEST-01","batchNo":"B1","remark":"scan in"}
 def scan_in():
     stock_in["warehouseId"]=state["main_wh"]
-    d=call(operator,"POST","/stock/in/scan",json_body=stock_in);eq(dec(d["newStockQuantity"]),10.0,"stock");return f"库存={d['newStockQuantity']}, 均价={d['newAvgCost']}"
+    d=call(admin,"POST","/stock/in/scan",json_body=stock_in);eq(dec(d["newStockQuantity"]),10.0,"stock");return f"库存={d['newStockQuantity']}, 均价={d['newAvgCost']}"
 record("扫码出入库", "扫码入库", scan_in)
-record("参数校验", "入库数量参数校验", lambda: expect_error(operator,"POST","/stock/in/scan",400,{**stock_in,"quantity":0}))
+record("权限控制", "操作员不可扫码出入库（仅 ADMIN）", lambda: expect_error(operator,"POST","/stock/in/scan",403,stock_in))
+record("参数校验", "入库数量参数校验", lambda: expect_error(admin,"POST","/stock/in/scan",400,{**stock_in,"quantity":0}))
 def scan_out():
-    d=call(operator,"POST","/stock/out/scan",json_body={"itemCode":item_code,"quantity":3,"salePrice":20,"warehouseId":state["main_wh"],"locationCode":"A-TEST-01","batchNo":"B1","remark":"scan out"});eq(dec(d["newStockQuantity"]),7.0,"stock");eq(dec(d["profit"]),22.5,"profit");return f"库存={d['newStockQuantity']}, 利润={d['profit']}"
+    d=call(admin,"POST","/stock/out/scan",json_body={"itemCode":item_code,"quantity":3,"salePrice":20,"warehouseId":state["main_wh"],"locationCode":"A-TEST-01","batchNo":"B1","remark":"scan out"});eq(dec(d["newStockQuantity"]),7.0,"stock");eq(dec(d["profit"]),22.5,"profit");return f"库存={d['newStockQuantity']}, 利润={d['profit']}"
 record("扫码出入库", "扫码出库及利润计算", scan_out)
-record("库存校验", "库存不足阻止出库", lambda: expect_error(operator,"POST","/stock/out/scan",400,{"itemCode":item_code,"quantity":999,"salePrice":20,"warehouseId":state["main_wh"],"locationCode":"A-TEST-01","batchNo":"B1"},contains="库存不足"))
+record("库存校验", "库存不足阻止出库", lambda: expect_error(admin,"POST","/stock/out/scan",400,{"itemCode":item_code,"quantity":999,"salePrice":20,"warehouseId":state["main_wh"],"locationCode":"A-TEST-01","batchNo":"B1"},contains="库存不足"))
 record("库位管理", "查询全部库位", lambda: f"库位数={len(call(admin,'GET','/locations'))}")
 record("库位管理", "按仓库查询库位", lambda: (lambda xs: (True if any(x["code"]=="A-TEST-01" for x in xs) else (_ for _ in ()).throw(AssertionError("location missing")), f"库位数={len(xs)}")[1])(call(admin,"GET","/locations",params={"warehouseId":state["main_wh"]})))
 record("库位管理", "不存在仓库的库位查询", lambda: expect_error(admin,"GET","/locations?warehouseId=999999",400))
@@ -183,7 +184,7 @@ def out_doc_flow():
     d=call(operator,"POST","/documents",json_body=p);call(admin,"POST",f"/documents/{d['id']}/review",json_body={"action":"APPROVE"});done=call(operator,"POST",f"/documents/{d['id']}/complete");eq(done["status"],"COMPLETED","status");return f"{done['documentNo']} {done['status']}"
 record("入出库单", "出库单完整流程", out_doc_flow)
 def cancel_doc():
-    d=call(operator,"POST","/documents",json_body=in_doc);done=call(operator,"POST",f"/documents/{d['id']}/cancel");eq(done["status"],"CANCELLED","status");return done["status"]
+    d=call(operator,"POST","/documents",json_body=in_doc);done=call(admin,"POST",f"/documents/{d['id']}/cancel");eq(done["status"],"CANCELLED","status");return done["status"]
 record("入出库单", "取消草稿单", cancel_doc)
 def reject_doc():
     d=call(operator,"POST","/documents",json_body=in_doc);done=call(admin,"POST",f"/documents/{d['id']}/review",json_body={"action":"REJECT","remark":"test reject"});eq(done["status"],"REJECTED","status");return done["status"]

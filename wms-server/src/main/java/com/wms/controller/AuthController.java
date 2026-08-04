@@ -1,10 +1,10 @@
 package com.wms.controller;
-import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.UserRequest; import com.wms.dto.WxLoginRequest; import com.wms.dto.WxBindRequest; import com.wms.model.entity.UserAccount; import com.wms.repository.UserAccountRepository; import com.wms.security.*; import com.wms.service.WechatService; import jakarta.validation.Valid; import org.slf4j.Logger; import org.slf4j.LoggerFactory; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.security.core.context.SecurityContextHolder; import org.springframework.security.crypto.password.PasswordEncoder; import org.springframework.web.bind.annotation.*; import java.util.*;
+import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.UserRequest; import com.wms.dto.WxLoginRequest; import com.wms.dto.WxBindRequest; import com.wms.model.entity.UserAccount; import com.wms.repository.UserAccountRepository; import com.wms.security.*; import com.wms.service.LoginRateLimiter; import com.wms.service.WechatService; import jakarta.servlet.http.HttpServletRequest; import jakarta.validation.Valid; import org.slf4j.Logger; import org.slf4j.LoggerFactory; import org.springframework.dao.DataIntegrityViolationException; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.security.core.context.SecurityContextHolder; import org.springframework.security.crypto.password.PasswordEncoder; import org.springframework.web.bind.annotation.*; import java.util.*;
 @RestController @RequestMapping("/auth") public class AuthController {
   private static final Logger log = LoggerFactory.getLogger(AuthController.class);
-  private final UserAccountRepository users; private final PasswordEncoder encoder; private final TokenService tokens; private final WechatService wechat;
-  public AuthController(UserAccountRepository users,PasswordEncoder encoder,TokenService tokens,WechatService wechat){this.users=users;this.encoder=encoder;this.tokens=tokens;this.wechat=wechat;}
- @PostMapping("/login") public ApiResponse<Map<String,Object>> login(@Valid @RequestBody LoginRequest request){UserAccount user=users.findByUsername(request.username().trim()).orElseThrow(()->new BusinessException("用户名或密码错误"));if(!Boolean.TRUE.equals(user.getEnabled())||!encoder.matches(request.password(),user.getPassword()))throw new BusinessException("用户名或密码错误");String token=tokens.issue(user);log.info("登录成功: username={}, role={}", user.getUsername(), user.getRole());return ApiResponse.ok("登录成功",view(user,token));}
+  private final UserAccountRepository users; private final PasswordEncoder encoder; private final TokenService tokens; private final WechatService wechat; private final LoginRateLimiter rateLimiter;
+  public AuthController(UserAccountRepository users,PasswordEncoder encoder,TokenService tokens,WechatService wechat,LoginRateLimiter rateLimiter){this.users=users;this.encoder=encoder;this.tokens=tokens;this.wechat=wechat;this.rateLimiter=rateLimiter;}
+ @PostMapping("/login") public ApiResponse<Map<String,Object>> login(@Valid @RequestBody LoginRequest request,HttpServletRequest http){String key=rateKey(http,request.username());if(rateLimiter.isBlocked(key))throw new RateLimitedException("登录失败次数过多，请 "+LoginRateLimiter.WINDOW.toMinutes()+" 分钟后再试");UserAccount user=users.findByUsername(request.username().trim()).orElse(null);if(user==null||!Boolean.TRUE.equals(user.getEnabled())||!encoder.matches(request.password(),user.getPassword())){rateLimiter.recordFailure(key);throw new BusinessException("用户名或密码错误");}rateLimiter.reset(key);String token=tokens.issue(user);log.info("登录成功: username={}, role={}", user.getUsername(), user.getRole());return ApiResponse.ok("登录成功",view(user,token));}
 
   @PostMapping("/wx-login") public ApiResponse<Map<String,Object>> wxLogin(@Valid @RequestBody WxLoginRequest request){
     String openid = wechat.getOpenid(request.code());
@@ -18,12 +18,17 @@ import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.Use
     return ApiResponse.ok(Map.of("needBind", true, "openid", openid));
   }
 
-  @PostMapping("/wx-bind") public ApiResponse<Map<String,Object>> wxBind(@Valid @RequestBody WxBindRequest request){
-    if (users.findByOpenid(request.openid()).isPresent()) throw new BusinessException("该微信已绑定其他账号");
-    UserAccount user = users.findByUsername(request.username().trim()).orElseThrow(()->new BusinessException("用户名或密码错误"));
-    if (!Boolean.TRUE.equals(user.getEnabled()) || !encoder.matches(request.password(), user.getPassword())) throw new BusinessException("用户名或密码错误");
+  @PostMapping("/wx-bind") public ApiResponse<Map<String,Object>> wxBind(@Valid @RequestBody WxBindRequest request,HttpServletRequest http){String key=rateKey(http,request.username());if(rateLimiter.isBlocked(key))throw new RateLimitedException("操作次数过多，请 "+LoginRateLimiter.WINDOW.toMinutes()+" 分钟后再试");if(users.findByOpenid(request.openid()).isPresent())throw new BusinessException("该微信已绑定其他账号");
+    UserAccount user = users.findByUsername(request.username().trim()).orElse(null);
+    if (user == null || !Boolean.TRUE.equals(user.getEnabled()) || !encoder.matches(request.password(), user.getPassword())) { rateLimiter.recordFailure(key); throw new BusinessException("用户名或密码错误"); }
+    rateLimiter.reset(key);
     user.setOpenid(request.openid());
-    users.save(user);
+    try {
+      users.saveAndFlush(user);
+    } catch (DataIntegrityViolationException e) {
+      // 并发绑定同一 openid 时唯一约束兜底，返回友好提示而非 500
+      throw new BusinessException("该微信已绑定其他账号");
+    }
     String token = tokens.issue(user);
     log.info("微信绑定登录: username={}, role={}", user.getUsername(), user.getRole());
     return ApiResponse.ok("绑定成功", view(user, token));
@@ -35,6 +40,9 @@ import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.Use
   @PutMapping("/users/{id}") @PreAuthorize("hasAuthority('user:manage')") public ApiResponse<Map<String,Object>> updateUser(@PathVariable Long id,@Valid @RequestBody UserRequest request){SecurityUtils.require(Permissions.USER_MANAGE);UserAccount u=users.findById(id).orElseThrow(()->new BusinessException("用户不存在"));u.setDisplayName(request.displayName());u.setRole(request.role());u.setEnabled(request.enabled()==null||request.enabled());if(request.password()!=null&&!request.password().isBlank()){if(request.password().length()<6)throw new BusinessException("密码至少 6 位");u.setPassword(encoder.encode(request.password()));}return ApiResponse.ok("用户更新成功",userView(users.save(u)));}
  @PostMapping("/logout") public ApiResponse<Void> logout(@RequestHeader(value="Authorization",required=false) String auth){if(auth!=null&&auth.startsWith("Bearer ")){tokens.revoke(auth.substring(7));log.info("用户退出登录");}return ApiResponse.ok("已退出登录",null);}
   private void ensureAdmin(){SecurityUtils.require(Permissions.USER_MANAGE);}
+  /** 限速键：客户端 IP + 用户名，避免恶意锁定他人账号（同 IP 不同用户互不影响）。 */
+  private String rateKey(HttpServletRequest http,String username){String ip=http==null?"unknown":clientIp(http);return ip+"|"+username;}
+  private String clientIp(HttpServletRequest http){String xff=http.getHeader("X-Forwarded-For");if(xff!=null&&!xff.isBlank())return xff.split(",")[0].trim();return http.getRemoteAddr();}
   private Map<String,Object> userView(UserAccount u){return Map.of("id",u.getId(),"username",u.getUsername(),"displayName",u.getDisplayName()==null?u.getUsername():u.getDisplayName(),"role",u.getRole(),"enabled",u.getEnabled());}
   private Map<String,Object> view(UserAccount u,String token){Map<String,Object> m=new LinkedHashMap<>();m.put("token",token);m.put("username",u.getUsername());m.put("displayName",u.getDisplayName());m.put("role",u.getRole());m.put("expiresIn",43200);m.put("permissions",RolePermissions.forRole(u.getRole()));return m;}
 }

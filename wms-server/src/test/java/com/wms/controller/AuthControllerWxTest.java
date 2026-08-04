@@ -5,9 +5,11 @@ import com.wms.dto.WxLoginRequest;
 import com.wms.harness.Harness;
 import com.wms.repository.UserAccountRepository;
 import com.wms.security.TokenService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.Map;
@@ -22,6 +24,10 @@ class AuthControllerWxTest {
     @Autowired private UserAccountRepository users;
     @Autowired private TokenService tokens;
 
+    private static HttpServletRequest req() {
+        return new MockHttpServletRequest("POST", "/api/v1/auth/wx-bind");
+    }
+
     @Test
     void wxLoginMockModeCreatesOpenidBindingFlow() {
         // 测试 mock 模式下：code 直接作为 openid
@@ -32,7 +38,7 @@ class AuthControllerWxTest {
         assertEquals("test-openid-123", loginResp.data().get("openid"));
 
         // 2. 绑定账号密码后可登录
-        var bindResp = authController.wxBind(new WxBindRequest("test-openid-123", "admin", "admin123"));
+        var bindResp = authController.wxBind(new WxBindRequest("test-openid-123", "admin", "admin123"), req());
         assertEquals(200, bindResp.code());
         assertNotNull(bindResp.data().get("token"));
 
@@ -44,11 +50,11 @@ class AuthControllerWxTest {
 
         // 4. 重复绑定同一 openid 报错
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("test-openid-123", "operator", "operator123")));
+                () -> authController.wxBind(new WxBindRequest("test-openid-123", "operator", "operator123"), req()));
 
         // 5. 绑定错误密码报错
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("another-openid", "admin", "wrongpass")));
+                () -> authController.wxBind(new WxBindRequest("another-openid", "admin", "wrongpass"), req()));
 
         // 6. 验证 openid 已持久化到数据库
         var user = users.findByOpenid("test-openid-123").orElseThrow();
@@ -85,6 +91,6 @@ class AuthControllerWxTest {
         });
 
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("new-openid-disabled", "test_disabled", "anypass")));
+                () -> authController.wxBind(new WxBindRequest("new-openid-disabled", "test_disabled", "anypass"), req()));
     }
 }

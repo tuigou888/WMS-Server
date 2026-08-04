@@ -91,7 +91,7 @@ const columns = [
         title: '执行后将产生库存流水，确认继续？',
         onConfirm: () => action(() => api.completeDocument(r.id)),
       }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
-      r.status === 'DRAFT' ? h(Button, { type: 'link', danger: true, onClick: () => action(() => api.cancelDocument(r.id)) }, '取消') : null,
+      r.status === 'DRAFT' && hasPerm(auth.user, 'document:review') ? h(Button, { type: 'link', danger: true, onClick: () => action(() => api.cancelDocument(r.id)) }, '取消') : null,
       r.status === 'COMPLETED' && hasPerm(auth.user, 'document:review') ? h('span', [
         h(Popconfirm, { title: '反审将冲销库存流水并回到已审核，确认？', onConfirm: () => action(() => api.uncompleteDocument(r.id)) }, { default: () => h(Button, { type: 'link' }, '反审') }),
         h(Popconfirm, { title: '红冲将生成反向单据并保留原单据执行记录，确认？', onConfirm: () => action(() => api.reverseDocument(r.id)) }, { default: () => h(Button, { type: 'link', danger: true }, '红冲') }),

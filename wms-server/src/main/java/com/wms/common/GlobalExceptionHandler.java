@@ -17,9 +17,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Void>> forbidden(AccessDeniedException e) { return ResponseEntity.status(403).body(ApiResponse.error(403, e.getMessage())); }
 
+    @ExceptionHandler(RateLimitedException.class)
+    public ResponseEntity<ApiResponse<Void>> rateLimited(RateLimitedException e) {
+        return ResponseEntity.status(429).body(ApiResponse.error(429, e.getMessage()));
+    }
+
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> business(BusinessException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
+    }
+
+    /** 唯一约束/外键等数据库完整性冲突：如并发绑定同一 openid、重复编码创建。 */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> dataIntegrity(org.springframework.dao.DataIntegrityViolationException e) {
+        log.warn("数据完整性冲突", e);
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "数据冲突，请刷新后重试"));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> uploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, "上传文件过大"));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

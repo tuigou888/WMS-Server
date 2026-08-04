@@ -15,6 +15,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.Set;
@@ -42,13 +43,15 @@ public class ReportController {
         BigDecimal amount = all.stream().map(Inventory::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         LocalDate today = LocalDate.now();
         List<InventoryTransaction> recent = transactions.findRecentDetailed();
+        Set<String> inboundTypes = Set.of("in", "transfer_in", "return_in", "gain_in", "adjust_in");
+        Set<String> outboundTypes = Set.of("out", "transfer_out", "return_out", "loss_out", "adjust_out", "reverse");
         BigDecimal inbound = recent.stream()
-                .filter(t -> t.getTransactionType().equals("in") && t.getTransactionAt().toLocalDate().equals(today))
+                .filter(t -> inboundTypes.contains(t.getTransactionType()) && t.getTransactionAt().toLocalDate().equals(today))
                 .map(InventoryTransaction::getTotalCostAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal outbound = recent.stream()
-                .filter(t -> t.getTransactionType().equals("out") && t.getTransactionAt().toLocalDate().equals(today))
-                .map(InventoryTransaction::getSaleAmount)
+                .filter(t -> outboundTypes.contains(t.getTransactionType()) && t.getTransactionAt().toLocalDate().equals(today))
+                .map(t -> t.getSaleAmount().signum() > 0 ? t.getSaleAmount() : t.getTotalCostAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<Map<String, Object>> categoryDist = categoryDistribution(all);
@@ -96,8 +99,8 @@ public class ReportController {
         // 检测1：连续3天库存下降
         result.addAll(detectContinuousDecline(all, recentTxns));
 
-        // 检测2：出库单缺少批次号
-        result.addAll(detectMissingBatch(recentTxns));
+        // 检测2：出库流水缺少库位（事务实体无批次号字段，库位缺失同样意味着库存无法追溯）
+        result.addAll(detectMissingLocation(recentTxns));
 
         // 检测3：出库数量异常（单日出库 > 安全库存50%）
         result.addAll(detectAbnormalOutbound(recentTxns));
@@ -198,8 +201,8 @@ public class ReportController {
         return result;
     }
 
-    /** 检测出库单缺少批次号 */
-    private List<Map<String, Object>> detectMissingBatch(List<InventoryTransaction> recentTxns) {
+    /** 检测出库流水缺少库位信息（无批次号字段，库位缺失使流水无法追溯） */
+    private List<Map<String, Object>> detectMissingLocation(List<InventoryTransaction> recentTxns) {
         List<Map<String, Object>> result = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (InventoryTransaction t : recentTxns) {
@@ -207,12 +210,12 @@ public class ReportController {
                 String key = t.getItem().getCode() + "@" + t.getReferenceNo();
                 if (seen.add(key)) {
                     result.add(Map.of(
-                            "type", "MISSING_BATCH",
+                            "type", "MISSING_LOCATION",
                             "severity", "LOW",
                             "itemCode", t.getItem().getCode(),
                             "itemName", t.getItem().getName(),
                             "referenceNo", t.getReferenceNo(),
-                            "description", "出库单缺少批次号信息"
+                            "description", "出库流水缺少库位信息"
                     ));
                 }
             }
@@ -296,6 +299,8 @@ public class ReportController {
             monthly.put(key, new BigDecimal[]{BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO});
         }
         for (InventoryTransaction t : txns) {
+            // 利润只应来自销售类出库流水：采购入库(amount>0)/调拨/报损报溢均无利润，混入会污染趋势
+            if (!"out".equals(t.getTransactionType())) continue;
             String key = t.getTransactionAt().format(fmt);
             BigDecimal[] values = monthly.get(key);
             if (values != null) {
@@ -382,23 +387,18 @@ public class ReportController {
         List<InventoryTransaction> txns = transactions.findRecentDetailed();
         LocalDate today = LocalDate.now();
 
-        // 仅看入库类流水，按物品+仓库+批次聚合最早入库日
-        Map<String, List<InventoryTransaction>> byStock = txns.stream()
+        // 入库流水按 物品+仓库+库位 分组并按时间升序（FIFO 分层）
+        Map<String, List<InventoryTransaction>> inboundByStock = txns.stream()
                 .filter(t -> Set.of("in", "transfer_in", "return_in", "gain_in", "adjust_in").contains(t.getTransactionType()))
+                .sorted(Comparator.comparing(InventoryTransaction::getTransactionAt))
                 .collect(Collectors.groupingBy(t -> stockKey(t.getItem().getId(), t.getWarehouse().getId(),
-                        t.getLocation() == null ? null : t.getLocation().getId(), null)));
+                        t.getLocation() == null ? null : t.getLocation().getId())));
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Inventory inv : all) {
             if (inv.getQuantity() == null || inv.getQuantity().signum() <= 0) continue;
-            LocalDate earliestIn = byStock.entrySet().stream()
-                    .filter(e -> matchesInventory(e.getKey(), inv))
-                    .flatMap(e -> e.getValue().stream())
-                    .map(t -> t.getTransactionAt().toLocalDate())
-                    .min(LocalDate::compareTo)
-                    .orElse(inv.getUpdatedAt() == null ? today : inv.getUpdatedAt().toLocalDate());
-            long days = java.time.temporal.ChronoUnit.DAYS.between(earliestIn, today);
-            String bucket = days < 30 ? "0-30" : days < 60 ? "30-60" : days < 90 ? "60-90" : ">90";
+            long ageDays = fifoAgeDays(inv, inboundByStock, today);
+            String bucket = ageDays < 30 ? "0-30" : ageDays < 60 ? "30-60" : ageDays < 90 ? "60-90" : ">90";
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("itemCode", inv.getItem().getCode());
             m.put("itemName", inv.getItem().getName());
@@ -408,13 +408,51 @@ public class ReportController {
             m.put("batchNo", inv.getBatchNo());
             m.put("quantity", inv.getQuantity());
             m.put("amount", inv.getTotalAmount());
-            m.put("earliestInDate", earliestIn);
-            m.put("ageDays", days);
+            m.put("earliestInDate", earliestLayerDate(inv, inboundByStock, today));
+            m.put("ageDays", ageDays);
             m.put("bucket", bucket);
             result.add(m);
         }
         result.sort((a, b) -> Long.compare((long) b.get("ageDays"), (long) a.get("ageDays")));
         return ApiResponse.ok(result);
+    }
+
+    /**
+     * 按 FIFO 估算当前库存的加权平均库龄：
+     * 从最早入库层开始逐层消耗，剩下的库存一定来自较新的层；加权天数 = Σ(层内剩余量 × 该层天数) / 总库存。
+     * 无法由入库层完全解释的多余量（如历史数据缺失）按 updatedAt 兜底计龄。
+     */
+    private long fifoAgeDays(Inventory inv, Map<String, List<InventoryTransaction>> inboundByStock, LocalDate today) {
+        BigDecimal remaining = inv.getQuantity();
+        BigDecimal weightedDays = BigDecimal.ZERO;
+        LocalDate fallback = inv.getUpdatedAt() == null ? today : inv.getUpdatedAt().toLocalDate();
+        for (InventoryTransaction t : inboundByStock.getOrDefault(stockKey(inv.getItem().getId(), inv.getWarehouse().getId(),
+                inv.getLocation() == null ? null : inv.getLocation().getId()), List.of())) {
+            if (remaining.signum() <= 0) break;
+            BigDecimal q = t.getQuantity().min(remaining);
+            long days = ChronoUnit.DAYS.between(t.getTransactionAt().toLocalDate(), today);
+            weightedDays = weightedDays.add(BigDecimal.valueOf(days).multiply(q));
+            remaining = remaining.subtract(q);
+        }
+        if (remaining.signum() > 0) {
+            long days = ChronoUnit.DAYS.between(fallback, today);
+            weightedDays = weightedDays.add(BigDecimal.valueOf(days).multiply(remaining));
+        }
+        return weightedDays.divide(inv.getQuantity(), 0, RoundingMode.HALF_UP).longValue();
+    }
+
+    /** 当前库存中最早入库层的日期（FIFO 剩余首层），无入库记录时用 updatedAt 兜底 */
+    private LocalDate earliestLayerDate(Inventory inv, Map<String, List<InventoryTransaction>> inboundByStock, LocalDate today) {
+        LocalDate fallback = inv.getUpdatedAt() == null ? today : inv.getUpdatedAt().toLocalDate();
+        BigDecimal remaining = inv.getQuantity();
+        for (InventoryTransaction t : inboundByStock.getOrDefault(stockKey(inv.getItem().getId(), inv.getWarehouse().getId(),
+                inv.getLocation() == null ? null : inv.getLocation().getId()), List.of())) {
+            if (remaining.signum() <= 0) break;
+            remaining = remaining.subtract(t.getQuantity());
+            if (remaining.signum() > 0) continue; // 该层已被完全消耗
+            return t.getTransactionAt().toLocalDate(); // 库存落在这一层
+        }
+        return fallback;
     }
 
     /** 收发存汇总（G8）：按物品聚合期初/入库/出库/期末（数量+金额）；period 例如 2026-07。 */
@@ -483,11 +521,8 @@ public class ReportController {
         return ApiResponse.ok(result);
     }
 
-    private String stockKey(Long itemId, Long warehouseId, Long locationId, String batchNo) {
-        return itemId + "@" + warehouseId + "@" + locationId + "@";
-    }
-    private boolean matchesInventory(String key, Inventory inv) {
-        return key.startsWith(inv.getItem().getId() + "@" + inv.getWarehouse().getId() + "@");
+    private String stockKey(Long itemId, Long warehouseId, Long locationId) {
+        return itemId + "@" + warehouseId + "@" + (locationId == null ? "-" : locationId);
     }
 
     /** 增强的库存流水视图（含变动前库存） */

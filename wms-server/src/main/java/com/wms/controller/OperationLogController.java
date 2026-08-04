@@ -5,8 +5,6 @@ import com.wms.model.entity.OperationLog;
 import com.wms.repository.OperationLogRepository;
 import com.wms.security.Permissions;
 import com.wms.security.SecurityUtils;
-import com.wms.security.TokenService;
-import com.wms.service.OperationLogService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,31 +17,13 @@ import java.util.Map;
 @RequestMapping("/logs")
 public class OperationLogController {
 
-    private final OperationLogService logs;
     private final OperationLogRepository repo;
-    private final TokenService tokens;
 
-    public OperationLogController(OperationLogService logs, OperationLogRepository repo, TokenService tokens) {
-        this.logs = logs;
+    public OperationLogController(OperationLogRepository repo) {
         this.repo = repo;
-        this.tokens = tokens;
     }
 
-    public record OperationLogEntry(String action, String target, String method,
-                                    String path, String body, String result, String message) {}
-
-    /** 手动补一条日志（供 AOP 调用）。 */
-    @PostMapping
-    @PreAuthorize("hasAuthority('log:view')")
-    public ApiResponse<Void> record(@RequestHeader(value = "Authorization", required = false) String auth,
-                                    @RequestBody OperationLogEntry entry) {
-        ensureAdmin();
-        TokenService.Principal p = resolvePrincipal(auth);        logs.record(p == null ? null : p.username(), entry.action(), entry.target(),
-                entry.method(), entry.path(), entry.body(), entry.result(), entry.message());
-        return ApiResponse.ok("操作日志已记录", null);
-    }
-
-    /** 查询日志列表（管理员）。 */
+    /** 查询日志列表（管理员）。日志写入仅由 OperationLogAspect 自动完成，不开放手动写入，避免审计数据被伪造。 */
     @GetMapping
     @PreAuthorize("hasAuthority('log:view')")
     public ApiResponse<List<Map<String, Object>>> list(
@@ -75,12 +55,6 @@ public class OperationLogController {
         m.put("message", l.getMessage());
         m.put("operationAt", l.getOperationAt());
         return m;
-    }
-
-    private TokenService.Principal resolvePrincipal(String auth) {
-        if (auth != null && auth.startsWith("Bearer "))
-            return tokens.resolve(auth.substring(7)).orElse(null);
-        return null;
     }
 
     private void ensureAdmin() {
