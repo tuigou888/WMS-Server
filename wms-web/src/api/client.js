@@ -1,8 +1,16 @@
 import axios from 'axios'
+import { getStorage, removeStorage } from '../utils/storage'
 
-const client = axios.create({ baseURL: '/api/v1', timeout: 15000 })
+const client = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '/api/v1', timeout: 15000 })
+
+let onUnauthorized = () => {}
+
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler
+}
+
 client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('wms_token')
+  const token = getStorage('wms_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -36,9 +44,9 @@ client.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('wms_token')
-      localStorage.removeItem('wms_user')
-      if (!window.location.pathname.includes('login')) window.location.reload()
+      removeStorage('wms_token')
+      removeStorage('wms_user')
+      onUnauthorized()
     }
     return Promise.reject(new Error(error.response?.data?.message || (error.response?.status === 401 ? '登录已失效，请重新登录' : error.message) || '网络异常'))
   },
