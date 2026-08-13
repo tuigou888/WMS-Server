@@ -41,4 +41,24 @@ public final class Permissions {
     public static final String EXCEL_WRITE = "excel:write";
     public static final String OCR_USE = "ocr:use";
     public static final String LOCATION_READ = "location:read";
+
+    // —— 商城子系统（market）——
+    /** 小程序：浏览商品/购物车/下单 */
+    public static final String MARKET_BUY = "market:buy";
+    /** 小程序：读商品/订单（未登录浏览走 permitAll，登录用户读自有订单/购物车） */
+    public static final String MARKET_READ = "market:read";
+    /** 后台：商品管理读 */
+    public static final String PRODUCT_READ = "product:read";
+    /** 后台：商品管理写（创建/上下架/改价） */
+    public static final String PRODUCT_WRITE = "product:write";
+    /** 后台：订单管理读 */
+    public static final String ORDER_READ = "order:read";
+    /** 后台：订单审核（PENDING → AUDITED / 拒绝/强制取消） */
+    public static final String ORDER_REVIEW = "order:review";
+    /** 后台：订单履约（发货/确认完成） */
+    public static final String ORDER_EXECUTE = "order:execute";
+    /** 后台：客户档案读 */
+    public static final String CUSTOMER_READ = "customer:read";
+    /** 后台：客户档案写（新增/编辑/删除） */
+    public static final String CUSTOMER_WRITE = "customer:write";
 }

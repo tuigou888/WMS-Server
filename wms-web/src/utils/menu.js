@@ -1,5 +1,5 @@
 import { h } from 'vue'
-import { AppstoreOutlined, DashboardOutlined, DatabaseOutlined, FileTextOutlined, InboxOutlined, LogoutOutlined, PieChartOutlined, QrcodeOutlined, SettingOutlined, SwapOutlined, TeamOutlined, UnorderedListOutlined, WarningOutlined } from '@ant-design/icons-vue'
+import { AppstoreOutlined, DashboardOutlined, DatabaseOutlined, FileTextOutlined, InboxOutlined, LogoutOutlined, PieChartOutlined, QrcodeOutlined, SettingOutlined, SwapOutlined, TeamOutlined, UnorderedListOutlined, WarningOutlined, ShopOutlined } from '@ant-design/icons-vue'
 import { hasPerm } from './permission'
 
 export function buildMenu(user) {
@@ -29,6 +29,11 @@ export function buildMenu(user) {
     ...((hasPerm(user, 'user:manage') || hasPerm(user, 'log:view')) ? [{ type: 'group', label: '系统设置', children: [
       ...(hasPerm(user, 'user:manage') ? [{ key: '/users', icon: h(SettingOutlined), label: '用户与权限' }] : []),
       ...(hasPerm(user, 'log:view') ? [{ key: '/logs', icon: h(UnorderedListOutlined), label: '操作日志' }] : []),
+    ] }] : []),
+    ...((hasPerm(user, 'product:read') || hasPerm(user, 'order:read') || hasPerm(user, 'customer:read')) ? [{ type: 'group', label: '商城管理', children: [
+      ...(hasPerm(user, 'product:read') ? [{ key: '/market/products', icon: h(ShopOutlined), label: '商城商品' }] : []),
+      ...(hasPerm(user, 'order:read') ? [{ key: '/market/orders', icon: h(FileTextOutlined), label: '商城订单' }] : []),
+      ...(hasPerm(user, 'customer:read') ? [{ key: '/market/customers', icon: h(TeamOutlined), label: '商城客户' }] : []),
     ] }] : []),
   ]
 }

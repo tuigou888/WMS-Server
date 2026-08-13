@@ -1,0 +1,52 @@
+{
+  "name": "WMS机械商城",
+  "appid": "",
+  "description": "WMS 机械零配件商城小程序：在线选购机械配件、下单、查询订单与物流",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true,
+    "nvueStyleCompiler": "uni-app",
+    "compilerVersion": 3,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    },
+    "modules": {},
+    "distribute": {
+      "android": {
+        "permissions": [
+          "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
+          "<uses-permission android:name=\"android.permission.ACCESS_WIFI_STATE\"/>"
+        ]
+      },
+      "ios": {},
+      "sdkConfigs": {}
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "es6": true,
+      "minified": true,
+      "postcss": true,
+      "urlCheck": false
+    },
+    "usingComponents": true,
+    "permission": {
+      "scope.userLocation": {
+        "desc": "你的位置将用于收货地址自动填充"
+      }
+    }
+  },
+  "h5": {
+    "router": {
+      "mode": "hash",
+      "base": "/"
+    }
+  },
+  "vueVersion": "3"
+}
