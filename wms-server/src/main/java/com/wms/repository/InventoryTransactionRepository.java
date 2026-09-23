@@ -1,6 +1,7 @@
 package com.wms.repository;
 
 import com.wms.model.entity.InventoryTransaction;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,8 +11,13 @@ import java.util.List;
 
 public interface InventoryTransactionRepository extends JpaRepository<InventoryTransaction, Long> {
 
+    /** 无 limit 的全量查询，仅供需要完整历史的统计使用（库龄 FIFO、连续下降检测、收发存汇总）。 */
     @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location order by t.transactionAt desc")
     List<InventoryTransaction> findRecentDetailed();
+
+    /** 把 limit 下推到 SQL，供"最近 N 条"展示路径使用；不要拿它做聚合，截断会静默改变结果。 */
+    @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location order by t.transactionAt desc")
+    List<InventoryTransaction> findRecentDetailedLimited(Pageable pageable);
 
     @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location where t.transactionType = :transactionType order by t.transactionAt desc")
     List<InventoryTransaction> findByTransactionType(String transactionType);

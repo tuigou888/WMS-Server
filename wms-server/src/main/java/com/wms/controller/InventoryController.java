@@ -7,6 +7,7 @@ import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.LocationRepository;
 import com.wms.repository.WarehouseRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -48,8 +49,9 @@ public class InventoryController {
     @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> transactionList(
             @RequestParam(defaultValue = "100") int limit) {
-        return ApiResponse.ok(transactions.findRecentDetailed().stream()
-                .limit(Math.min(Math.max(limit, 0), 500))
+        int size = Math.min(Math.max(limit, 0), 500);
+        if (size == 0) return ApiResponse.ok(List.of());
+        return ApiResponse.ok(transactions.findRecentDetailedLimited(PageRequest.of(0, size)).stream()
                 .map(this::transactionView)
                 .toList());
     }

@@ -101,7 +101,8 @@ public class MarketService {
 
     @Transactional
     public MarketProduct updateProduct(Long id, MarketProductRequest req) {
-        MarketProduct p = products.findById(id)
+        // 必须走 join fetch：controller 的 view() 会读 item 字段，而 open-in-view 已关闭
+        MarketProduct p = products.findDetailedById(id)
                 .orElseThrow(() -> new BusinessException("商品不存在"));
         Category cat = req.categoryId() == null ? null
                 : categories.findById(req.categoryId()).orElse(null);
@@ -118,7 +119,7 @@ public class MarketService {
 
     @Transactional
     public MarketProduct changeStatus(Long id, String status) {
-        MarketProduct p = products.findById(id)
+        MarketProduct p = products.findDetailedById(id)
                 .orElseThrow(() -> new BusinessException("商品不存在"));
         if (!Set.of("SHELF_ON", "SHELF_OFF").contains(status)) {
             throw new BusinessException("非法状态：" + status);
@@ -675,18 +676,17 @@ public class MarketService {
     // ======================== 商品收藏（小程序） ========================
 
     /** 收藏或取消收藏商品（toggle）。返回 true=已收藏，false=已取消。
-     *  采用 existsByUserIdAndProductId 判断 + 原子 JPQL 删除，避免并发下唯一约束冲突。 */
-    @Transactional
+     *  刻意不加 @Transactional：exists 只是快路径，并发下插入仍可能撞唯一约束，冲突时必须让插入自身回滚。
+     *  若挂在调用方的事务上，异常会把该事务标记为 rollback-only，catch 住后提交仍抛 UnexpectedRollbackException。 */
     public boolean toggleFavorite(UserAccount user, Long productId) {
-        products.findById(productId).orElseThrow(() -> new BusinessException("商品不存在"));
+        MarketProduct product = products.findById(productId).orElseThrow(() -> new BusinessException("商品不存在"));
         Long userId = user.getId();
         if (favorites.existsByUserIdAndProductId(userId, productId)) {
-            favorites.deleteByUserAndProduct(userId, productId);
+            transactionTemplate.executeWithoutResult(status -> favorites.deleteByUserAndProduct(userId, productId));
             return false;
         }
         try {
-            MarketProduct p = products.getReferenceById(productId);
-            favorites.save(new MarketFavorite(user, p));
+            transactionTemplate.executeWithoutResult(status -> favorites.save(new MarketFavorite(user, product)));
             return true;
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             // 并发场景：另一请求已收藏，视为已收藏

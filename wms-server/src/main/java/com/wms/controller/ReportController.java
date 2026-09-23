@@ -7,6 +7,7 @@ import com.wms.model.entity.Item;
 import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.ItemRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,16 +43,16 @@ public class ReportController {
         BigDecimal qty = all.stream().map(Inventory::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal amount = all.stream().map(Inventory::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         LocalDate today = LocalDate.now();
-        List<InventoryTransaction> recent = transactions.findRecentDetailed();
-        BigDecimal inbound = recent.stream()
-                .filter(t -> t.getQuantity().signum()>0 && t.getTransactionAt().toLocalDate().equals(today))
+        List<InventoryTransaction> todayTxns = transactions.findDetailedBetween(today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        BigDecimal inbound = todayTxns.stream()
+                .filter(t -> t.getQuantity().signum()>0)
                 .map(InventoryTransaction::getTotalCostAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal outbound = recent.stream()
-                .filter(t -> t.getQuantity().signum()<0 && t.getTransactionAt().toLocalDate().equals(today))
+        BigDecimal outbound = todayTxns.stream()
+                .filter(t -> t.getQuantity().signum()<0)
                 .map(InventoryTransaction::getTotalCostAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal sales = recent.stream().filter(t -> "out".equals(t.getTransactionType()) && t.getTransactionAt().toLocalDate().equals(today)).map(InventoryTransaction::getSaleAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
+        BigDecimal sales = todayTxns.stream().filter(t -> "out".equals(t.getTransactionType())).map(InventoryTransaction::getSaleAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
 
         List<Map<String, Object>> categoryDist = categoryDistribution(all);
         List<Map<String, Object>> valueByCategory = valueByCategory(all);
@@ -68,7 +69,7 @@ public class ReportController {
         result.put("todaySalesAmount", sales);
         result.put("alertCount", (long) alerts.size());
         result.put("alerts", alerts);
-        result.put("recentTransactions", recent.stream().limit(8).map(this::tx).toList());
+        result.put("recentTransactions", transactions.findRecentDetailedLimited(PageRequest.of(0, 8)).stream().map(this::tx).toList());
         result.put("categoryDistribution", categoryDist);
         result.put("valueByCategory", valueByCategory);
         result.put("dailyTrend", dailyTrend);
