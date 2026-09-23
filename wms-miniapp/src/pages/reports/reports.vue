@@ -61,7 +61,7 @@
 
         <!-- 近期流水 -->
         <view class="card" v-if="recentTransactions && recentTransactions.length > 0">
-          <text class="section-title">近期流水 (TOP 8)</text>
+          <text class="section-title">近期流水（前 8 条）</text>
           <view class="tx-list">
             <view v-for="tx in recentTransactions.slice(0, 8)" :key="tx.id" class="tx-row">
               <text class="tx-type" :class="typeClass(tx.transactionType)">{{ typeText(tx.transactionType) }}</text>
@@ -88,7 +88,7 @@
 
         <!-- 金额分布 -->
         <view class="card" v-if="valueByCategory && valueByCategory.length > 0">
-          <text class="section-title">分类金额 (TOP 8)</text>
+          <text class="section-title">分类金额（前 8 名）</text>
           <view class="category-list">
             <view v-for="c in valueByCategory.slice(0, 8)" :key="c.name" class="category-row">
               <text class="cat-name">{{ c.name }}</text>
@@ -115,7 +115,7 @@
 
         <!-- 高价值物品 -->
         <view class="card" v-if="topItemsByValue && topItemsByValue.length > 0">
-          <text class="section-title">高价值物品 (TOP 8)</text>
+          <text class="section-title">高价值物品（前 8 名）</text>
           <view class="top-items">
             <view v-for="item in topItemsByValue" :key="item.itemCode" class="top-item">
               <text class="top-rank">#{{ item.rank }}</text>

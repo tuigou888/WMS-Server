@@ -1,6 +1,8 @@
 spring:
   application:
     name: wms-server
+  jackson:
+    time-zone: Asia/Shanghai
   datasource:
     # Development defaults to an in-memory H2 database. Use DB_URL/DB_USERNAME/DB_PASSWORD/DB_DRIVER for MySQL.
     url: ${DB_URL:jdbc:h2:mem:wms;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1}
@@ -14,6 +16,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        jdbc.time_zone: Asia/Shanghai
   h2:
     console:
       enabled: true
@@ -27,6 +30,28 @@ wechat:
   appid: ${WECHAT_APPID:}
   secret: ${WECHAT_SECRET:}
   mock: ${WECHAT_MOCK:false}
+  pay:
+    # 无 Profile 的本地开发默认走 mock；prod Profile 会强制为 false，且安全检查会拒绝覆盖。
+    mock: ${WECHAT_PAY_MOCK:true}
+    # 商户号
+    mch-id: ${WECHAT_PAY_MCH_ID:}
+    # 商户API证书序列号
+    mch-serial-no: ${WECHAT_PAY_MCH_SERIAL:}
+    # APIv3密钥（32位，回调解密用）
+    api-v3-key: ${WECHAT_PAY_API_V3_KEY:}
+    # 商户私钥 apiclient_key.pem 路径
+    private-key-path: ${WECHAT_PAY_KEY_PATH:}
+    # 微信支付公钥ID（PUB_KEY_ID_xxx）
+    wechat-pay-public-key-id: ${WECHAT_PAY_PUB_KEY_ID:}
+    # 微信支付公钥 pem 路径
+    wechat-pay-public-key-path: ${WECHAT_PAY_PUB_KEY_PATH:}
+    # 支付成功回调地址，如 https://your-domain/api/v1/market/pay/notify
+    notify-url: ${WECHAT_PAY_NOTIFY_URL:}
+    # 退款结果回调地址，如 https://your-domain/api/v1/market/pay/refund-notify
+    refund-notify-url: ${WECHAT_PAY_REFUND_NOTIFY_URL:}
+
+ocr:
+  mock: ${OCR_MOCK:true}
 
 logging:
   level:

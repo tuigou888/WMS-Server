@@ -106,10 +106,6 @@ page {
 .value-red { color: #ff4d4f; }
 .value-green { color: #52c41a; }
 
-.row { display: flex; margin-bottom: 12px; }
-.row > * { flex: 1; }
-.row > *:first-child { margin-right: 8px; }
-
 .badge {
   display: inline-block;
   padding: 2px 8px;

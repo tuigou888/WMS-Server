@@ -7,9 +7,7 @@
 
     <view v-if="categories.length" class="cat-grid">
       <view v-for="c in categories" :key="c.id" class="cat-card" @tap="openCategory(c.id, c.name)">
-        <image class="cat-icon" :src="c.icon" mode="aspectFit" />
         <text class="cat-name">{{ c.name }}</text>
-        <text class="cat-count">{{ c.count }} 件商品</text>
       </view>
     </view>
 
@@ -21,7 +19,6 @@
 
 <script>
 import { products } from '@/api/market.js'
-import { ref } from 'vue'
 
 export default {
   data() {
@@ -32,15 +29,8 @@ export default {
   },
   methods: {
     back() { uni.navigateBack() },
-    async openCategory(id, name) {
-      await uni.showLoading({ title: '加载中' })
-      try {
-        const res = await products.list({ categoryId: id })
-        // 跳转到商品列表页（带分类参数）
-        uni.switchTab({ url: '/pages/category/category' })
-      } catch (e) {
-        uni.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
-      } finally { uni.hideLoading() }
+    openCategory(id, name) {
+      uni.navigateTo({ url: `/pages/search/search?categoryId=${id}&name=${encodeURIComponent(name)}` })
     },
   },
 }

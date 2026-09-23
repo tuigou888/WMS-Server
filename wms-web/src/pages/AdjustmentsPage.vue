@@ -4,6 +4,7 @@ import { Button, Card, Descriptions, Drawer, Form, Input, InputNumber, Modal, Po
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { dateTime, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
 
@@ -58,7 +59,7 @@ const columns = [
   { title: '原因', dataIndex: 'reason' },
   { title: '状态', dataIndex: 'status', render: (v) => h(Tag, { color: statuses[v]?.[1] }, statuses[v]?.[0] || v) },
   { title: '审核人', dataIndex: 'reviewer' },
-  { title: '创建时间', dataIndex: 'createdAt', render: (v) => dateTime(v) },
+  { title: '创建时间', dataIndex: 'createdAt', customRender: ({ text }) => dateTime(text) },
   {
     title: '操作',
     render: (_, r) => h(Space, [
@@ -90,7 +91,7 @@ const detailCols = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="data" :columns="columns" />
+    <a-table row-key="id" :data-source="data" :columns="normalizeColumns(columns)" />
   </Card>
 
   <a-modal v-model:open="open" title="新建报损 / 报溢草稿" width="850" :destroy-on-close="true" @ok="save">
@@ -140,7 +141,7 @@ const detailCols = [
         <Descriptions.Item label="原因">{{ detail.reason || '-' }}</Descriptions.Item>
         <Descriptions.Item label="备注">{{ detail.remark || '-' }}</Descriptions.Item>
       </Descriptions>
-      <a-table style="margin-top: 16px;" :pagination="false" row-key="id" :data-source="detail.lines" :columns="detailCols" />
+      <a-table style="margin-top: 16px;" :pagination="false" row-key="id" :data-source="detail.lines" :columns="normalizeColumns(detailCols)" />
     </template>
   </a-drawer>
 </template>

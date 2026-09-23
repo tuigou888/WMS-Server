@@ -65,7 +65,7 @@ const upload = async ({ file, onSuccess, onError }) => {
 <template>
   <div class="page-heading">
     <div>
-      <Typography.Title :level="3" class="page-title">二维码与 Excel</Typography.Title>
+      <Typography.Title :level="3" class="page-title">二维码与电子表格</Typography.Title>
       <Typography.Text type="secondary">生成物品二维码，批量导入或导出物品档案</Typography.Text>
     </div>
   </div>
@@ -87,11 +87,11 @@ const upload = async ({ file, onSuccess, onError }) => {
       </Card>
     </Col>
     <Col :xs="24" :lg="12">
-      <Card title="物品档案 Excel">
+      <Card title="物品档案电子表格">
         <Typography.Paragraph>导出当前物品档案，或上传按相同列顺序编辑后的 .xlsx 文件进行新增/更新。</Typography.Paragraph>
         <Button :icon="h(DownloadOutlined)" :loading="exportLoading" @click="download">导出物品档案</Button>
         <a-upload accept=".xlsx" :show-upload-list="false" :custom-request="upload" style="margin-left: 12px; display: inline-block;">
-          <Button :icon="h(UploadOutlined)">导入 Excel</Button>
+          <Button :icon="h(UploadOutlined)">导入电子表格</Button>
         </a-upload>
       </Card>
     </Col>

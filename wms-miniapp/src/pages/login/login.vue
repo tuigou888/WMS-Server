@@ -18,7 +18,8 @@
             <text v-if="loading" class="loading"></text>
             <text v-else>微信授权登录</text>
           </button>
-          <text class="wx-tip">首次使用需绑定账号，已绑定可直接登录</text>
+          <text class="wx-tip" v-if="isLocalDebug">本地调试请使用账号密码登录；微信一键登录需要真实 AppID</text>
+          <text class="wx-tip" v-else>首次使用需绑定账号，已绑定可直接登录</text>
         </view>
 
         <view v-else-if="wxState === 'bind'" class="wx-bind">
@@ -54,7 +55,12 @@
         </button>
       </view>
 
-      <view class="demo-accounts">
+      <view v-if="loginSucceeded" class="login-success">
+        <text>登录成功，正在打开首页</text>
+        <navigator class="btn-primary login-home-link" url="/pages/index/index" open-type="reLaunch">进入首页</navigator>
+      </view>
+
+      <view v-if="isLocalDebug" class="demo-accounts">
         <text class="demo-title">演示账号：</text>
         <view class="demo-row">
           <text class="demo-item" @tap="fillAccount('admin', 'admin123')">管理员 / admin123</text>
@@ -69,14 +75,18 @@
 
 <script>
 import { useUserStore } from '@/store/user.js'
-import { api } from '@/api/request.js'
+import { api, IS_LOCAL_API } from '@/api/request.js'
+
+const isLocalDebug = import.meta.env.DEV || IS_LOCAL_API
 
 export default {
   data() {
     return {
-      tab: 'wx',
+      tab: isLocalDebug ? 'pwd' : 'wx',
       wxState: 'login', // login | bind
       loading: false,
+      isLocalDebug,
+      loginSucceeded: false,
       bindForm: { username: '', password: '' },
       pwdForm: { username: '', password: '' },
     }
@@ -91,7 +101,7 @@ export default {
         if (result.needBind) {
           this.wxState = 'bind'
           this.bindForm = { username: '', password: '' }
-          this.bindForm.openid = result.openid
+          this.bindForm.bindTicket = result.bindTicket
         } else {
           this.handleLoginSuccess(result)
         }
@@ -106,7 +116,7 @@ export default {
       this.loading = true
       try {
         const result = await api.wxBind({
-          openid: this.bindForm.openid,
+          bindTicket: this.bindForm.bindTicket,
           username: this.bindForm.username,
           password: this.bindForm.password,
         })
@@ -138,10 +148,30 @@ export default {
         role: result.role,
         permissions: result.permissions,
       }, result.token)
+      this.loginSucceeded = true
       uni.showToast({ title: '登录成功', icon: 'success' })
-      setTimeout(() => {
-        uni.switchTab({ url: '/pages/index/index' })
-      }, 500)
+      this.navigateAfterLogin()
+    },
+
+    navigateAfterLogin() {
+      const url = '/pages/index/index'
+      const navigationApi = typeof wx !== 'undefined' && typeof wx.reLaunch === 'function' ? wx : uni
+      console.log('[WMS] 登录成功，准备打开首页')
+      navigationApi.reLaunch({
+        url,
+        success: () => console.log('[WMS] 登录后已打开首页'),
+        fail: (error) => {
+          console.log('[WMS] 重启首页失败，改用切换导航', error)
+          uni.switchTab({
+            url,
+            success: () => console.log('[WMS] 登录后已切换至首页'),
+            fail: (fallbackError) => {
+              console.log('[WMS] 登录后打开首页失败', fallbackError)
+              uni.showToast({ title: '登录成功，但首页打开失败', icon: 'none' })
+            },
+          })
+        },
+      })
     },
 
     fillAccount(username, password) {
@@ -213,6 +243,33 @@ export default {
 .form-section { flex: 1; }
 
 .input-group { margin-bottom: 16px; }
+.login-card .input {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  line-height: 44px;
+  background: #fff;
+}
+
+.login-success {
+  position: fixed;
+  right: 20px;
+  bottom: 24px;
+  left: 20px;
+  z-index: 10;
+  padding: 10px 12px;
+  color: #2e7d32;
+  font-size: 13px;
+  background: #f1f8f3;
+  border: 1px solid #b7dfbf;
+  border-radius: 6px;
+}
+.login-home-link {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  text-decoration: none;
+}
 
 .wx-login { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0; }
 .wx-tip { font-size: 12px; color: #999; margin-top: 12px; }

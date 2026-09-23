@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -40,9 +41,10 @@ public class SecurityConfig {
 
         return http
                 .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> {
-                    authz.requestMatchers("/auth/login", "/auth/wx-login", "/auth/wx-bind", "/health").permitAll();
+                    authz.requestMatchers("/auth/login", "/auth/wx-login", "/auth/wx-bind", "/auth/wx-register", "/health", "/health/**", "/market/pay/notify", "/market/pay/refund-notify").permitAll();
                     if (isDev) {
                         authz.requestMatchers("/h2-console/**").permitAll();
                     }

@@ -192,7 +192,8 @@ public class MarketController {
         SecurityUtils.require(Permissions.MARKET_READ);
         UserAccount user = user();
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(50, Math.max(1, pageSize)));
-        Page<MarketOrder> p = orders.search(user.getId(), status, pageable);
+        Page<MarketOrder> p = orders.search(user.getId(),
+                (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status), pageable);
         return ApiResponse.ok(orderPageOf(p));
     }
 
@@ -208,11 +209,20 @@ public class MarketController {
         return ApiResponse.ok(view);
     }
 
-    @PostMapping("/orders/{id}/pay")
-    public ApiResponse<Map<String, Object>> pay(@PathVariable Long id) {
+    /** 拉起微信支付：返回小程序 requestPayment 所需参数（mock 模式返回 mock 参数 + mock=true）。 */
+    @PostMapping("/orders/{id}/prepay")
+    public ApiResponse<Map<String, Object>> prepay(@PathVariable Long id) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
-        return ApiResponse.ok("支付成功", view(service.pay(user, id, user.getUsername())));
+        return ApiResponse.ok("已生成支付参数", service.prepay(user, id));
+    }
+
+    /** mock 模式专用：跳过 requestPayment 直接确认支付落单。 */
+    @PostMapping("/orders/{id}/mock-pay")
+    public ApiResponse<Map<String, Object>> mockPay(@PathVariable Long id) {
+        SecurityUtils.require(Permissions.MARKET_BUY);
+        UserAccount user = user();
+        return ApiResponse.ok("支付成功", view(service.confirmMockPay(user, id)));
     }
 
     @PostMapping("/orders/{id}/cancel")
@@ -227,7 +237,7 @@ public class MarketController {
     public ApiResponse<Map<String, Object>> receive(@PathVariable Long id) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
-        return ApiResponse.ok("已确认收货", view(service.complete(id, user.getUsername())));
+        return ApiResponse.ok("已确认收货", view(service.completeByUser(user, id)));
     }
 
     @GetMapping("/warehouses")
@@ -239,6 +249,52 @@ public class MarketController {
                     m.put("id", w.getId()); m.put("code", w.getCode()); m.put("name", w.getName());
                     return m;
                 }).toList());
+    }
+
+    // ==================== 商品收藏 ====================
+    @PostMapping("/favorites/{productId}")
+    public ApiResponse<Map<String, Object>> toggleFavorite(@PathVariable Long productId) {
+        SecurityUtils.require(Permissions.MARKET_BUY);
+        UserAccount user = user();
+        boolean fav = service.toggleFavorite(user, productId);
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("favorited", fav);
+        return ApiResponse.ok(fav ? "已收藏" : "已取消收藏", m);
+    }
+
+    @GetMapping("/favorites")
+    public ApiResponse<Map<String, Object>> favorites(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        SecurityUtils.require(Permissions.MARKET_READ);
+        UserAccount user = user();
+        var p = service.myFavorites(user.getId(), page, pageSize);
+        // 过滤掉商品已被物理删除的收藏项（外键残留），避免懒加载抛 EntityNotFoundException
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (var f : p.getContent()) {
+            try {
+                Map<String, Object> m = view(f.getProduct());
+                m.put("favoriteId", f.getId());
+                m.put("favoritedAt", f.getCreatedAt());
+                rows.add(m);
+            } catch (Exception ignored) { /* 商品已删除，跳过该收藏项 */ }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("records", rows);
+        // P1-6：total 应为数据库实际分页总数，而非过滤已删除商品后的行数
+        result.put("total", p.getTotalElements());
+        result.put("page", p.getNumber() + 1);
+        result.put("pageSize", p.getSize());
+        return ApiResponse.ok(result);
+    }
+
+    @GetMapping("/favorites/{productId}/check")
+    public ApiResponse<Map<String, Object>> checkFavorite(@PathVariable Long productId) {
+        SecurityUtils.require(Permissions.MARKET_READ);
+        UserAccount user = user();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("favorited", service.isFavorite(user.getId(), productId));
+        return ApiResponse.ok(m);
     }
 
     // ==================== View helpers ====================
@@ -325,6 +381,12 @@ public class MarketController {
         m.put("cancelReason", o.getCancelReason());
         m.put("reviewer", o.getReviewer());
         m.put("reviewRemark", o.getReviewRemark());
+        m.put("transactionId", o.getTransactionId());
+        m.put("prepayId", o.getPrepayId());
+        m.put("refundNo", o.getRefundNo());
+        m.put("refundReason", o.getRefundReason());
+        m.put("refundAmount", o.getRefundAmount());
+        m.put("refundedAt", o.getRefundedAt());
         m.put("createdAt", o.getCreatedAt());
         m.put("items", o.getItems().stream().map(MarketController::view).toList());
         return m;

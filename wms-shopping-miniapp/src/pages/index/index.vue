@@ -85,7 +85,7 @@ export default {
       this.hasMore = this.products.length < (res.total || 0)
     },
     goProduct(id) { uni.navigateTo({ url: `/pages/product/product?id=${id}` }) },
-    goCategory(id, name) { uni.switchTab({ url: '/pages/category/category' }).catch(() => {}) },
+    goCategory(id, name) { uni.switchTab({ url: '/pages/category/category', fail: () => {} }) },
     async addCart(p) {
       if (p.status !== 'SHELF_ON') { uni.showToast({ title: '已下架', icon: 'none' }); return }
       try {

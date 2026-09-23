@@ -19,13 +19,13 @@ public class StockController {
     }
 
     @PostMapping("/in/scan")
-    @PreAuthorize("hasAuthority('inventory:write') and hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('inventory:scan')")
     public ApiResponse<Map<String, Object>> stockIn(@Valid @RequestBody StockInRequest r) {
         return ApiResponse.ok("入库成功", service.stockIn(r));
     }
 
     @PostMapping("/out/scan")
-    @PreAuthorize("hasAuthority('inventory:write') and hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('inventory:scan')")
     public ApiResponse<Map<String, Object>> stockOut(@Valid @RequestBody StockOutRequest r) {
         return ApiResponse.ok("出库成功", service.stockOut(r));
     }

@@ -1,13 +1,13 @@
 <template>
   <view class="stock-page">
     <view v-if="!userStore.isAdmin" class="role-hint">仅管理员可扫码直接出库，操作员请通过单据流程</view>
-    <view v-if="!item" class="scan-prompt" @tap="scanCode">
+    <view v-if="userStore.isAdmin && !item" class="scan-prompt" @tap="scanCode">
       <text class="scan-icon">📷</text>
       <text class="scan-text">点击扫描物品二维码</text>
       <text class="scan-hint">或从扫码历史选择</text>
     </view>
 
-    <view v-else class="stock-form">
+    <view v-else-if="userStore.isAdmin" class="stock-form">
       <!-- 物品信息卡片 -->
       <view class="item-card">
         <view class="item-header">

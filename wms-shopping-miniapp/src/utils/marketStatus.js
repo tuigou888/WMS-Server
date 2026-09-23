@@ -11,6 +11,7 @@ const ORDER_STATUS = {
 const PAY_STATUS = {
   UNPAID: { text: '未支付', color: 'warning' },
   PAID: { text: '已支付', color: 'success' },
+  REFUNDING: { text: '退款处理中', color: 'warning' },
   REFUNDED: { text: '已退款', color: 'error' },
 }
 

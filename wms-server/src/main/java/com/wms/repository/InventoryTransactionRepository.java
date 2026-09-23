@@ -24,4 +24,11 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
 
     @Query("select case when count(t) > 0 then true else false end from InventoryTransaction t where t.item.id = :itemId")
     boolean existsByItemId(@Param("itemId") Long itemId);
+
+    /** 商城回滚库存：按订单号查出原出库（OUT）流水，取实际扣减成本回填，避免用当前均价导致成本失真。 */
+    @Query("select t from InventoryTransaction t where t.referenceNo = :referenceNo and t.transactionType = :txType order by t.transactionAt asc, t.id asc")
+    List<InventoryTransaction> findByReferenceNoAndType(@Param("referenceNo") String referenceNo, @Param("txType") String txType);
+
+    @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location where t.referenceNo = :referenceNo and t.reversalOfTransactionId is null order by t.transactionAt asc, t.id asc")
+    List<InventoryTransaction> findUnreversedByReferenceNo(@Param("referenceNo") String referenceNo);
 }

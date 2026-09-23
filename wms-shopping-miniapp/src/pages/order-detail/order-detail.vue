@@ -8,7 +8,26 @@
           <text class="track-status">{{ statusText }}</text>
           <text class="track-sub">{{ subText }}</text>
         </view>
-        <view class="track-no" v-if="order.logisticsNumber">运单号：{{ order.logisticsCompany }} {{ order.logisticsNumber }}</view>
+        <view class="track-no" v-if="order.logisticsNumber" @tap="copyLogistics">
+          运单号：{{ order.logisticsCompany }} {{ order.logisticsNumber }}
+          <text class="copy-hint">（点击复制）</text>
+        </view>
+        <view class="track-ship-time" v-if="order.shippedAt">发货时间：{{ fmtDate(order.shippedAt) }}</view>
+      </view>
+
+      <!-- 物流轨迹（操作日志） -->
+      <view class="card" v-if="order.logs && order.logs.length">
+        <view class="section-label">物流轨迹</view>
+        <view class="timeline">
+          <view class="tl-item" v-for="(log, idx) in order.logs" :key="log.id">
+            <view class="tl-dot" :class="{ active: idx === order.logs.length - 1 }"></view>
+            <view class="tl-content">
+              <text class="tl-action">{{ logActionText(log.action) }}</text>
+              <text class="tl-time">{{ fmtDate(log.createdAt) }}</text>
+              <text class="tl-remark" v-if="log.remark">{{ log.remark }}</text>
+            </view>
+          </view>
+        </view>
       </view>
 
       <!-- 订单信息 -->
@@ -56,6 +75,7 @@
 <script>
 import { orders as orderApi } from '@/api/market.js'
 import { formatDateTime } from '@/utils/format.js'
+import { requestPayment, PaymentCancelled } from '@/utils/pay.js'
 
 export default {
   data() { return { order: null, id: null } },
@@ -68,7 +88,7 @@ export default {
       return ''
     },
     payTypeText() { return this.order ? { PAY_ONLINE: '在线支付', CASH_ON_DELIVERY: '货到付款', CREDIT: '挂账' }[this.order.payType] || this.order.payType : '' },
-    payStatusText() { return this.order ? { UNPAID: '未支付', PAID: '已支付', REFUNDED: '已退款' }[this.order.payStatus] || this.order.payStatus : '' },
+    payStatusText() { return this.order ? { UNPAID: '未支付', PAID: '已支付', REFUNDING: '退款处理中', REFUNDED: '已退款' }[this.order.payStatus] || this.order.payStatus : '' },
   },
   onLoad(opt) {
     this.id = opt.id
@@ -85,12 +105,31 @@ export default {
       uni.showModal({ title: '取消订单', content: '确认取消该订单？', success: async (b) => { if (b) { try { await orderApi.cancel(this.id); uni.showToast({ title: '已取消', icon: 'success' }); this.load() } catch (e) { uni.showToast({ title: (e && e.message) || '取消失败', icon: 'none' }) } } } })
     },
     async pay() {
-      try { await orderApi.pay(this.id); uni.showToast({ title: '支付成功', icon: 'success' }); this.load() }
-      catch (e) { uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' }) }
+      try {
+        await requestPayment(this.id)
+        uni.showToast({ title: '支付成功', icon: 'success' })
+        this.load()
+      } catch (e) {
+        if (e && e.cancelled) {
+          uni.showToast({ title: '已取消支付', icon: 'none' })
+        } else {
+          uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+        }
+      }
     },
     async receive() {
       try { await orderApi.receive(this.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load() }
       catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+    },
+    copyLogistics() {
+      if (!this.order || !this.order.logisticsNumber) return
+      uni.setClipboardData({
+        data: this.order.logisticsNumber,
+        success: () => uni.showToast({ title: '运单号已复制', icon: 'success' }),
+      })
+    },
+    logActionText(action) {
+      return ({ CREATE: '订单创建', PAY: '支付成功', AUDIT: '订单审核', SHIP: '商家发货', COMPLETE: '确认收货', CANCEL: '订单取消', REFUND: '退款' }[action]) || action
     },
   },
 }
@@ -102,6 +141,19 @@ export default {
 .track-status { font-size: 40rpx; font-weight: 700; }
 .track-sub { font-size: 26rpx; opacity: 0.85; }
 .track-no { font-size: 24rpx; opacity: 0.85; margin-top: 16rpx; }
+.copy-hint { font-size: 20rpx; opacity: 0.7; }
+.track-ship-time { font-size: 22rpx; opacity: 0.75; margin-top: 8rpx; }
+.timeline { padding-left: 8rpx; }
+.tl-item { display: flex; padding-bottom: 24rpx; position: relative; }
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before { content: ''; position: absolute; left: 7rpx; top: 24rpx; bottom: 0; width: 2rpx; background: #e8e8e8; }
+.tl-item:last-child::before { display: none; }
+.tl-dot { width: 16rpx; height: 16rpx; border-radius: 50%; background: #d9d9d9; margin-top: 8rpx; margin-right: 20rpx; flex-shrink: 0; z-index: 1; }
+.tl-dot.active { background: #1677ff; }
+.tl-content { flex: 1; display: flex; flex-direction: column; }
+.tl-action { font-size: 26rpx; color: #333; }
+.tl-time { font-size: 22rpx; color: #999; margin-top: 4rpx; }
+.tl-remark { font-size: 22rpx; color: #666; margin-top: 4rpx; }
 .card { background: #fff; border-radius: 16rpx; padding: 24rpx; margin-bottom: 20rpx; }
 .section-label { font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; }
 .info-row { display: flex; padding: 10rpx 0; font-size: 26rpx; }

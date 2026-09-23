@@ -5,6 +5,7 @@ import { Button, Card, DatePicker, Descriptions, Drawer, Form, Input, InputNumbe
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { dateTime, money, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
 
@@ -78,7 +79,7 @@ const columns = [
   { title: '仓库', dataIndex: 'warehouseName' },
   { title: '状态', dataIndex: 'status', render: (v) => h(Tag, { color: statuses[v]?.[1] }, statuses[v]?.[0] || v) },
   { title: '日期', dataIndex: 'businessDate' },
-  { title: '创建时间', dataIndex: 'createdAt', render: (v) => dateTime(v) },
+  { title: '创建时间', dataIndex: 'createdAt', customRender: ({ text }) => dateTime(text) },
   {
     title: '操作',
     render: (_, r) => h(Space, [
@@ -120,7 +121,7 @@ const setDetail = (d) => { detail.value = d }
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="data" :columns="columns" />
+    <a-table row-key="id" :data-source="data" :columns="normalizeColumns(columns)" />
   </Card>
 
   <a-modal v-model:open="open" title="新建入/出/退货草稿单" width="850" :destroy-on-close="true" @ok="save">
@@ -182,7 +183,7 @@ const setDetail = (d) => { detail.value = d }
         <Descriptions.Item label="单位">{{ detail.partnerName || '-' }}</Descriptions.Item>
         <Descriptions.Item label="仓库">{{ detail.warehouseName }}</Descriptions.Item>
       </Descriptions>
-      <a-table style="margin-top: 16px;" :pagination="false" row-key="id" :data-source="detail.lines" :columns="detailColumns" />
+      <a-table style="margin-top: 16px;" :pagination="false" row-key="id" :data-source="detail.lines" :columns="normalizeColumns(detailColumns)" />
     </template>
   </a-drawer>
 </template>

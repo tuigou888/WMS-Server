@@ -10,8 +10,12 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MarketCartRepository extends JpaRepository<MarketCart, Long> {
-    Optional<MarketCart> findByUserIdAndProductId(Long userId, Long productId);
-    List<MarketCart> findByUserIdOrderByIdDesc(Long userId);
+    @Query("select c from MarketCart c join fetch c.product p join fetch p.item item left join fetch item.category left join fetch p.category where c.user.id = :userId and p.id = :productId")
+    Optional<MarketCart> findByUserIdAndProductId(@Param("userId") Long userId, @Param("productId") Long productId);
+    @Query("select c from MarketCart c join fetch c.product p join fetch p.item item left join fetch item.category left join fetch p.category where c.user.id = :userId order by c.id desc")
+    List<MarketCart> findByUserIdOrderByIdDesc(@Param("userId") Long userId);
+    @Query("select c from MarketCart c join fetch c.product p join fetch p.item item left join fetch item.category left join fetch p.category where c.id = :id")
+    Optional<MarketCart> findDetailedById(@Param("id") Long id);
     long countByUserId(Long userId);
 
     @Modifying

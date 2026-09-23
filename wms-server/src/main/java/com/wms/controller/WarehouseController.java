@@ -26,7 +26,11 @@ public class WarehouseController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('inventory:read') or hasAuthority('warehouse:manage')")
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(defaultValue = "false") boolean includeDisabled) {
+        if (includeDisabled) {
+            SecurityUtils.require(Permissions.WAREHOUSE_MANAGE);
+        }
         List<Warehouse> values = includeDisabled ? warehouses.findAll() : warehouses.findByStatusTrueOrderByNameAsc();
         return ApiResponse.ok(values.stream().map(WarehouseController::view).toList());
     }

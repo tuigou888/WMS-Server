@@ -4,6 +4,7 @@ import { Card, Col, Row, Segmented, Statistic, Table, Tag, Typography, message }
 import { WarningOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { dateTime, money, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 
 const severityColor = { HIGH: 'red', MEDIUM: 'orange', LOW: 'blue' }
 const severityLabel = { HIGH: '高', MEDIUM: '中', LOW: '低' }
@@ -54,7 +55,7 @@ const profitCols = [
   { title: '成本金额', dataIndex: 'totalCostAmount', render: (v) => money(v) },
   { title: '销售金额', dataIndex: 'saleAmount', render: (v) => money(v) },
   { title: '利润', dataIndex: 'profit', render: (v) => h('b', { class: Number(v) >= 0 ? 'positive' : 'negative' }, money(v)) },
-  { title: '时间', dataIndex: 'transactionAt', render: (v) => dateTime(v) },
+  { title: '时间', dataIndex: 'transactionAt', customRender: ({ text }) => dateTime(text) },
 ]
 </script>
 
@@ -77,16 +78,16 @@ const profitCols = [
   </Row>
 
   <Card title="库存预警（智能优先级）" class="table-card" style="margin-top: 18px;">
-    <a-table row-key="itemId" :loading="loading" :data-source="alerts" :columns="alertCols" />
+    <a-table row-key="itemId" :loading="loading" :data-source="alerts" :columns="normalizeColumns(alertCols)" />
   </Card>
 
   <Card class="table-card" style="margin-top: 18px;">
     <template #title><WarningOutlined /> 库存异常检测</template>
-    <a-table v-if="anomalies.length" :row-key="(r, i) => r.type + '-' + i" :loading="loading" :data-source="anomalies" :columns="anomalyCols" />
+    <a-table v-if="anomalies.length" :row-key="(r, i) => r.type + '-' + i" :loading="loading" :data-source="anomalies" :columns="normalizeColumns(anomalyCols)" />
     <Typography.Text v-else type="secondary">暂无异常检测结果</Typography.Text>
   </Card>
 
   <Card title="销售利润明细" class="table-card" style="margin-top: 18px;">
-    <a-table row-key="id" :loading="loading" :data-source="profit" :columns="profitCols" />
+    <a-table row-key="id" :loading="loading" :data-source="profit" :columns="normalizeColumns(profitCols)" />
   </Card>
 </template>

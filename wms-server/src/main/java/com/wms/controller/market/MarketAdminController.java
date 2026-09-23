@@ -58,14 +58,9 @@ public class MarketAdminController {
             @RequestParam(required = false) String status) {
         SecurityUtils.require(Permissions.PRODUCT_READ);
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(100, Math.max(1, pageSize)));
-        Page<MarketProduct> p = products.searchAll(keyword, pageable);
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (MarketProduct item : p.getContent()) {
-            Map<String, Object> v = MarketController.view(item);
-            if (status != null && !status.isBlank()
-                    && !status.equals(item.getStatus())) continue;
-            rows.add(v);
-        }
+        // P2-7：status 条件下沉到 Repository 查询，避免内存过滤导致分页 total 不准
+        Page<MarketProduct> p = products.searchAll(keyword, status, pageable);
+        List<Map<String, Object>> rows = p.getContent().stream().map(MarketController::view).toList();
         return ApiResponse.ok(Map.of("records", rows, "total", p.getTotalElements(),
                 "page", p.getNumber() + 1, "pageSize", p.getSize()));
     }
@@ -106,7 +101,8 @@ public class MarketAdminController {
             @RequestParam(required = false) String status) {
         SecurityUtils.require(Permissions.ORDER_READ);
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(100, Math.max(1, pageSize)));
-        Page<MarketOrder> p = orders.searchAdmin(keyword, status, pageable);
+        Page<MarketOrder> p = orders.searchAdmin(keyword,
+                (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status), pageable);
         return ApiResponse.ok(pageOf(p));
     }
 
@@ -146,7 +142,7 @@ public class MarketAdminController {
         return ApiResponse.ok("已完成", MarketController.view(o));
     }
 
-    /** 强制取消（任意可取消状态），已发货时仅记录说明不反扣库存。 */
+    /** 强制取消（任意可取消状态）。已审核/已发货的订单已扣库存，取消时自动回滚（IN 流水）。 */
     @PostMapping("/orders/{id}/cancel")
     public ApiResponse<Map<String, Object>> cancel(@PathVariable Long id,
                                                     @RequestBody(required = false) Map<String, String> body) {
@@ -155,6 +151,16 @@ public class MarketAdminController {
                 body == null ? null : body.getOrDefault("reason", "管理员取消"),
                 SecurityUtils.username());
         return ApiResponse.ok("已取消", MarketController.view(o));
+    }
+
+    /** 发起退款：调微信退款接口，受理成功即回滚库存 + 置 REFUNDED。仅已支付订单可退款。 */
+    @PostMapping("/orders/{id}/refund")
+    public ApiResponse<Map<String, Object>> refund(@PathVariable Long id,
+                                                    @RequestBody(required = false) Map<String, String> body) {
+        SecurityUtils.require(Permissions.ORDER_REVIEW);
+        String reason = body == null ? null : body.get("reason");
+        MarketOrder o = service.refund(id, reason, SecurityUtils.username());
+        return ApiResponse.ok("退款已发起", MarketController.view(o));
     }
 
     // ==================== 客户/收货人 ====================
@@ -188,6 +194,36 @@ public class MarketAdminController {
         SecurityUtils.require(Permissions.CUSTOMER_WRITE);
         service.deleteCustomer(null, id);
         return ApiResponse.ok("已删除", null);
+    }
+
+    // ==================== 销售汇总（dashboard） ====================
+    @GetMapping("/stats")
+    public ApiResponse<Map<String, Object>> stats() {
+        SecurityUtils.require(Permissions.REPORT_VIEW);
+        Map<String, Object> m = new LinkedHashMap<>();
+        // 核心指标
+        m.put("totalSales", orders.sumCompletedAmount());
+        m.put("todayOrders", orders.countTodayOrders());
+        m.put("todaySales", orders.sumTodayAmount());
+        m.put("totalProducts", products.count());
+        m.put("totalCustomers", customers.count());
+        // 各状态订单数
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        for (MarketOrderStatus s : MarketOrderStatus.values()) {
+            statusCounts.put(s.name(), orders.countByStatus(s));
+        }
+        m.put("statusCounts", statusCounts);
+        // 商品销量 Top 10
+        List<Object[]> rows = orders.topProducts(PageRequest.of(0, 10));
+        List<Map<String, Object>> top = new ArrayList<>();
+        for (Object[] row : rows) {
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("name", row[0]); t.put("code", row[1]);
+            t.put("quantity", row[2]); t.put("amount", row[3]);
+            top.add(t);
+        }
+        m.put("topProducts", top);
+        return ApiResponse.ok(m);
     }
 
     // ==================== View helpers ====================

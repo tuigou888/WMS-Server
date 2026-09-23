@@ -3,6 +3,7 @@ import { h, onMounted, ref } from 'vue'
 import { Button, Card, Form, Input, Modal, Select, Switch, Table, Tag, Typography, message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
+import { permissionLabel, roleLabel } from '../utils/labels'
 
 const rows = ref([])
 const matrix = ref(null)
@@ -36,19 +37,19 @@ const save = async () => {
   }
 }
 
+const roleNames = { ADMIN: '管理员', WAREHOUSE: '仓库操作员', PROCUREMENT: '采购专员', AUDITOR: '审计员', FINANCE: '财务人员', CUSTOMER_SERVICE: '客服人员', CUSTOMER: '商城客户' }
+const roleOptions = Object.entries(roleNames).map(([value, label]) => ({ value, label }))
+
 const columns = [
   { title: '用户名', dataIndex: 'username' },
   { title: '姓名', dataIndex: 'displayName' },
-  { title: '角色', dataIndex: 'role', render: (v) => h(Tag, { color: v === 'ADMIN' ? 'purple' : 'blue' }, v === 'ADMIN' ? '管理员' : '仓库操作员') },
-  { title: '状态', dataIndex: 'enabled', render: (v) => h(Tag, { color: v ? 'green' : 'default' }, v ? '启用' : '停用') },
-  { title: '操作', render: (_, r) => h(Button, { type: 'link', onClick: () => show(r) }, '编辑') },
+  { title: '角色', dataIndex: 'role', customRender: ({ text }) => h(Tag, { color: text === 'ADMIN' ? 'purple' : text === 'CUSTOMER' ? 'default' : 'blue' }, roleLabel(text)) },
+  { title: '状态', dataIndex: 'enabled', customRender: ({ text }) => h(Tag, { color: text ? 'green' : 'default' }, text ? '启用' : '停用') },
+  { title: '操作', customRender: ({ record }) => h(Button, { type: 'link', onClick: () => show(record) }, '编辑') },
 ]
 
-const matrixCols = [
-  { title: '权限', dataIndex: 'code' },
-  { title: '管理员 ADMIN', render: () => h(Tag, { color: 'green' }, '✓') },
-  { title: '仓库操作员 WAREHOUSE', render: (_, r) => h(Tag, { color: matrix.value?.roles?.WAREHOUSE?.includes(r.code) ? 'green' : 'default' }, matrix.value?.roles?.WAREHOUSE?.includes(r.code) ? '✓' : '✗') },
-]
+const matrixCols = [{ title: '权限', dataIndex: 'code', customRender: ({ text }) => permissionLabel(text) }]
+const matrixColumns = () => [...matrixCols, ...Object.keys(matrix.value?.roles || {}).sort().map((role) => ({ title: roleLabel(role), customRender: ({ record }) => h(Tag, { color: matrix.value?.roles?.[role]?.includes(record.code) ? 'green' : 'default' }, matrix.value?.roles?.[role]?.includes(record.code) ? '✓' : '✗') }))]
 </script>
 
 <template>
@@ -66,7 +67,7 @@ const matrixCols = [
 
   <Card v-if="matrix" title="权限矩阵" style="margin-top: 16px;">
     <template #extra><Typography.Text type="secondary">角色由系统固定映射到权限，管理员拥有全部权限</Typography.Text></template>
-    <a-table row-key="code" size="small" :pagination="false" :data-source="matrix.all.map((x) => ({ code: x }))" :columns="matrixCols" />
+    <a-table row-key="code" size="small" :scroll="{ x: 'max-content' }" :pagination="false" :data-source="matrix.all.map((x) => ({ code: x }))" :columns="matrixColumns()" />
   </Card>
 
   <a-modal v-model:open="open" :title="editing ? '编辑用户' : '新建用户'" :destroy-on-close="true" @ok="save">
@@ -81,7 +82,7 @@ const matrixCols = [
         <a-input-password v-model:value="formState.password" />
       </a-form-item>
       <a-form-item name="role" label="角色" :rules="[{ required: true }]">
-        <a-select v-model:value="formState.role" :options="[{ value: 'ADMIN', label: '管理员' }, { value: 'WAREHOUSE', label: '仓库操作员' }]" />
+        <a-select v-model:value="formState.role" :options="roleOptions" />
       </a-form-item>
       <a-form-item name="enabled" label="状态">
         <a-switch v-model:checked="formState.enabled" checked-children="启用" un-checked-children="停用" />

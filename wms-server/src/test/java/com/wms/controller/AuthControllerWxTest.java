@@ -2,6 +2,7 @@ package com.wms.controller;
 
 import com.wms.dto.WxBindRequest;
 import com.wms.dto.WxLoginRequest;
+import com.wms.dto.WxRegistrationRequest;
 import com.wms.harness.Harness;
 import com.wms.repository.UserAccountRepository;
 import com.wms.security.TokenService;
@@ -35,10 +36,11 @@ class AuthControllerWxTest {
         var loginResp = authController.wxLogin(new WxLoginRequest("test-openid-123"));
         assertEquals(200, loginResp.code());
         assertTrue((Boolean) loginResp.data().get("needBind"));
-        assertEquals("test-openid-123", loginResp.data().get("openid"));
+        String bindTicket = (String) loginResp.data().get("bindTicket");
+        assertNotNull(bindTicket);
 
         // 2. 绑定账号密码后可登录
-        var bindResp = authController.wxBind(new WxBindRequest("test-openid-123", "admin", "admin123"), req());
+        var bindResp = authController.wxBind(new WxBindRequest(bindTicket, "admin", "admin123"), req());
         assertEquals(200, bindResp.code());
         assertNotNull(bindResp.data().get("token"));
 
@@ -48,13 +50,14 @@ class AuthControllerWxTest {
         assertNotNull(loginResp2.data().get("token"));
         assertEquals("admin", loginResp2.data().get("username"));
 
-        // 4. 重复绑定同一 openid 报错
+        // 4. 同一个一次性凭据不可重放
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("test-openid-123", "operator", "operator123"), req()));
+                () -> authController.wxBind(new WxBindRequest(bindTicket, "operator", "operator123"), req()));
 
         // 5. 绑定错误密码报错
+        String otherTicket = (String) authController.wxLogin(new WxLoginRequest("another-openid")).data().get("bindTicket");
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("another-openid", "admin", "wrongpass"), req()));
+                () -> authController.wxBind(new WxBindRequest(otherTicket, "admin", "wrongpass"), req()));
 
         // 6. 验证 openid 已持久化到数据库
         var user = users.findByOpenid("test-openid-123").orElseThrow();
@@ -90,7 +93,21 @@ class AuthControllerWxTest {
             users.save(u);
         });
 
+        String bindTicket = (String) authController.wxLogin(new WxLoginRequest("new-openid-disabled")).data().get("bindTicket");
         assertThrows(com.wms.common.BusinessException.class,
-                () -> authController.wxBind(new WxBindRequest("new-openid-disabled", "test_disabled", "anypass"), req()));
+                () -> authController.wxBind(new WxBindRequest(bindTicket, "test_disabled", "anypass"), req()));
+    }
+
+    @Test
+    void wxRegisterCreatesOnlyCustomerAndCannotReplayTicket() {
+        String ticket = (String) authController.wxLogin(new WxLoginRequest("new-customer-openid")).data().get("bindTicket");
+        var response = authController.wxRegister(new WxRegistrationRequest(ticket, "wx_customer", "customer123", "微信客户"), req());
+        assertEquals(200, response.code());
+        assertEquals("CUSTOMER", response.data().get("role"));
+        assertNotNull(response.data().get("token"));
+        var user = users.findByUsername("wx_customer").orElseThrow();
+        assertEquals("CUSTOMER", user.getRole());
+        assertEquals("new-customer-openid", user.getOpenid());
+        assertThrows(com.wms.common.BusinessException.class, () -> authController.wxRegister(new WxRegistrationRequest(ticket, "wx_customer_two", "customer123", "客户"), req()));
     }
 }

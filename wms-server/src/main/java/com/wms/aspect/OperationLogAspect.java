@@ -38,13 +38,13 @@ public class OperationLogAspect {
         long start = System.currentTimeMillis();
         Object result;
         String resultStatus = "ERROR";
-        String message = "unknown";
+        String message = "未知";
         try {
             result = pjp.proceed();
             resultStatus = "SUCCESS";
-            message = "ok";
+            message = "确定";
         } catch (Throwable t) {
-            message = t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName();
+            message = t.getMessage() != null ? t.getMessage() : "操作失败";
             throw t;
         } finally {
             long elapsed = System.currentTimeMillis() - start;

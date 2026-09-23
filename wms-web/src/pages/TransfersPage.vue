@@ -4,6 +4,7 @@ import { Button, Card, Form, Input, InputNumber, Modal, Popconfirm, Select, Spac
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { dateTime, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
 
@@ -73,7 +74,7 @@ const columns = [
   { title: '调入仓', dataIndex: 'targetWarehouseName' },
   { title: '明细', render: (_, r) => r.lines.map((l) => `${l.itemCode}${l.batchNo ? ` [${l.batchNo}]` : ''} × ${number(l.quantity)}`).join('；') },
   { title: '状态', dataIndex: 'status', render: (v) => h(Tag, { color: statusLabels[v]?.[1] }, statusLabels[v]?.[0]) },
-  { title: '创建时间', dataIndex: 'createdAt', render: (v) => dateTime(v) },
+  { title: '创建时间', dataIndex: 'createdAt', customRender: ({ text }) => dateTime(text) },
   {
     title: '操作',
     render: (_, r) => h(Space, [
@@ -102,7 +103,7 @@ const columns = [
   <Typography.Paragraph v-if="warehouses.length < 2" type="warning">请先新增至少一个启用仓库，才能发起跨仓库调拨。</Typography.Paragraph>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="columns" />
+    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" />
   </Card>
 
   <a-modal v-model:open="transferOpen" title="新建调拨草稿" width="840" :destroy-on-close="true" @ok="createTransfer">

@@ -12,17 +12,22 @@ export function formatNumber(value) {
 
 export function formatDateTime(value) {
   if (!value) return ''
-  // 兼容 "2026-08-13T16:04" 或 Date
-  const d = new Date(value)
+  const text = String(value).trim().replace(' ', 'T')
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)
+  const d = new Date(hasTimezone ? text : `${text}+08:00`)
   if (isNaN(d.getTime())) return String(value)
+  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000)
   const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${beijing.getUTCFullYear()}-${pad(beijing.getUTCMonth() + 1)}-${pad(beijing.getUTCDate())} ${pad(beijing.getUTCHours())}:${pad(beijing.getUTCMinutes())}`
 }
 
 export function formatDate(value) {
   if (!value) return ''
-  const d = new Date(value)
+  const text = String(value).trim().replace(' ', 'T')
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text)
+  const d = new Date(hasTimezone ? text : `${text}+08:00`)
   if (isNaN(d.getTime())) return String(value)
+  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000)
   const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return `${beijing.getUTCFullYear()}-${pad(beijing.getUTCMonth() + 1)}-${pad(beijing.getUTCDate())}`
 }

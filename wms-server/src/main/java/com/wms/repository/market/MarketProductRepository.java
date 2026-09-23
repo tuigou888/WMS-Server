@@ -16,29 +16,41 @@ public interface MarketProductRepository extends JpaRepository<MarketProduct, Lo
     boolean existsByItemId(Long itemId);
     boolean existsByTitle(String title);
 
-    @Query("select p from MarketProduct p join fetch p.item where p.status = 'SHELF_ON'")
+    @Query("select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.status = 'SHELF_ON'")
     List<MarketProduct> findAllShelfOn();
 
-    @Query("select p from MarketProduct p join fetch p.item where p.status = 'SHELF_ON' order by p.sortNo asc, p.salesCount desc")
+    @Query(value = "select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.status = 'SHELF_ON' order by p.sortNo asc, p.salesCount desc",
+            countQuery = "select count(p) from MarketProduct p where p.status = 'SHELF_ON'")
     Page<MarketProduct> findShelfOn(Pageable pageable);
 
-    @Query("select p from MarketProduct p join fetch p.item where p.status = 'SHELF_ON' "
+    @Query(value = "select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.status = 'SHELF_ON' "
             + "and (:categoryId is null or p.category.id = :categoryId) "
             + "and (:keyword is null or :keyword = '' or lower(p.title) like lower(concat('%', :keyword, '%')) "
-            + "   or lower(p.item.name) like lower(concat('%', :keyword, '%')) "
-            + "   or lower(p.item.code) like lower(concat('%', :keyword, '%'))) order by p.sortNo asc, p.salesCount desc")
+            + "   or lower(item.name) like lower(concat('%', :keyword, '%')) "
+            + "   or lower(item.code) like lower(concat('%', :keyword, '%'))) order by p.sortNo asc, p.salesCount desc",
+            countQuery = "select count(p) from MarketProduct p join p.item item where p.status = 'SHELF_ON' "
+                    + "and (:categoryId is null or p.category.id = :categoryId) "
+                    + "and (:keyword is null or :keyword = '' or lower(p.title) like lower(concat('%', :keyword, '%')) "
+                    + "   or lower(item.name) like lower(concat('%', :keyword, '%')) "
+                    + "   or lower(item.code) like lower(concat('%', :keyword, '%')))")
     Page<MarketProduct> searchShelfOn(@Param("categoryId") Long categoryId, @Param("keyword") String keyword, Pageable pageable);
 
-    @Query("select p from MarketProduct p left join fetch p.item left join fetch p.category "
+    @Query(value = "select p from MarketProduct p left join fetch p.item item left join fetch item.category left join fetch p.category "
             + "where (:keyword is null or :keyword = '' or lower(p.title) like lower(concat('%', :keyword, '%')) "
-            + "   or lower(p.item.name) like lower(concat('%', :keyword, '%')) "
-            + "   or lower(p.item.code) like lower(concat('%', :keyword, '%')))")
-    Page<MarketProduct> searchAll(@Param("keyword") String keyword, Pageable pageable);
+            + "   or lower(item.name) like lower(concat('%', :keyword, '%')) "
+            + "   or lower(item.code) like lower(concat('%', :keyword, '%'))) "
+            + "and (:status is null or :status = '' or p.status = :status)",
+            countQuery = "select count(p) from MarketProduct p join p.item item "
+                    + "where (:keyword is null or :keyword = '' or lower(p.title) like lower(concat('%', :keyword, '%')) "
+                    + "   or lower(item.name) like lower(concat('%', :keyword, '%')) "
+                    + "   or lower(item.code) like lower(concat('%', :keyword, '%'))) "
+                    + "and (:status is null or :status = '' or p.status = :status)")
+    Page<MarketProduct> searchAll(@Param("keyword") String keyword, @Param("status") String status, Pageable pageable);
 
-    @Query("select p from MarketProduct p join fetch p.item where p.id = :id")
+    @Query("select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.id = :id")
     Optional<MarketProduct> findDetailedById(@Param("id") Long id);
 
-    @Query("select p from MarketProduct p join fetch p.item where p.item.id = :itemId")
+    @Query("select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.item.id = :itemId")
     Optional<MarketProduct> findByItemIdDetailed(@Param("itemId") Long itemId);
 
     @Query("select count(p) from MarketProduct p where p.status='SHELF_ON'")

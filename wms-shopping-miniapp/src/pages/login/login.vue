@@ -17,13 +17,22 @@
         <input class="input" v-model="username" placeholder="用户名" />
         <input class="input" v-model="password" type="password" placeholder="密码" />
         <button class="btn-primary" :disabled="submitting" @tap="doLogin">登录</button>
-        <view class="hint">演示账号：admin / admin123</view>
+        <view v-if="isDev" class="hint">演示账号：admin / admin123</view>
       </view>
 
       <!-- 微信登录 -->
+      <view v-else-if="bindTicket" class="form">
+        <view class="register-title">创建商城账户</view>
+        <input class="input" v-model="registerForm.username" placeholder="设置用户名" />
+        <input class="input" v-model="registerForm.displayName" placeholder="姓名或昵称（可选）" />
+        <input class="input" v-model="registerForm.password" type="password" placeholder="设置密码（至少 6 位）" />
+        <button class="btn-primary" :disabled="submitting" @tap="wxRegister">创建账户并登录</button>
+        <view class="link" @tap="bindTicket=''">重新获取微信授权</view>
+      </view>
+
       <view v-else class="form">
         <button class="btn-primary" :disabled="submitting" @tap="wxLogin">微信一键登录</button>
-        <view class="hint">未绑定的账号将跳到绑定流程</view>
+        <view class="hint">首次使用可直接创建商城账户</view>
       </view>
     </view>
   </view>
@@ -35,7 +44,7 @@ import { useUserStore } from '@/store/user.js'
 
 export default {
   data() {
-    return { mode: 'password', username: '', password: '', submitting: false }
+    return { mode: 'password', username: '', password: '', bindTicket: '', registerForm: { username: '', displayName: '', password: '' }, submitting: false, isDev: import.meta.env.DEV }
   },
   methods: {
     async doLogin() {
@@ -57,18 +66,25 @@ export default {
         })
         const data = await auth.wxLogin(res)
         if (data && data.needBind) {
-          // 需要绑定：转入绑定（这里先提示与账号登录结合）
-          uni.showModal({
-            title: '微信未绑定',
-            content: '请先使用账号登录，或在后台将微信 openid 绑定到账号',
-            showCancel: false,
-          })
+          this.bindTicket = data.bindTicket
+          this.registerForm = { username: '', displayName: '', password: '' }
         } else {
           useUserStore().login(data, data.token)
           uni.switchTab({ url: '/pages/index/index' })
         }
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '微信登录失败', icon: 'none' })
+      } finally { this.submitting = false }
+    },
+    async wxRegister() {
+      if (!this.registerForm.username || !this.registerForm.password || this.registerForm.password.length < 6) { uni.showToast({ title: '请输入用户名和至少 6 位密码', icon: 'none' }); return }
+      this.submitting = true
+      try {
+        const data = await auth.wxRegister({ bindTicket: this.bindTicket, ...this.registerForm })
+        useUserStore().login(data, data.token)
+        uni.switchTab({ url: '/pages/index/index' })
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || '开户失败', icon: 'none' })
       } finally { this.submitting = false }
     },
   },
@@ -86,5 +102,7 @@ export default {
 .tab { flex: 1; text-align: center; padding: 16rpx; font-size: 30rpx; color: #666; }
 .tab.active { color: #1677ff; font-weight: 600; border-bottom: 4rpx solid #1677ff; }
 .form { display: flex; flex-direction: column; gap: 24rpx; }
+.register-title { font-size: 30rpx; font-weight: 600; color: #333; }
+.link { text-align: center; color: #1677ff; font-size: 25rpx; }
 .hint { text-align: center; color: #999; font-size: 24rpx; margin-top: 16rpx; }
 </style>

@@ -12,6 +12,7 @@ wms-web/dist/
 .vscode/
 .DS_Store
 .env
+secrets/
 
 # Python
 __pycache__/

@@ -2,7 +2,8 @@
 // 部署时可注入环境变量 VITE_API_BASE（H5 构建）或修改 VITE_MAIN_BASE（小程序本地存储覆盖，优先级最高），默认本地联调地址
 const ENV_BASE = import.meta.env.VITE_API_BASE || ''
 const STORED_BASE = uni.getStorageSync('wms_api_base')
-const BASE_URL = STORED_BASE || ENV_BASE || 'http://localhost:8088/api/v1'
+const BASE_URL = STORED_BASE || ENV_BASE || (import.meta.env.DEV ? 'http://localhost:8088/api/v1' : '')
+const IS_LOCAL_API = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/|$)/.test(BASE_URL)
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
 const WAREHOUSE_KEY = 'wms_warehouse'
@@ -48,6 +49,7 @@ function setWarehouseId(id) {
 
 async function request(options) {
   const { url, method = 'GET', data, header = {}, responseType } = options
+  if (!BASE_URL) return Promise.reject(new RequestError('未配置生产 API 地址，请使用 VITE_API_BASE 重新构建', -2))
   const token = getToken()
 
   const requestOptions = {
@@ -82,13 +84,14 @@ async function request(options) {
           return
         }
 
+        const apiRes = normalizeResponseData(res.data)
+
         if (res.statusCode >= 400) {
-          const msg = res.data?.message || `请求失败 (${res.statusCode})`
+          const msg = apiRes?.message || `请求失败 (${res.statusCode})`
           reject(new RequestError(msg, res.statusCode, res))
           return
         }
 
-        const apiRes = res.data
         if (apiRes && typeof apiRes === 'object' && 'code' in apiRes) {
           if (apiRes.code === 200) {
             resolve(apiRes.data)
@@ -104,6 +107,17 @@ async function request(options) {
       },
     })
   })
+}
+
+function normalizeResponseData(data) {
+  if (typeof data !== 'string') return data
+  const text = data.trim()
+  if (!text) return data
+  try {
+    return JSON.parse(text)
+  } catch (_) {
+    return data
+  }
 }
 
 const api = {
@@ -223,4 +237,5 @@ export {
   setWarehouseId,
   RequestError,
   BASE_URL,
+  IS_LOCAL_API,
 }

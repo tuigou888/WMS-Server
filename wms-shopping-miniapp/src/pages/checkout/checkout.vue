@@ -74,7 +74,13 @@ export default {
   computed: {
     warehouse() { return this.warehouses.find(w => w.id === this.warehouseId) },
     warehouseNames() { return this.warehouses.map(w => w.name) },
-    payTypes() { return [ { value: 'PAY_ONLINE', label: '在线支付(模拟)' }, { value: 'CASH_ON_DELIVERY', label: '货到付款' } ] },
+    payTypes() {
+      const base = [ { value: 'PAY_ONLINE', label: '微信支付' }, { value: 'CASH_ON_DELIVERY', label: '货到付款' } ]
+      // P2-10：挂账(CREDIT)入口仅管理员可见
+      const user = useUserStore().user
+      if (user && user.role === 'ADMIN') base.push({ value: 'CREDIT', label: '挂账' })
+      return base
+    },
   },
   async onShow() {
     await useCartStore().load()

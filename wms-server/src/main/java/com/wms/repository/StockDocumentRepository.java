@@ -7,4 +7,5 @@ public interface StockDocumentRepository extends JpaRepository<StockDocument,Lon
  @Query("select case when count(l) > 0 then true else false end from StockDocumentLine l where l.item.id=:itemId") boolean existsLineByItemId(@Param("itemId") Long itemId);
  boolean existsByPartnerId(Long partnerId);
  boolean existsByDocumentNo(String documentNo);
+ boolean existsByReversalOfDocumentId(Long reversalOfDocumentId);
 }

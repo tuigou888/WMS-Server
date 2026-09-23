@@ -5,6 +5,7 @@ import com.wms.common.BusinessException;
 import com.wms.model.entity.Location;
 import com.wms.repository.LocationRepository;
 import com.wms.repository.WarehouseRepository;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -27,6 +28,7 @@ public class LocationController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('location:read')")
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) Long warehouseId) {
         List<Location> values;
         if (warehouseId != null) {

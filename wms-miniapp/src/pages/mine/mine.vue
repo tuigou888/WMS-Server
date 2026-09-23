@@ -9,7 +9,7 @@
           {{ userStore.isAdmin ? '系统管理员' : '仓库操作员' }}
         </text>
         <view class="user-perms">
-          <text v-for="p in userStore.permissions.slice(0, 6)" :key="p" class="perm-tag">{{ p }}</text>
+          <text v-for="p in userStore.permissions.slice(0, 6)" :key="p" class="perm-tag">{{ permissionLabel(p) }}</text>
           <text v-if="userStore.permissions.length > 6" class="perm-tag">...+{{ userStore.permissions.length - 6 }}</text>
         </view>
       </view>
@@ -50,7 +50,7 @@
         <view class="log-list">
           <view v-for="log in myLogs.slice(0, 5)" :key="log.id" class="log-item">
             <view class="log-main">
-              <text class="log-action">{{ log.action }}</text>
+              <text class="log-action">{{ actionLabel(log.action) }}</text>
               <text class="log-target">{{ log.target }}</text>
             </view>
             <view class="log-meta">
@@ -72,7 +72,7 @@
             <text>1.0.0</text>
           </view>
           <view class="about-row">
-            <text>后端 API</text>
+            <text>后端接口</text>
             <text class="value-green">v1.0</text>
           </view>
           <view class="about-row">
@@ -95,6 +95,7 @@
 import { useUserStore } from '@/store/user.js'
 import { api } from '@/api/request.js'
 import { dateTime as formatDateTime } from '@/utils/format.js'
+import { actionLabel, permissionLabel } from '@/utils/labels.js'
 
 export default {
   data() {
@@ -176,6 +177,8 @@ export default {
       }
     },
     formatDateTime,
+    actionLabel,
+    permissionLabel,
   },
 }
 </script>

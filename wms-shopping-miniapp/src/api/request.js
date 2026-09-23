@@ -2,7 +2,7 @@
 // 部署时可用环境变量 VITE_API_BASE（H5 构建期注入）或本地存储 wms_api_base 覆盖
 const ENV_BASE = import.meta.env.VITE_API_BASE || ''
 const STORED_BASE = uni.getStorageSync('wms_api_base')
-const BASE_URL = STORED_BASE || ENV_BASE || 'http://localhost:8088/api/v1'
+const BASE_URL = STORED_BASE || ENV_BASE || (import.meta.env.DEV ? 'http://localhost:8088/api/v1' : '')
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
 
@@ -50,6 +50,7 @@ function redirectToLogin() {
 
 export function request(options) {
   const { url, method = 'GET', data, header = {}, responseType } = options
+  if (!BASE_URL) return Promise.reject(new RequestError('未配置生产 API 地址，请使用 VITE_API_BASE 重新构建', -2))
   const token = getToken()
   const opts = {
     url: BASE_URL + url,

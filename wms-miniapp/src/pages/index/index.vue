@@ -101,14 +101,6 @@ export default {
       alerts: null,
       refreshing: false,
       contentHeight: 0,
-      menus: [
-        { key: 'stock-in', name: '扫码入库', icon: '📥', url: '/pages/stock-in/stock-in' },
-        { key: 'stock-out', name: '扫码出库', icon: '📤', url: '/pages/stock-out/stock-out' },
-        { key: 'scan', name: '扫码查询', icon: '🔍', url: '/pages/scan/scan' },
-        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory' },
-        { key: 'check', name: '盘点任务', icon: '📋', url: '/pages/check/check' },
-        { key: 'item-list', name: '物品查询', icon: '🏷️', url: '/pages/item-list/item-list' },
-      ],
     }
   },
   computed: {
@@ -124,6 +116,18 @@ export default {
     },
     currentWarehouse() {
       return this.userStore.warehouses.find(w => w.id === this.userStore.warehouseId)
+    },
+    menus() {
+      return [
+        ...(this.userStore.isAdmin ? [
+          { key: 'stock-in', name: '扫码入库', icon: '📥', url: '/pages/stock-in/stock-in' },
+          { key: 'stock-out', name: '扫码出库', icon: '📤', url: '/pages/stock-out/stock-out' },
+        ] : []),
+        { key: 'scan', name: '扫码查询', icon: '🔍', url: '/pages/scan/scan' },
+        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory' },
+        { key: 'check', name: '盘点任务', icon: '📋', url: '/pages/check/check' },
+        { key: 'item-list', name: '物品查询', icon: '🏷️', url: '/pages/item-list/item-list' },
+      ]
     },
   },
   onLoad() {

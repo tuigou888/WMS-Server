@@ -1,8 +1,9 @@
 <script setup>
 import { h, onMounted, ref } from 'vue'
-import { Button, Card, Input, Modal, Space, Table, Tag, Typography, message } from 'ant-design-vue'
+import { Button, Card, Input, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'ant-design-vue'
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
+import { normalizeColumns } from '../utils/table'
 
 const data = ref([])
 const total = ref(0)
@@ -62,11 +63,10 @@ const columns = [
     title: '操作', width: 140,
     render: (_, r) => h(Space, [
       h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑'),
-      h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined), onClick: () => {
-        if (confirm('确认删除该客户？')) {
-          api.deleteMarketCustomer(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message))
-        }
-      } }, '删除'),
+      h(Popconfirm, {
+        title: '确认删除该客户？',
+        onConfirm: () => api.deleteMarketCustomer(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message)),
+      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }),
     ]),
   },
 ]
@@ -86,7 +86,7 @@ const columns = [
       <a-input allow-clear placeholder="搜索姓名或电话" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load" />
       <Button @click="load">查询</Button>
     </Space>
-    <a-table row-key="id" :loading="loading" :data-source="data" :columns="columns"
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)"
       :pagination="{ current: page, total, pageSize: 10, onChange: (p) => { page = p; load() }, showTotal: (t) => `共 ${t} 条` }" />
   </Card>
 

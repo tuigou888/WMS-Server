@@ -4,11 +4,14 @@ import { Button, Card, Input, InputNumber, Modal, Popconfirm, Select, Space, Swi
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { money, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 
 const empty = { unit: '个', safetyStock: 0, maxStock: 0, minStock: 0, status: true }
 
 const data = ref([])
 const total = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
 const loading = ref(false)
 const keyword = ref('')
 const modalOpen = ref(false)
@@ -18,11 +21,12 @@ const warehouses = ref([])
 const inventoryMap = ref({})
 const formState = ref({ ...empty })
 
-const load = async () => {
+const load = async (resetPage = false) => {
+  if (resetPage) page.value = 1
   loading.value = true
   try {
     const [items, inv] = await Promise.all([
-      api.items({ page: 1, pageSize: 100, keyword: keyword.value || undefined }),
+      api.items({ page: page.value, pageSize: pageSize.value, keyword: keyword.value || undefined }),
       api.inventory(),
     ])
     data.value = items.records
@@ -110,10 +114,10 @@ const columns = [
 
   <Card class="table-card">
     <Space style="margin-bottom: 16px;">
-      <a-input allow-clear placeholder="搜索物品编码或名称" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load" />
-      <Button @click="load">查询</Button>
+      <a-input allow-clear placeholder="搜索物品编码或名称" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load(true)" />
+      <Button @click="load(true)">查询</Button>
     </Space>
-    <a-table row-key="id" :loading="loading" :data-source="data" :columns="columns" :pagination="{ total, pageSize: 100, showTotal: (t) => `共 ${t} 条` }" />
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)" :scroll="{ x: 920 }" :pagination="{ current: page, total, pageSize, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, s) => { page = p; pageSize = s; load() } }" />
   </Card>
 
   <a-modal v-model:open="modalOpen" :title="editing ? '编辑物品' : '新增物品'" :destroy-on-close="true" width="660" ok-text="保存" @ok="save">

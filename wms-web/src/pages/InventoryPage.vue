@@ -3,6 +3,7 @@ import { h, onMounted, ref, watch } from 'vue'
 import { Card, Segmented, Table, Tag, Typography, message } from 'ant-design-vue'
 import { api } from '../api/wms'
 import { dateTime, money, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 
 const tab = ref('stock')
 const stock = ref([])
@@ -50,7 +51,7 @@ const stockCols = [
   { title: '库存数量', dataIndex: 'quantity', render: (v, r) => h('b', `${number(v)} ${r.unit}`) },
   { title: '平均成本', dataIndex: 'avgCost', render: (v) => money(v) },
   { title: '库存金额', dataIndex: 'totalAmount', render: (v) => money(v) },
-  { title: '更新时间', dataIndex: 'updatedAt', render: (v) => dateTime(v) },
+  { title: '更新时间', dataIndex: 'updatedAt', customRender: ({ text }) => dateTime(text) },
 ]
 
 const txCols = [
@@ -61,7 +62,7 @@ const txCols = [
   { title: '变动数量', dataIndex: 'quantity', render: (v) => h('span', { class: Number(v) < 0 ? 'negative' : 'positive' }, number(v)) },
   { title: '单价', dataIndex: 'unitCost', render: (v) => money(v) },
   { title: '余额数量', dataIndex: 'balanceQuantity', render: (v) => number(v) },
-  { title: '时间', dataIndex: 'transactionAt', render: (v) => dateTime(v) },
+  { title: '时间', dataIndex: 'transactionAt', customRender: ({ text }) => dateTime(text) },
 ]
 </script>
 
@@ -77,7 +78,7 @@ const txCols = [
     <template #title>
       <Segmented v-model:value="tab" :options="[{ label: '库存查询', value: 'stock' }, { label: '库存流水', value: 'transactions' }]" />
     </template>
-    <a-table v-if="tab === 'stock'" row-key="id" :loading="stockLoading" :data-source="stock" :columns="stockCols" />
-    <a-table v-else row-key="id" :loading="txLoading" :data-source="transactions" :columns="txCols" />
+    <a-table v-if="tab === 'stock'" row-key="id" :loading="stockLoading" :data-source="stock" :columns="normalizeColumns(stockCols)" />
+    <a-table v-else row-key="id" :loading="txLoading" :data-source="transactions" :columns="normalizeColumns(txCols)" />
   </Card>
 </template>

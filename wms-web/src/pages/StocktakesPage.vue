@@ -4,6 +4,7 @@ import { Button, Card, Drawer, InputNumber, Popconfirm, Select, Space, Table, Ta
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { dateTime, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
 
@@ -58,7 +59,7 @@ const columns = [
   { title: '盘点单号', dataIndex: 'stocktakeNo' },
   { title: '仓库', dataIndex: 'warehouseName' },
   { title: '状态', dataIndex: 'status', render: (v) => h(Tag, { color: label[v]?.[1] }, label[v]?.[0]) },
-  { title: '创建时间', dataIndex: 'createdAt', render: (v) => dateTime(v) },
+  { title: '创建时间', dataIndex: 'createdAt', customRender: ({ text }) => dateTime(text) },
   {
     title: '操作',
     render: (_, r) => h(Space, [
@@ -104,13 +105,13 @@ const detailColumns = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="columns" />
+    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" />
   </Card>
 
   <a-drawer v-model:open="drawerOpen" :title="detail?.stocktakeNo" width="760">
     <template v-if="detail">
       <Typography.Paragraph>账面数量与实盘数量的差额将在审核并执行后写入库存流水。</Typography.Paragraph>
-      <a-table row-key="id" :pagination="false" :data-source="detail.lines" :columns="detailColumns" />
+      <a-table row-key="id" :pagination="false" :data-source="detail.lines" :columns="normalizeColumns(detailColumns)" />
       <Button v-if="detail.status === 'DRAFT'" type="primary" style="margin-top: 16px;" @click="saveCounts">保存实盘数量</Button>
     </template>
   </a-drawer>

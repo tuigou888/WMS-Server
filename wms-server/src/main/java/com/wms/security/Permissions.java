@@ -9,6 +9,8 @@ public final class Permissions {
 
     public static final String INVENTORY_READ = "inventory:read";
     public static final String INVENTORY_WRITE = "inventory:write";
+    /** 直接扫码出入库；与单据制单权限分离，默认仅管理员拥有。 */
+    public static final String INVENTORY_SCAN = "inventory:scan";
     public static final String DOCUMENT_READ = "document:read";
     public static final String DOCUMENT_WRITE = "document:write";
     public static final String DOCUMENT_EXECUTE = "document:execute";

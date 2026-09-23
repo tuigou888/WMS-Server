@@ -30,7 +30,7 @@ const ageCols = [
   { title: '批次号', dataIndex: 'batchNo', render: (v) => v ? h(Tag, { color: 'blue' }, v) : '-' },
   { title: '数量', dataIndex: 'quantity', render: (v) => number(v) },
   { title: '金额', dataIndex: 'amount', render: (v) => money(v) },
-  { title: '最早入库日期', dataIndex: 'earliestInDate', render: (v) => v || '-' },
+  { title: '最早入库日期', dataIndex: 'earliestInDate', customRender: ({ text }) => text || '-' },
   { title: '库龄（天）', dataIndex: 'ageDays', render: (v) => h('b', v) },
   { title: '库龄区间', dataIndex: 'bucket', render: (v) => h(Tag, { color: bucketColor[v] }, `${v} 天`) },
 ]

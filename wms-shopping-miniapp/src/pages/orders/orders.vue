@@ -40,6 +40,7 @@
 <script>
 import { orders as orderApi } from '@/api/market.js'
 import { useUserStore } from '@/store/user.js'
+import { requestPayment, PaymentCancelled } from '@/utils/pay.js'
 
 export default {
   data() {
@@ -73,8 +74,17 @@ export default {
       }})
     },
     async payOrder(o) {
-      try { await orderApi.pay(o.id); uni.showToast({ title: '支付成功', icon: 'success' }); this.load(true) }
-      catch (e) { uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' }) }
+      try {
+        await requestPayment(o.id)
+        uni.showToast({ title: '支付成功', icon: 'success' })
+        this.load(true)
+      } catch (e) {
+        if (e && e.cancelled) {
+          uni.showToast({ title: '已取消支付', icon: 'none' })
+        } else {
+          uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+        }
+      }
     },
     async receiveOrder(o) {
       try { await orderApi.receive(o.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load(true) }

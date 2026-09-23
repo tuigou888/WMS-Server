@@ -37,6 +37,12 @@ public final class TransactionType {
     /** 报溢入库 */
     public static final String GAIN_IN = "gain_in";
 
-    /** 反审冲销（红字） */
+    /** 反审/红冲冲销：逆转原出库，数量为正且不计销售/利润。 */
+    public static final String REVERSE_IN = "reverse_in";
+
+    /** 反审/红冲冲销：逆转原入库，数量为负且不计销售/利润。 */
+    public static final String REVERSE_OUT = "reverse_out";
+
+    /** 兼容历史反审流水；新代码必须使用 reverse_in / reverse_out。 */
     public static final String REVERSE = "reverse";
 }

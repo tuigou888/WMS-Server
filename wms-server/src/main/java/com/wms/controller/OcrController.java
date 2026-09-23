@@ -5,6 +5,8 @@ import com.wms.common.BusinessException;
 import com.wms.model.entity.Item;
 import com.wms.repository.ItemRepository;
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,13 +21,16 @@ import java.util.*;
 public class OcrController {
 
     private final ItemRepository items;
+    @Value("${ocr.mock:false}") private boolean mock;
 
     public OcrController(ItemRepository items) {
         this.items = items;
     }
 
     @PostMapping(value = "/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('ocr:use')")
     public ApiResponse<Map<String, Object>> recognize(@RequestPart("file") MultipartFile file) {
+        if (!mock) throw new BusinessException("OCR 服务尚未配置，当前环境不可使用识别功能");
         if (file.isEmpty()) {
             throw new BusinessException("请选择图片文件");
         }
@@ -52,6 +57,6 @@ public class OcrController {
         result.put("lines", lines);
         result.put("totalLines", lines.size());
 
-        return ApiResponse.ok("识别完成", result);
+        return ApiResponse.ok("模拟识别完成，结果仅供录入辅助，请人工核验", result);
     }
 }

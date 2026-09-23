@@ -1,0 +1,29 @@
+spring:
+  datasource:
+    # Production deliberately has no H2 fallback: every database setting must be supplied.
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: ${DB_DRIVER}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    # Existing deployments created by Hibernate have no schema-history table.
+    # Treat their pre-Flyway schema as V1, then apply every later migration.
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+  h2:
+    console:
+      enabled: false
+
+wechat:
+  # Docker Compose also pins these values. ProductionSafetyConfig rejects environment overrides.
+  mock: false
+  pay:
+    mock: false
+
+ocr:
+  mock: false

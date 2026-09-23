@@ -596,8 +596,9 @@ CREATE TABLE `operation_logs` (
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | /auth/login | 用户名密码登录 |
-| POST | /auth/wx-login | 微信登录：未绑定返回 `{needBind:true, openid}`，已绑定直接返回 token |
-| POST | /auth/wx-bind | 微信绑定账号 `{openid, username, password}`，绑定后签发 token |
+| POST | /auth/wx-login | 微信登录：未绑定返回 `{needBind:true, bindTicket, expiresIn}`，已绑定直接返回 token |
+| POST | /auth/wx-bind | 微信绑定既有账号 `{bindTicket, username, password}`，绑定后签发 token |
+| POST | /auth/wx-register | 微信首次开户 `{bindTicket, username, password, displayName?}`，服务端固定创建 CUSTOMER |
 | GET | /auth/me | 当前用户信息 |
 | POST | /auth/logout | 退出登录 |
 | GET | /auth/permissions | 角色权限矩阵 |
@@ -856,6 +857,16 @@ public class StockServiceImpl implements StockService {
 
 实际实现位于 `wms-miniapp/`（uni-app + Vue 3 + Pinia，可编译微信小程序 / H5）：
 
+微信开发者工具不能直接编译 `wms-miniapp/src` 下的 uni-app 源码。请先执行：
+
+```bash
+cd wms-miniapp
+npm install
+npm run build:mp-weixin
+```
+
+然后在微信开发者工具中打开 `wms-miniapp/dist/build/mp-weixin`。如果打开的是 `wms-miniapp` 项目根目录，必须先完成上述构建；根目录的 `project.config.json` 已配置 `miniprogramRoot` 指向该编译产物。不要直接把 `wms-miniapp` 源码目录当作微信小程序源码编译，否则会报“项目根目录未找到 app.json”。
+
 ```
 wms-miniapp/src/
 ├── main.js                  # 入口（挂载 Pinia，401 拦截跳登录）
@@ -1076,9 +1087,12 @@ Page({
 小程序 uni.login() 取 code
   → POST /auth/wx-login {code}
     ├─ 已绑定  → 返回 {token, username, role, permissions}（同账号密码登录壳）
-    └─ 未绑定  → 返回 {needBind: true, openid}
-                   → POST /auth/wx-bind {openid, username, password}
-                   → 返回 {token, ...}
+    └─ 未绑定  → 返回 {needBind: true, bindTicket, expiresIn}
+                   → bindTicket 仅服务端保存 openid、5 分钟有效且只能使用一次
+                   ├─ POST /auth/wx-bind {bindTicket, username, password}
+                   │  → 绑定既有账号并返回 {token, ...}
+                   └─ POST /auth/wx-register {bindTicket, username, password, displayName?}
+                      → 创建 CUSTOMER 并返回 {token, ...}
 ```
 
 - 前端统一请求封装（`src/api/request.js`）：token 注入 `Authorization: Bearer`，401 清 token 跳登录页，仅在 `code === 200` 时 resolve `data`。
@@ -1267,123 +1281,43 @@ ORDER BY shortage DESC;
 
 ### 11.1 Docker Compose 部署
 
-```yaml
-version: '3.8'
-services:
-  mysql:
-    image: mysql:8.0
-    container_name: wms-mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: your_password
-      MYSQL_DATABASE: wms
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
-    restart: always
+实际 `docker-compose.yml` 只编排 MySQL、`wms-server` 和 `wms-web`；Redis、MinIO 和外置 Nginx 并不在当前仓库的运行编排中。
 
-  redis:
-    image: redis:7-alpine
-    container_name: wms-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    restart: always
+部署前必须准备独立数据库账号和微信支付真实参数。复制模板并填入高强度口令，私钥与微信支付公钥放在未提交的 `./secrets/` 目录：
 
-  wms-server:
-    build:
-      context: ./wms-server
-      dockerfile: Dockerfile
-    container_name: wms-server
-    ports:
-      - "8088:8088"
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/wms?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=your_password
-      - SPRING_DATA_REDIS_HOST=redis
-    depends_on:
-      - mysql
-      - redis
-    restart: always
-
-  minio:
-    image: minio/minio
-    container_name: wms-minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: your_password
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    restart: always
-
-  wms-web:
-    build:
-      context: ./wms-web
-      dockerfile: Dockerfile
-    container_name: wms-web
-    ports:
-      - "3000:80"
-    depends_on:
-      - wms-server
-    restart: always
-
-  nginx:
-    image: nginx:alpine
-    container_name: wms-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-    depends_on:
-      - wms-server
-      - wms-web
-    restart: always
-
-volumes:
-  mysql_data:
-  redis_data:
-  minio_data:
+```bash
+cp .env.example .env
+mkdir -p secrets
+# 编辑 .env，并放入 secrets/apiclient_key.pem、secrets/wechatpay_public_key.pem
+docker compose --env-file .env up --build -d
 ```
 
 ### 11.2 系统配置清单
 
-| 配置项 | 说明 | 默认值 |
-|--------|------|--------|
-| 服务器 | 4核8G CentOS 7+ | - |
-| MySQL | 8.0，utf8mb4 | 端口3306 |
-| Redis | 7.x | 端口6379 |
-| 小程序AppID | 微信小程序ID | 需申请 |
-| SSL证书 | HTTPS必需 | 需申请 |
-| 域名 | API域名+静态资源域名 | 需备案 |
+| 配置项 | 说明 |
+|--------|------|
+| MySQL 8.0 | 容器创建 `wms` 数据库；应用使用 `MYSQL_USER`，不使用 root。 |
+| 数据库口令 | `MYSQL_ROOT_PASSWORD`、`MYSQL_PASSWORD` 必填且无默认值。 |
+| 微信小程序 | `WECHAT_APPID`、`WECHAT_SECRET` 必填。 |
+| 微信支付 | 商户号、证书序列号、APIv3 密钥、两份 PEM 和 HTTPS 回调地址均必填。 |
+| Profile | Compose 固定为 `prod`：禁用 H2 Console、演示数据及登录/支付 mock，JPA 只校验模型。 |
 
 ### 11.3 初始化步骤
 
 ```bash
-# 1. 克隆项目
+# 1. 获取代码并创建仅本机保存的部署变量
 git clone xxx/wms.git
+cd wms
+cp .env.example .env
 
-# 2. 修改配置
-cp config/config.example.yaml config/config.yaml
-# 编辑数据库密码、Redis密码等
+# 2. 填写 .env，准备 secrets/ 下的两份 PEM 后启动
+docker compose --env-file .env up --build -d
 
-# 3. 初始化数据库
-mysql -u root -p < sql/init.sql
-
-# 4. 启动服务
-docker-compose up -d
-
-# 5. 检查服务
-curl http://localhost:8088/api/health
+# 3. 检查服务（实际接口前缀为 /api/v1）
+curl http://localhost:8088/api/v1/health
 ```
+
+全新生产库不会生成演示账号。首次启动空库前，临时在 `.env` 设置 `WMS_BOOTSTRAP_ADMIN_USERNAME` 和至少 12 位的 `WMS_BOOTSTRAP_ADMIN_PASSWORD`；启动成功后立即删除引导密码并重新部署。已有管理员的数据库无需设置这两个变量。
 
 ---
 
@@ -1397,4 +1331,3 @@ curl http://localhost:8088/api/health
 | **pigx** | gitee.com/log4j/pig | 微服务架构参考 |
 
 ---
-

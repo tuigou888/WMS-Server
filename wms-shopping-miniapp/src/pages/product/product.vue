@@ -12,7 +12,7 @@
         </view>
         <view class="detail-info">
           <view class="row">
-            <text class="label">分类：</text><text class="value">{{ product.categoryName || 'N/A' }}</text>
+            <text class="label">分类：</text><text class="value">{{ product.categoryName || '无数据' }}</text>
           </view>
           <view class="row">
             <text class="label">库存：</text><text class="value">{{ product.availableStock }} 件</text>
@@ -21,7 +21,7 @@
             <text class="label">单位：</text><text class="value">{{ product.unit }}</text>
           </view>
           <view class="row">
-            <text class="label">规格：</text><text class="value">{{ product.specs || 'N/A' }}</text>
+            <text class="label">规格：</text><text class="value">{{ product.specs || '无数据' }}</text>
           </view>
         </view>
 
@@ -40,6 +40,7 @@
             <text>{{ getStockText(product) }}</text>
           </text>
           <view class="flex">
+            <button class="btn-fav" @tap="toggleFav">{{ favorited ? '★ 已收藏' : '☆ 收藏' }}</button>
             <button class="btn-primary" @tap="doAdd" :disabled="addingDisabled">加入购物车</button>
             <button class="btn-outline" @tap="doBuy" :disabled="addingDisabled">直接购买</button>
           </view>
@@ -61,17 +62,20 @@
 </template>
 
 <script>
-import { products } from '@/api/market.js'
+import { products, favorites } from '@/api/market.js'
 import { useCartStore } from '@/store/cart.js'
-import { ref } from 'vue'
 
 export default {
     data() {
-      return { product: null, defaultImg: '', isAdding: false }
+      return { product: null, defaultImg: '', isAdding: false, favorited: false }
     },
-  onLoad() {
-    const id = this.$route.params.id
-    if (id) products.detail(id).then(p => { this.product = p })
+  onLoad(opt) {
+    const id = opt && opt.id
+    if (id) {
+      products.detail(id).then(p => { this.product = p })
+        .catch(e => uni.showToast({ title: (e && e.message) || '加载失败', icon: 'none' }))
+      favorites.check(id).then(r => { this.favorited = !!(r && r.favorited) }).catch(() => {})
+    }
   },
   computed: {
     productStatus() {
@@ -104,10 +108,10 @@ export default {
       if (this.addingDisabled) return
       uni.showModal({
         title: '确认下单',
-        content: `购买「${this.product.title}」× 1（¥${this.product.salePrice}）`,
+        content: `购买「${this.product.title}」× 1（¥${this.formatPrice(this.product.salePrice)}）`,
         confirmText: '确认购买',
         cancelText: '取消',
-        success: (b) => { if (b) this.goCheckout() },
+        success: (r) => { if (r && r.confirm) this.goCheckout() },
       })
     },
     goCheckout() {
@@ -117,6 +121,16 @@ export default {
       const avail = Number(p.availableStock || 0)
       if (avail <= 0) return '库存不足'
       return '有货'
+    },
+    async toggleFav() {
+      if (!this.product) return
+      try {
+        const r = await favorites.toggle(this.product.id)
+        this.favorited = !!(r && r.favorited)
+        uni.showToast({ title: this.favorited ? '已收藏' : '已取消收藏', icon: 'none' })
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
+      }
     },
   },
 }

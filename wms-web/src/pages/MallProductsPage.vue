@@ -4,6 +4,7 @@ import { Button, Card, Input, InputNumber, Modal, Popconfirm, Select, Space, Swi
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { money, number } from '../utils/format'
+import { normalizeColumns } from '../utils/table'
 
 const emptyForm = { itemId: undefined, title: '', subTitle: '', mainImage: '', gallery: '', salePrice: 0, marketPrice: 0, categoryId: undefined, sortNo: 0 }
 
@@ -18,6 +19,7 @@ const editing = ref(null)
 const formState = ref({ ...emptyForm })
 const items = ref([])
 const itemMap = ref({})
+const categories = ref([])
 
 const load = async () => {
   loading.value = true
@@ -41,12 +43,24 @@ onMounted(async () => {
   } catch (e) {
     message.error(e.message)
   }
+  try {
+    categories.value = await api.categories()
+  } catch (e) { /* 分类加载失败不阻塞 */
+  }
 })
 
 const open = (record) => {
   editing.value = record || null
   formState.value = { ...emptyForm, ...(record || {}), gallery: Array.isArray(record?.gallery) ? record.gallery.join(',') : (record?.gallery || '') }
   modalOpen.value = true
+}
+
+const onItemChange = (itemId) => {
+  // 选择物品后自动带出其分类作为默认（用户可再改）
+  const it = itemMap.value[itemId]
+  if (it && it.category && formState.value.categoryId == null) {
+    formState.value.categoryId = it.category.id
+  }
 }
 
 const save = async () => {
@@ -112,14 +126,14 @@ const columns = [
       <a-select v-model:value="statusFilter" allow-clear placeholder="状态" style="width: 120px;" :options="[{ value: 'SHELF_ON', label: '上架' }, { value: 'SHELF_OFF', label: '下架' }]" @change="load" />
       <Button @click="load">查询</Button>
     </Space>
-    <a-table row-key="id" :loading="loading" :data-source="data" :columns="columns"
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)"
       :pagination="{ current: page, total, pageSize: 10, onChange: (p) => { page = p; load() }, showTotal: (t) => `共 ${t} 条` }" />
   </Card>
 
   <a-modal v-model:open="modalOpen" :title="editing ? '编辑商品' : '新增商品'" :destroy-on-close="true" width="680" ok-text="保存" @ok="save">
     <a-form layout="vertical" :model="formState">
       <a-form-item label="关联物品（选中后显示编码/名称）" required>
-        <a-select v-model:value="formState.itemId" :options="items.map((x) => ({ value: x.id, label: `${x.code} ${x.name}` }))" :filter-option="(input, opt) => String(opt.label).toLowerCase().includes(input.toLowerCase())" show-search placeholder="搜索选择物品" />
+        <a-select v-model:value="formState.itemId" :options="items.map((x) => ({ value: x.id, label: `${x.code} ${x.name}` }))" :filter-option="(input, opt) => String(opt.label).toLowerCase().includes(input.toLowerCase())" show-search placeholder="搜索选择物品" @change="onItemChange" />
       </a-form-item>
       <div class="grid-2">
         <a-form-item label="标题" required><a-input v-model:value="formState.title" placeholder="商品标题" /></a-form-item>
@@ -129,12 +143,12 @@ const columns = [
         <a-form-item label="售价（元）" required><a-input-number v-model:value="formState.salePrice" :min="0" :precision="2" style="width: 100%;" /></a-form-item>
         <a-form-item label="划线价（元）"><a-input-number v-model:value="formState.marketPrice" :min="0" :precision="2" style="width: 100%;" /></a-form-item>
       </div>
-      <a-form-item label="主图 URL"><a-input v-model:value="formState.mainImage" placeholder="https://..." /></a-form-item>
-      <a-form-item label="图集 URL（逗号分隔）"><a-input v-model:value="formState.gallery" placeholder="https://...,https://..." /></a-form-item>
+      <a-form-item label="主图地址"><a-input v-model:value="formState.mainImage" placeholder="https://..." /></a-form-item>
+      <a-form-item label="图集地址（逗号分隔）"><a-input v-model:value="formState.gallery" placeholder="https://...,https://..." /></a-form-item>
       <div class="grid-2">
         <a-form-item label="排序（越小越靠前）"><a-input-number v-model:value="formState.sortNo" style="width: 100%;" /></a-form-item>
-        <a-form-item label="分类（沿用物品分类）">
-          <a-input :value="editing ? (itemMap[formState.itemId]?.category?.name || '') : ''" disabled />
+        <a-form-item label="分类">
+          <a-select v-model:value="formState.categoryId" allow-clear placeholder="选择分类" :options="categories.map((c) => ({ value: c.id, label: c.name }))" />
         </a-form-item>
       </div>
     </a-form>

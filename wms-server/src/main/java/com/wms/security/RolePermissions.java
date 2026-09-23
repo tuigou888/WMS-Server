@@ -15,7 +15,7 @@ public final class RolePermissions {
     private RolePermissions() {}
 
     private static final Set<String> ALL = Set.of(
-            INVENTORY_READ, INVENTORY_WRITE,
+            INVENTORY_READ, INVENTORY_WRITE, INVENTORY_SCAN,
             DOCUMENT_READ, DOCUMENT_WRITE, DOCUMENT_EXECUTE, DOCUMENT_REVIEW,
             TRANSFER_READ, TRANSFER_WRITE, TRANSFER_EXECUTE, TRANSFER_REVIEW,
             STOCKTAKE_READ, STOCKTAKE_WRITE, STOCKTAKE_EXECUTE, STOCKTAKE_REVIEW,
@@ -43,8 +43,24 @@ public final class RolePermissions {
     private static final Set<String> CUSTOMER = Set.of(
             MARKET_BUY, MARKET_READ, CUSTOMER_READ);
 
-    private static final Map<String, Set<String>> MATRIX = Map.of(
-            "ADMIN", ALL, "WAREHOUSE", WAREHOUSE, "CUSTOMER", CUSTOMER);
+    /** 采购专员只能维护采购申请和基础档案，不具备审批或库存执行权。 */
+    private static final Set<String> PROCUREMENT = Set.of(
+            PURCHASE_READ, PURCHASE_WRITE, ITEM_READ, PARTNER_READ, INVENTORY_READ, LOCATION_READ, REPORT_VIEW);
+    /** 审计员只读业务数据并执行审核，不具备制单、执行或用户管理权。 */
+    private static final Set<String> AUDITOR = Set.of(
+            INVENTORY_READ, DOCUMENT_READ, DOCUMENT_REVIEW, TRANSFER_READ, TRANSFER_REVIEW,
+            STOCKTAKE_READ, STOCKTAKE_REVIEW, ADJUSTMENT_READ, ADJUSTMENT_REVIEW,
+            PURCHASE_READ, PURCHASE_REVIEW, ITEM_READ, PARTNER_READ, LOCATION_READ, LOG_VIEW, REPORT_VIEW,
+            PRODUCT_READ, ORDER_READ, CUSTOMER_READ);
+    /** 财务角色读取经营数据及商城订单，不具备履约和库存操作权。 */
+    private static final Set<String> FINANCE = Set.of(REPORT_VIEW, INVENTORY_READ, DOCUMENT_READ, PURCHASE_READ, ORDER_READ, CUSTOMER_READ);
+    /** 客服维护客户档案、查看订单和商品；退款、审核、发货仍需专门职责。 */
+    private static final Set<String> CUSTOMER_SERVICE = Set.of(PRODUCT_READ, ORDER_READ, CUSTOMER_READ, CUSTOMER_WRITE);
+
+    private static final Map<String, Set<String>> MATRIX = Map.ofEntries(
+            Map.entry("ADMIN", ALL), Map.entry("WAREHOUSE", WAREHOUSE), Map.entry("PROCUREMENT", PROCUREMENT),
+            Map.entry("AUDITOR", AUDITOR), Map.entry("FINANCE", FINANCE), Map.entry("CUSTOMER_SERVICE", CUSTOMER_SERVICE),
+            Map.entry("CUSTOMER", CUSTOMER));
 
     public static Set<String> forRole(String role) {
         Set<String> permissions = role == null ? null : MATRIX.get(role);
@@ -52,4 +68,5 @@ public final class RolePermissions {
     }
 
     public static Set<String> all() { return new LinkedHashSet<>(ALL); }
+    public static Map<String, Set<String>> roles(){Map<String,Set<String>> result=new java.util.TreeMap<>();MATRIX.forEach((role,permissions)->result.put(role,new LinkedHashSet<>(permissions)));return result;}
 }

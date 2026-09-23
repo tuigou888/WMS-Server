@@ -1,7 +1,7 @@
 <template>
   <view class="page">
     <view class="search-bar">
-      <input class="input" v-model="keyword" placeholder="搜索商品名称 / 型号 / 品牌" confirm-type="search" @confirm="search" />
+      <input class="input" :placeholder="categoryName ? `分类：${categoryName}` : '搜索商品名称 / 型号 / 品牌'" v-model="keyword" confirm-type="search" @confirm="search" />
       <button class="btn-primary search-btn" @tap="search">搜索</button>
     </view>
     <view class="search-result">
@@ -22,13 +22,20 @@
 import { products } from '@/api/market.js'
 
 export default {
-  data() { return { keyword: '', results: [], searched: false } },
+  data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false } },
+  onLoad(opt) {
+    this.categoryId = (opt && opt.categoryId) || null
+    this.categoryName = (opt && opt.name) || ''
+    if (this.categoryId) this.search()
+  },
   methods: {
     money(v) { return Number(v || 0).toFixed(2) },
     async search() {
-      if (!this.keyword) return
       try {
-        const res = await products.list({ keyword: this.keyword })
+        const params = {}
+        if (this.keyword) params.keyword = this.keyword
+        if (this.categoryId) params.categoryId = this.categoryId
+        const res = await products.list(params)
         this.results = (res && res.records) || []
         this.searched = true
       } catch (e) { uni.showToast({ title: (e && e.message) || '搜索失败', icon: 'none' }) }

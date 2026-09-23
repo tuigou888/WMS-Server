@@ -6,7 +6,9 @@
     "dev": "uni",
     "dev:wechat": "uni -p mp-weixin",
     "build": "uni build",
-    "build:wechat": "uni build -p mp-weixin"
+    "build:wechat": "uni build -p mp-weixin",
+    "check:release": "node scripts/check-release-config.mjs",
+    "build:wechat:release": "npm run check:release && uni build -p mp-weixin"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-5010520260709002",

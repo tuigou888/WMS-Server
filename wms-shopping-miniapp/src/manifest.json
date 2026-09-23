@@ -28,12 +28,12 @@
     }
   },
   "mp-weixin": {
-    "appid": "",
+    "appid": "wx2ccb8a9055b9e8db",
     "setting": {
       "es6": true,
       "minified": true,
       "postcss": true,
-      "urlCheck": false
+      "urlCheck": true
     },
     "usingComponents": true,
     "permission": {

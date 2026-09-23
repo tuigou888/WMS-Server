@@ -10,6 +10,7 @@ const inbound = computed(() => props.type !== 'out')
 const warehouses = ref([])
 const result = ref(null)
 const ocrLoading = ref(false)
+const ocrEnabled = import.meta.env.DEV
 const formState = ref({ quantity: 1, unitCost: 0, salePrice: 0, locationCode: 'A-01-01' })
 
 const ocrScan = async ({ file }) => {
@@ -19,7 +20,7 @@ const ocrScan = async ({ file }) => {
     if (r.lines && r.lines.length > 0) {
       const line = r.lines[0]
       formState.value = { ...formState.value, itemCode: line.itemCode, quantity: line.quantity, batchNo: line.batchNo }
-      message.success(`识别到 ${r.totalLines} 项，已自动填入第一项`)
+      message.warning(`演示识别返回 ${r.totalLines} 项，已填入第一项；请逐项人工核验后再入库`)
     } else {
       message.warning('未识别到物品信息')
     }
@@ -85,9 +86,9 @@ onMounted(() => {
       </a-space-compact>
       <a-form-item name="batchNo" label="批次号">
         <a-input v-model:value="formState.batchNo" placeholder="如 BATCH-20260718">
-          <template v-if="inbound" #addonBefore>
+          <template v-if="inbound && ocrEnabled" #addonBefore>
             <a-upload accept="image/*" :show-upload-list="false" :custom-request="ocrScan">
-              <Button type="link" :loading="ocrLoading" :icon="h(CameraOutlined)" style="padding: 0;">拍照识别</Button>
+              <Button type="link" :loading="ocrLoading" :icon="h(CameraOutlined)" style="padding: 0;">演示识别（需核验）</Button>
             </a-upload>
           </template>
         </a-input>

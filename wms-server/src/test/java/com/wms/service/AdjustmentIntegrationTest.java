@@ -6,6 +6,7 @@ import com.wms.dto.DocumentRequest;
 import com.wms.dto.ReviewRequest;
 import com.wms.harness.Harness;
 import com.wms.repository.InventoryRepository;
+import com.wms.repository.InventoryTransactionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,11 +29,19 @@ class AdjustmentIntegrationTest {
     @Autowired private DocumentService documents;
     @Autowired private AdjustmentService adjustments;
     @Autowired private InventoryRepository inventories;
+    @Autowired private InventoryTransactionRepository transactions;
 
     private BigDecimal qty(String itemCode) {
         return inventories.findAllDetailed().stream()
                 .filter(x -> x.getItem().getCode().equals(itemCode))
                 .map(x -> x.getQuantity())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal amount(String itemCode) {
+        return inventories.findAllDetailed().stream()
+                .filter(x -> x.getItem().getCode().equals(itemCode))
+                .map(x -> x.getTotalAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -92,6 +101,54 @@ class AdjustmentIntegrationTest {
                     List.of(new DocumentRequest.DocumentLineRequest("ITEM-001", "A-01-01", new BigDecimal("2"), new BigDecimal("15"), null, null))));
             Long id = ((Number) created.get("id")).longValue();
             assertThrows(BusinessException.class, () -> documents.uncompleteDocument(id)); // DRAFT 不能反审
+        });
+    }
+
+    @Test
+    void uncompleteOutRestoresOriginalCostInsteadOfSalesPrice() {
+        Harness.asAdmin(() -> {
+            BigDecimal beforeQty = qty("ITEM-001");
+            BigDecimal beforeAmount = amount("ITEM-001");
+            Map<String, Object> created = documents.createDocument(new DocumentRequest(
+                    "OUT", null, 1L, null, "按销售价出库后反审",
+                    List.of(new DocumentRequest.DocumentLineRequest("ITEM-001", "A-01-01", new BigDecimal("4"), new BigDecimal("999"), null, null))));
+            Long id = ((Number) created.get("id")).longValue();
+            String no = (String) created.get("documentNo");
+            documents.reviewDocument(id, new ReviewRequest("APPROVE", null));
+            documents.completeDocument(id);
+            documents.uncompleteDocument(id);
+
+            assertEquals(0, beforeQty.compareTo(qty("ITEM-001")));
+            assertEquals(0, beforeAmount.compareTo(amount("ITEM-001")));
+            var reversals = transactions.findByReferenceNoAndType("REV-" + no, TransactionType.REVERSE_IN);
+            assertEquals(1, reversals.size());
+            assertEquals(0, reversals.getFirst().getSaleAmount().compareTo(BigDecimal.ZERO));
+            assertEquals(0, reversals.getFirst().getProfit().compareTo(BigDecimal.ZERO));
+            assertNotNull(reversals.getFirst().getReversalOfTransactionId());
+        });
+    }
+
+    @Test
+    void reverseDocumentUsesOriginalTransactionAndRejectsDuplicateReversal() {
+        Harness.asAdmin(() -> {
+            BigDecimal beforeQty = qty("ITEM-002");
+            BigDecimal beforeAmount = amount("ITEM-002");
+            Map<String, Object> created = documents.createDocument(new DocumentRequest(
+                    "OUT", null, 1L, null, "红冲测试",
+                    List.of(new DocumentRequest.DocumentLineRequest("ITEM-002", "A-01-02", new BigDecimal("3"), new BigDecimal("500"), null, null))));
+            Long originalId = ((Number) created.get("id")).longValue();
+            documents.reviewDocument(originalId, new ReviewRequest("APPROVE", null));
+            documents.completeDocument(originalId);
+
+            Map<String, Object> reversed = documents.reverseDocument(originalId);
+            Long reversalId = ((Number) reversed.get("id")).longValue();
+            assertThrows(BusinessException.class, () -> documents.reverseDocument(originalId));
+            documents.completeDocument(reversalId);
+
+            assertEquals(0, beforeQty.compareTo(qty("ITEM-002")));
+            assertEquals(0, beforeAmount.compareTo(amount("ITEM-002")));
+            String reversalNo = (String) reversed.get("documentNo");
+            assertEquals(1, transactions.findByReferenceNoAndType(reversalNo, TransactionType.REVERSE_IN).size());
         });
     }
 }

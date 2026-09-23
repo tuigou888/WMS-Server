@@ -35,6 +35,12 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     @Query("select coalesce(sum(i.quantity),0) from Inventory i where i.item.id = :itemId and i.warehouse.id = :warehouseId")
     java.math.BigDecimal availableQty(@Param("itemId") Long itemId, @Param("warehouseId") Long warehouseId);
 
+    /** 商城取消回滚：取 item+warehouse 下第一条库存记录用于回填（限 quantity>0，加悲观锁防与并发出库竞态）。 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Inventory i where i.item.id = :itemId and i.warehouse.id = :warehouseId "
+            + "and i.quantity > 0 order by i.updatedAt asc")
+    List<Inventory> findByItemAndWarehouse(@Param("itemId") Long itemId, @Param("warehouseId") Long warehouseId);
+
     @Query("select i from Inventory i join fetch i.item join fetch i.warehouse left join fetch i.location where i.batchNo is not null and i.batchNo <> ''")
     List<Inventory> findWithBatch();
 }

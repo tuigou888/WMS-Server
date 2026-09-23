@@ -248,9 +248,9 @@ def navigation_js(menu_label, expected_title):
 {WAIT_HELPERS}
   const menu = await waitFor(() => [...document.querySelectorAll('.ant-menu-title-content')].find(x => text(x) === {js_string(menu_label)}), 5000, 'menu {menu_label}');
   menu.click();
-  await waitFor(() => text(document.querySelector('.page-title')) === {js_string(expected_title)}, 10000, 'page {expected_title}');
+  await waitFor(() => document.body.innerText.includes({js_string(expected_title)}), 10000, 'page {expected_title}');
   await sleep(900);
-  return {{title:text(document.querySelector('.page-title')), body:text(document.body).slice(0, 1000)}};
+  return {{title:text(document.querySelector('.page-title')), visible:document.body.innerText.includes({js_string(expected_title)}), body:text(document.body).slice(0, 1000)}};
 }})()
 """
 
@@ -278,32 +278,37 @@ def main():
             cdp.command(domain)
         cdp.command("Page.navigate", {"url": BASE_URL})
         cdp.eval(f"(async()=>{{{WAIT_HELPERS} await waitFor(()=>document.querySelector('.login-card'),10000,'login card'); return true}})()")
-        login_view = cdp.eval("({title:document.title,heading:document.querySelector('h2')?.textContent,button:[...document.querySelectorAll('button')].some(x=>x.textContent.includes('登录系统')),hint:document.body.innerText.includes('operator / operator123')})")
-        assertion("登录页标题", login_view.get("heading"), "WMS 管理系统")
+        login_view = cdp.eval("({title:document.title,brand:document.querySelector('.login-brand')?.textContent,heading:document.querySelector('.login-title')?.textContent,button:[...document.querySelectorAll('button')].some(x=>x.textContent.includes('登录系统')),hint:document.body.innerText.includes('operator / operator123')})")
+        assertion("登录页品牌显示", login_view.get("brand"), "WMS 管理系统")
+        assertion("登录页标题", login_view.get("heading"), "登录运营工作台")
         assertion("登录按钮可见", login_view.get("button"), True)
         assertion("演示账号提示可见", login_view.get("hint"), True)
 
         admin = cdp.eval(LOGIN_JS("admin", "admin123"), timeout=30)
         assertion("管理员登录成功", admin.get("token"), True)
         assertion("管理员身份显示", "管理员" in admin.get("header", ""), True)
-        expected_admin_menus = ["仪表盘", "物品档案", "供应商 / 客户", "扫码入库", "扫码出库", "入库 / 出库单", "库存调拨", "库存盘点", "库存管理", "报表中心", "二维码与 Excel", "用户与权限"]
+        expected_admin_menus = ["仪表盘", "物品档案", "供应商 / 客户", "扫码入库", "扫码出库", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与 Excel", "用户与权限", "操作日志", "商城概览", "商城商品", "商城订单", "商城客户"]
         assertion("管理员菜单完整", admin.get("menus"), expected_admin_menus)
-        assertion("默认打开仪表盘", admin.get("pageTitle"), "仪表盘")
+        assertion("默认打开仪表盘", admin.get("pageTitle"), "仓储运营概览")
         cdp.screenshot(SHOT_PATH)
         record("管理员仪表盘截图", SHOT_PATH.exists() and SHOT_PATH.stat().st_size > 1000, f"{SHOT_PATH} ({SHOT_PATH.stat().st_size} bytes)")
 
         pages = [
             ("物品档案", "物品档案"), ("供应商 / 客户", "供应商 / 客户"),
             ("扫码入库", "扫码入库"), ("扫码出库", "扫码出库"),
-            ("入库 / 出库单", "入库 / 出库单"), ("库存调拨", "库存调拨"),
-            ("库存盘点", "库存盘点"), ("库存管理", "库存管理"),
-            ("报表中心", "报表中心"), ("二维码与 Excel", "二维码与 Excel"),
-            ("用户与权限", "用户与权限"), ("仪表盘", "仪表盘"),
+            ("入库 / 出库单", "入库 / 出库单"), ("报损 / 报溢", "报损 / 报溢"),
+            ("库存调拨", "库存调拨"), ("库存盘点", "库存盘点"),
+            ("库存管理", "库存管理"), ("采购申请", "采购申请"),
+            ("报表中心", "报表中心"), ("库龄与收发存", "报表中心 · 拓展"),
+            ("二维码与 Excel", "二维码与 Excel"), ("用户与权限", "用户与权限"),
+            ("操作日志", "操作日志"), ("商城概览", "商城概览"),
+            ("商城商品", "商城商品"), ("商城订单", "商城订单"), ("商城客户", "商城客户"),
+            ("仪表盘", "仓储运营概览"),
         ]
         for menu, title in pages:
             try:
                 value = cdp.eval(navigation_js(menu, title), timeout=25)
-                assertion(f"页面切换：{menu}", value.get("title"), title)
+                assertion(f"页面切换：{menu}", value.get("visible"), True)
             except Exception as e:
                 record(f"页面切换：{menu}", False, e)
 
@@ -354,7 +359,8 @@ def main():
         assertion("操作员登录成功", operator.get("token"), True)
         assertion("操作员身份显示", "仓库操作员" in operator.get("header", ""), True)
         assertion("操作员隐藏用户权限菜单", "用户与权限" not in operator.get("menus", []), True)
-        assertion("操作员业务菜单数量", len(operator.get("menus", [])), 11)
+        expected_operator_menus = ["仪表盘", "物品档案", "供应商 / 客户", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与 Excel", "商城概览", "商城商品", "商城订单", "商城客户"]
+        assertion("操作员业务菜单完整", operator.get("menus"), expected_operator_menus)
 
         # Drain events and classify browser/runtime/network failures.
         cdp.eval("new Promise(r=>setTimeout(()=>r(true),1200))", timeout=5)

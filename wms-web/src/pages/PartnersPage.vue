@@ -3,6 +3,7 @@ import { h, onMounted, ref } from 'vue'
 import { Button, Card, Form, Input, Modal, Popconfirm, Select, Switch, Table, Tag, Typography, message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
+import { normalizeColumns } from '../utils/table'
 
 const empty = { type: 'SUPPLIER', enabled: true }
 const data = ref([])
@@ -68,7 +69,7 @@ const columns = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :loading="loading" :data-source="data" :columns="columns" />
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)" />
   </Card>
 
   <a-modal v-model:open="open" :title="editing ? '编辑往来单位' : '新增往来单位'" :destroy-on-close="true" @ok="save">
