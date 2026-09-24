@@ -49,7 +49,8 @@
     {
       "path": "pages/item-detail/item-detail",
       "style": {
-        "navigationBarTitleText": "物品详情"
+        "navigationBarTitleText": "物品详情",
+        "enablePullDownRefresh": true
       }
     },
     {
@@ -88,7 +89,8 @@
     {
       "path": "pages/reports/reports",
       "style": {
-        "navigationBarTitleText": "报表中心"
+        "navigationBarTitleText": "报表中心",
+        "enablePullDownRefresh": true
       }
     },
     {

@@ -20,6 +20,7 @@
 
 <script>
 import { products } from '@/api/market.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false } },
@@ -29,7 +30,7 @@ export default {
     if (this.categoryId) this.search()
   },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     async search() {
       try {
         const params = {}

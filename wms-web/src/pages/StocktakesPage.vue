@@ -14,6 +14,7 @@ const auth = useAuthStore()
 const rows = ref([])
 const page = ref(1)
 const total = ref(0)
+const loading = ref(false)
 const warehouses = ref([])
 const warehouseId = ref()
 const detail = ref(null)
@@ -22,7 +23,7 @@ watch(drawerOpen, (v) => { if (!v) detail.value = null })
 watch(detail, (v) => { drawerOpen.value = !!v })
 const counts = ref({})
 
-const load = (target = page.value) => api.stocktakes({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message))
+const load = (target = page.value) => { loading.value = true; return api.stocktakes({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 
 onMounted(() => {
   load()
@@ -107,7 +108,7 @@ const detailColumns = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
+    <a-table row-key="id" :loading="loading" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
   </Card>
 
   <a-drawer v-model:open="drawerOpen" :title="detail?.stocktakeNo" width="760">

@@ -8,11 +8,12 @@ import { permissionLabel, roleLabel } from '../utils/labels'
 const rows = ref([])
 const warehouseOptions = ref([])
 const matrix = ref(null)
+const loading = ref(false)
 const open = ref(false)
 const editing = ref(null)
 const formState = ref({ role: 'WAREHOUSE', enabled: true })
 
-const load = () => api.users().then((x) => { rows.value = x }).catch((e) => message.error(e.message))
+const load = () => { loading.value = true; return api.users().then((x) => { rows.value = x }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 
 onMounted(() => {
   load()
@@ -64,7 +65,7 @@ const matrixColumns = () => [...matrixCols, ...Object.keys(matrix.value?.roles |
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="columns" />
+    <a-table row-key="id" :loading="loading" :data-source="rows" :columns="columns" />
   </Card>
 
   <Card v-if="matrix" title="权限矩阵" style="margin-top: 16px;">

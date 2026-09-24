@@ -41,6 +41,7 @@
 import { orders as orderApi } from '@/api/market.js'
 import { useUserStore } from '@/store/user.js'
 import { requestPayment, PaymentCancelled } from '@/utils/pay.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() {
@@ -55,7 +56,7 @@ export default {
   onShow() { this.load(true) },
   onReachBottom() { if (this.hasMore) this.load() },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     switchTab(v) { this.status = v; this.list = []; this.load(true) },
     async load(reset = false) {
       const page = reset ? 1 : this.page + 1

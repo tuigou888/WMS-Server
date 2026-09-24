@@ -13,13 +13,14 @@ const auth = useAuthStore()
 const rows = ref([])
 const page = ref(1)
 const total = ref(0)
+const loading = ref(false)
 const createOpen = ref(false)
 const warehouses = ref([])
 const suppliers = ref([])
 const items = ref([])
 const createForm = ref({ warehouseId: undefined, supplierId: undefined, requiredDate: '', remark: '', lines: [] })
 
-const load = (target = page.value) => api.purchaseRequests({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message || '加载失败'))
+const load = (target = page.value) => { loading.value = true; return api.purchaseRequests({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message || '加载失败')).finally(() => { loading.value = false }) }
 const loadReferences = async () => {
   try {
     const [warehouseRows, supplierRows, itemPage] = await Promise.all([api.warehouses(), api.partners('SUPPLIER'), api.items({ page: 1, pageSize: 100 })])
@@ -79,7 +80,7 @@ const innerCols = [
     <template #extra>
       <a-space><Typography.Text type="secondary">库存预警建议可作为申请数量依据</Typography.Text><Button v-if="hasPerm(auth.user, 'purchase-request:write')" type="primary" :icon="h(PlusOutlined)" @click="openCreate">新建申请</Button></a-space>
     </template>
-    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" :expandable="{ expandedRowRender: (r) => h(Table, { size: 'small', pagination: false, rowKey: 'itemCode', dataSource: r.lines, columns: normalizeColumns(innerCols) }) }" />
+    <a-table row-key="id" :loading="loading" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" :expandable="{ expandedRowRender: (r) => h(Table, { size: 'small', pagination: false, rowKey: 'itemCode', dataSource: r.lines, columns: normalizeColumns(innerCols) }) }" />
   </Card>
 
   <a-modal v-model:open="createOpen" title="新建采购申请" width="860" ok-text="提交申请" @ok="submit">
@@ -87,7 +88,7 @@ const innerCols = [
       <a-row :gutter="16"><a-col :span="12"><a-form-item label="目标仓库" required><a-select v-model:value="createForm.warehouseId" :options="warehouses" placeholder="请选择仓库" /></a-form-item></a-col><a-col :span="12"><a-form-item label="供应商"><a-select v-model:value="createForm.supplierId" :options="suppliers" allow-clear placeholder="可稍后指定" /></a-form-item></a-col></a-row>
       <a-row :gutter="16"><a-col :span="12"><a-form-item label="期望到货日"><a-input v-model:value="createForm.requiredDate" placeholder="YYYY-MM-DD（可选）" /></a-form-item></a-col><a-col :span="12"><a-form-item label="备注"><a-input v-model:value="createForm.remark" maxlength="255" /></a-form-item></a-col></a-row>
       <a-divider orientation="left">申请明细</a-divider>
-      <a-space v-for="(line, index) in createForm.lines" :key="index" align="start" style="display: flex; margin-bottom: 8px;">
+      <a-space v-for="(line, index) in createForm.lines" :key="index" align="start" style="display: flex; flex-wrap: wrap; margin-bottom: 8px;">
         <a-select v-model:value="line.itemCode" :options="items" show-search option-filter-prop="label" placeholder="物品" style="width: 245px;" />
         <a-input v-model:value="line.quantity" placeholder="申请数量*" style="width: 110px;" />
         <a-input v-model:value="line.suggestedQuantity" placeholder="建议数量" style="width: 110px;" />

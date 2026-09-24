@@ -66,6 +66,7 @@
 import { cart as cartApi, customers, orders, products } from '@/api/market.js'
 import { useCartStore } from '@/store/cart.js'
 import { useUserStore } from '@/store/user.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() {
@@ -98,7 +99,7 @@ export default {
     }
   },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     async loadAddresses() {
       try { this.addressList = await customers.list() } catch (e) {}
     },
@@ -134,7 +135,7 @@ export default {
 </script>
 
 <style scoped>
-.page { padding: 20rpx 20rpx 140rpx; }
+.page { padding: 20rpx 20rpx; padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
 .card { margin-bottom: 20rpx; }
 .section-label { font-size: 28rpx; font-weight: 600; color: #333; margin-bottom: 16rpx; }
 .addr-name { font-size: 32rpx; font-weight: 600; }
@@ -152,7 +153,7 @@ export default {
 .pay-options { display: flex; flex-wrap: wrap; gap: 16rpx; }
 .pay-opt { border: 1rpx solid #d9d9d9; border-radius: 8rpx; padding: 16rpx 28rpx; font-size: 26rpx; color: #666; }
 .pay-opt.active { border-color: #1677ff; color: #1677ff; background: #e6f7ff; }
-.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
 .total-label { font-size: 26rpx; }
 .total-price { font-size: 36rpx; color: #ff4d4f; font-weight: 700; }
 .btn-primary { border-radius: 40rpx; padding: 20rpx 40rpx; }

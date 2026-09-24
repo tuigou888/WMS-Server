@@ -193,99 +193,99 @@ export default {
 
 <style scoped>
 .index-page { height: 100vh; }
-.content { width: 100%; box-sizing: border-box; padding-bottom: 20px; }
+.content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
 .welcome-card {
   background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-  border-radius: 12px;
-  margin: 12px;
-  padding: 20px;
+  border-radius: 24rpx;
+  margin: 24rpx;
+  padding: 40rpx;
   color: #fff;
 }
-.welcome-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.greeting { font-size: 18px; font-weight: 500; }
-.role-badge { font-size: 11px; padding: 2px 8px; }
+.welcome-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32rpx; }
+.greeting { font-size: 36rpx; font-weight: 500; }
+.role-badge { font-size: 22rpx; padding: 4rpx 16rpx; }
 
 .warehouse-selector {
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: rgba(255,255,255,0.15);
-  border-radius: 8px;
-  padding: 12px 16px;
+  border-radius: 16rpx;
+  padding: 24rpx 32rpx;
 }
 .warehouse-info { display: flex; flex-direction: column; }
-.warehouse-info .label { font-size: 12px; color: rgba(255,255,255,0.8); }
-.warehouse-info .value { font-size: 16px; font-weight: 500; }
-.arrow { font-size: 12px; color: rgba(255,255,255,0.6); }
+.warehouse-info .label { font-size: 24rpx; color: rgba(255,255,255,0.8); }
+.warehouse-info .value { font-size: 32rpx; font-weight: 500; }
+.arrow { font-size: 24rpx; color: rgba(255,255,255,0.6); }
 
 .dashboard-card {
   background: #fff;
-  border-radius: 12px;
-  margin: 12px;
-  padding: 16px;
+  border-radius: 24rpx;
+  margin: 24rpx;
+  padding: 32rpx;
 }
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 8px;
+  gap: 24rpx;
+  margin-top: 16rpx;
 }
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px;
+  padding: 24rpx;
   background: #fafafa;
-  border-radius: 8px;
+  border-radius: 16rpx;
 }
-.stat-label { font-size: 12px; color: #999; }
-.stat-value { font-size: 18px; font-weight: 600; color: #333; margin-top: 4px; }
+.stat-label { font-size: 24rpx; color: #999; }
+.stat-value { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
 
 .menu-section {
   background: #fff;
-  border-radius: 12px;
-  margin: 12px;
-  padding: 16px;
+  border-radius: 24rpx;
+  margin: 24rpx;
+  padding: 32rpx;
 }
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-top: 8px;
+  gap: 24rpx;
+  margin-top: 16rpx;
 }
 .menu-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 12px;
+  padding: 32rpx 24rpx;
   background: #fafafa;
-  border-radius: 10px;
+  border-radius: 20rpx;
   text-decoration: none;
 }
 .menu-item-hover { background: #e6f7ff; }
-.menu-icon { font-size: 28px; margin-bottom: 8px; }
-.menu-name { font-size: 13px; color: #333; text-align: center; }
+.menu-icon { font-size: 56rpx; margin-bottom: 16rpx; }
+.menu-name { font-size: 26rpx; color: #333; text-align: center; }
 
 .alert-card {
   background: #fff;
-  border-radius: 12px;
-  margin: 12px;
-  padding: 16px;
+  border-radius: 24rpx;
+  margin: 24rpx;
+  padding: 32rpx;
 }
-.alert-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.view-all { font-size: 13px; color: #1677ff; }
-.alert-list { display: flex; flex-direction: column; gap: 10px; }
+.alert-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
+.view-all { font-size: 26rpx; color: #1677ff; }
+.alert-list { display: flex; flex-direction: column; gap: 20rpx; }
 .alert-item {
   display: flex;
   justify-content: space-between;
-  padding: 12px;
+  padding: 24rpx;
   background: #fffbe6;
-  border: 1px solid #ffe58f;
-  border-radius: 8px;
+  border: 2rpx solid #ffe58f;
+  border-radius: 16rpx;
 }
-.alert-main { display: flex; align-items: center; gap: 8px; flex: 1; }
-.alert-name { font-size: 13px; color: #333; }
-.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; }
-.footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
+.alert-main { display: flex; align-items: center; gap: 16rpx; flex: 1; }
+.alert-name { font-size: 26rpx; color: #333; }
+.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; }
+.footer { text-align: center; padding: 40rpx; font-size: 24rpx; color: #999; }
 </style>

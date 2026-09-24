@@ -133,39 +133,39 @@ export default {
 
 <style scoped>
 .check-page { background: #f5f5f5; min-height: 100vh; }
-.content { width: 100%; box-sizing: border-box; padding-bottom: 20px; }
+.content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
 .task-card {
   background: #fff;
-  border-radius: 10px;
-  margin: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 20rpx;
+  margin: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
 }
-.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.task-no { font-size: 15px; font-weight: 600; color: #333; font-family: monospace; }
-.task-info { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.info-row { display: flex; justify-content: space-between; font-size: 13px; }
+.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
+.task-no { font-size: 30rpx; font-weight: 600; color: #333; font-family: monospace; }
+.task-info { display: flex; flex-direction: column; gap: 12rpx; margin-bottom: 24rpx; }
+.info-row { display: flex; justify-content: space-between; font-size: 26rpx; }
 .info-row .label { color: #999; }
 .info-row text:last-child { color: #333; }
-.task-actions { display: flex; gap: 8px; }
+.task-actions { display: flex; gap: 16rpx; }
 .btn-count, .btn-view {
   flex: 1;
-  padding: 10px;
-  border-radius: 6px;
-  font-size: 14px;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  font-size: 28rpx;
   border: none;
 }
 .btn-count { background: #52c41a; color: #fff; }
-.btn-view { background: #f0f0f0; color: #333; border: 1px solid #d9d9d9; }
+.btn-view { background: #f0f0f0; color: #333; border: 2rpx solid #d9d9d9; }
 
 .loading, .loading-more, .empty-state {
   text-align: center;
-  padding: 30px;
+  padding: 60rpx;
   color: #999;
-  font-size: 14px;
+  font-size: 28rpx;
 }
-.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.empty-state text:first-child { font-size: 48px; opacity: 0.5; }
-.hint { font-size: 12px; color: #ccc; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
+.empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
+.hint { font-size: 24rpx; color: #ccc; }
 </style>

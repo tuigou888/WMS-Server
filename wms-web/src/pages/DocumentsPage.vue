@@ -17,6 +17,7 @@ const auth = useAuthStore()
 const data = ref([])
 const page = ref(1)
 const total = ref(0)
+const loading = ref(false)
 const items = ref([])
 const warehouses = ref([])
 const partners = ref([])
@@ -34,7 +35,7 @@ const availablePartners = computed(() => partners.value.filter((x) => x.enabled 
 
 const itemOptions = computed(() => items.value.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` })))
 
-const load = (target = page.value) => api.documents({ page: target, pageSize: 20 }).then((x) => { data.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message))
+const load = (target = page.value) => { loading.value = true; return api.documents({ page: target, pageSize: 20 }).then((x) => { data.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 
 onMounted(() => {
   load()
@@ -123,7 +124,7 @@ const setDetail = (d) => { detail.value = d }
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="data" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
   </Card>
 
   <a-modal v-model:open="open" title="新建入/出/退货草稿单" width="850" :destroy-on-close="true" @ok="save">

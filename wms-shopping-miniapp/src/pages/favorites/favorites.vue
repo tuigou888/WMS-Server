@@ -20,12 +20,13 @@
 <script>
 import { favorites } from '@/api/market.js'
 import { useCartStore } from '@/store/cart.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() { return { list: [] } },
   onShow() { this.load() },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     async load() {
       try {
         const res = await favorites.list({ page: 1, pageSize: 50 })

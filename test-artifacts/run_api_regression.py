@@ -3,6 +3,7 @@ import io
 import json
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -28,8 +29,13 @@ def record(module, name, fn):
         print(f"FAIL [{module}] {name}: {exc}")
 
 
+def idem_key():
+    return "reg-" + uuid.uuid4().hex[:24]
+
+
 def call(session, method, path, *, expected=200, json_body=None, files=None, params=None, raw=False):
-    response = session.request(method, BASE + path, json=json_body, files=files, params=params, timeout=TIMEOUT)
+    headers = {"Idempotency-Key": idem_key()} if method.upper() in ("POST", "PUT", "PATCH") else {}
+    response = session.request(method, BASE + path, json=json_body, files=files, params=params, headers=headers, timeout=TIMEOUT)
     if response.status_code != expected:
         raise AssertionError(f"{method} {path}: expected HTTP {expected}, got {response.status_code}: {response.text[:500]}")
     if raw:
@@ -44,7 +50,8 @@ def call(session, method, path, *, expected=200, json_body=None, files=None, par
 
 
 def expect_error(session, method, path, status, json_body=None, files=None, contains=None):
-    response = session.request(method, BASE + path, json=json_body, files=files, timeout=TIMEOUT)
+    headers = {"Idempotency-Key": idem_key()} if method.upper() in ("POST", "PUT", "PATCH") else {}
+    response = session.request(method, BASE + path, json=json_body, files=files, headers=headers, timeout=TIMEOUT)
     if response.status_code != status:
         raise AssertionError(f"expected HTTP {status}, got {response.status_code}: {response.text[:500]}")
     if contains and contains not in response.text:
@@ -143,6 +150,13 @@ def update_wh():
 record("仓库管理", "更新仓库", update_wh)
 record("仓库管理", "查询启用仓库", lambda: f"仓库数={len(call(admin,'GET','/warehouses'))}")
 
+def grant_operator_wh():
+    users=call(admin,"GET","/auth/users");op=next(u for u in users if u["username"]=="operator")
+    call(admin,"PUT",f"/auth/users/{op['id']}",json_body={"username":"operator","displayName":"操作员","role":"WAREHOUSE","enabled":True,"warehouseIds":[state["main_wh"],state["target_wh"]]})
+    login=call(operator,"POST","/auth/login",json_body={"username":"operator","password":"operator123"});operator.headers["Authorization"]="Bearer "+login["token"]
+    return "操作员已授权主仓+目标仓"
+record("仓库管理", "操作员授权目标仓库", grant_operator_wh)
+
 stock_in={"itemCode":item_code,"quantity":10,"unitCost":12.5,"warehouseId":None,"locationCode":"A-TEST-01","batchNo":"B1","remark":"scan in"}
 def scan_in():
     stock_in["warehouseId"]=state["main_wh"]
@@ -157,7 +171,7 @@ record("库存校验", "库存不足阻止出库", lambda: expect_error(admin,"P
 record("库位管理", "查询全部库位", lambda: f"库位数={len(call(admin,'GET','/locations'))}")
 record("库位管理", "按仓库查询库位", lambda: (lambda xs: (True if any(x["code"]=="A-TEST-01" for x in xs) else (_ for _ in ()).throw(AssertionError("location missing")), f"库位数={len(xs)}")[1])(call(admin,"GET","/locations",params={"warehouseId":state["main_wh"]})))
 record("库位管理", "不存在仓库的库位查询", lambda: expect_error(admin,"GET","/locations?warehouseId=999999",400))
-record("库存管理", "库存列表与分页", lambda: (lambda xs: f"pageSize=2 返回={len(xs)}" if len(xs)==2 else (_ for _ in ()).throw(AssertionError(f"expected 2 got {len(xs)}")))(call(admin,"GET","/inventory",params={"page":1,"pageSize":2})))
+record("库存管理", "库存列表与分页", lambda: (lambda xs: f"pageSize=2 返回={len(xs)}" if len(xs)==2 else (_ for _ in ()).throw(AssertionError(f"expected 2 got {len(xs)}")))(call(admin,"GET","/inventory",params={"page":1,"pageSize":2})["records"]))
 record("库存管理", "按物品查询库存", lambda: (lambda xs: (True if any(x["itemCode"]==item_code for x in xs) else (_ for _ in ()).throw(AssertionError("inventory missing")), f"库存行={len(xs)}")[1])(call(admin,"GET",f"/inventory/{state['item_id']}")))
 record("库存管理", "库存流水查询", lambda: f"流水数={len(call(admin,'GET','/inventory/transactions',params={'limit':20}))}")
 record("库存管理", "库存模块仓库列表", lambda: f"仓库数={len(call(admin,'GET','/inventory/warehouses'))}")
@@ -253,7 +267,7 @@ def ocr():
 record("OCR", "OCR 模拟识别", ocr)
 record("OCR", "OCR 空文件校验", lambda: expect_error(admin,"POST","/ocr/recognize",400,files={"file":("empty.png",b"","image/png")}))
 
-new_user={"username":"user"+suffix,"password":"test123","displayName":"自动化用户","role":"WAREHOUSE","enabled":True}
+new_user={"username":"user"+suffix,"password":"test123","displayName":"自动化用户","role":"WAREHOUSE","enabled":True,"warehouseIds":[state["main_wh"]]}
 def user_flow():
     d=call(admin,"POST","/auth/users",json_body=new_user);state["user_id"]=d["id"]
     s=requests.Session();login=call(s,"POST","/auth/login",json_body={"username":new_user["username"],"password":new_user["password"]});eq(login["role"],"WAREHOUSE","role")

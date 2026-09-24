@@ -50,6 +50,7 @@ public class WarehouseAccessService {
         if ("WAREHOUSE".equals(user.getRole()) && ids.isEmpty()) throw new BusinessException("仓库操作员至少需要分配一个仓库");
         if (warehouses.findAllById(ids).size() != ids.size()) throw new BusinessException("仓库授权包含不存在的仓库");
         access.deleteByUser_Id(user.getId());
+        access.flush(); // 强制先执行 DELETE，否则 flush 时 INSERT 先于 DELETE 触发 (user_id, warehouse_id) 唯一约束冲突
         access.saveAll(ids.stream().map(id -> new UserWarehouseAccess(user, warehouses.getReferenceById(id))).toList());
     }
 

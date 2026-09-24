@@ -287,7 +287,7 @@ def main():
         admin = cdp.eval(LOGIN_JS("admin", "admin123"), timeout=30)
         assertion("管理员登录成功", admin.get("token"), True)
         assertion("管理员身份显示", "管理员" in admin.get("header", ""), True)
-        expected_admin_menus = ["仪表盘", "物品档案", "供应商 / 客户", "扫码入库", "扫码出库", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与 Excel", "用户与权限", "操作日志", "商城概览", "商城商品", "商城订单", "商城客户"]
+        expected_admin_menus = ["仪表盘", "物品档案", "供应商 / 客户", "扫码入库", "扫码出库", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与电子表格", "用户与权限", "操作日志", "商城概览", "商城商品", "商城订单", "商城客户"]
         assertion("管理员菜单完整", admin.get("menus"), expected_admin_menus)
         assertion("默认打开仪表盘", admin.get("pageTitle"), "仓储运营概览")
         cdp.screenshot(SHOT_PATH)
@@ -300,7 +300,7 @@ def main():
             ("库存调拨", "库存调拨"), ("库存盘点", "库存盘点"),
             ("库存管理", "库存管理"), ("采购申请", "采购申请"),
             ("报表中心", "报表中心"), ("库龄与收发存", "报表中心 · 拓展"),
-            ("二维码与 Excel", "二维码与 Excel"), ("用户与权限", "用户与权限"),
+            ("二维码与电子表格", "二维码与电子表格"), ("用户与权限", "用户与权限"),
             ("操作日志", "操作日志"), ("商城概览", "商城概览"),
             ("商城商品", "商城商品"), ("商城订单", "商城订单"), ("商城客户", "商城客户"),
             ("仪表盘", "仓储运营概览"),
@@ -359,7 +359,7 @@ def main():
         assertion("操作员登录成功", operator.get("token"), True)
         assertion("操作员身份显示", "仓库操作员" in operator.get("header", ""), True)
         assertion("操作员隐藏用户权限菜单", "用户与权限" not in operator.get("menus", []), True)
-        expected_operator_menus = ["仪表盘", "物品档案", "供应商 / 客户", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与 Excel", "商城概览", "商城商品", "商城订单", "商城客户"]
+        expected_operator_menus = ["仪表盘", "物品档案", "供应商 / 客户", "入库 / 出库单", "报损 / 报溢", "库存调拨", "库存盘点", "库存管理", "采购申请", "报表中心", "库龄与收发存", "二维码与电子表格", "商城概览", "商城商品", "商城订单", "商城客户"]
         assertion("操作员业务菜单完整", operator.get("menus"), expected_operator_menus)
 
         # Drain events and classify browser/runtime/network failures.

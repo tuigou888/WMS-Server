@@ -64,6 +64,7 @@
 <script>
 import { products, favorites } from '@/api/market.js'
 import { useCartStore } from '@/store/cart.js'
+import { formatPrice } from '@/utils/format.js'
 
 export default {
     data() {
@@ -93,7 +94,7 @@ export default {
     },
   },
   methods: {
-    formatPrice(v) { return Number(v || 0).toFixed(2) },
+    formatPrice,
     async doAdd() {
       if (this.addingDisabled) return
       this.isAdding = true

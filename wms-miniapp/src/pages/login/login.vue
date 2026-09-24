@@ -191,16 +191,16 @@ export default {
   flex-direction: column;
   height: 100vh;
   background: linear-gradient(180deg, #f5f5f5 0%, #eef2f7 100%);
-  padding: 20px;
+  padding: 40rpx;
   box-sizing: border-box;
 }
 
 .login-card {
   flex: 1;
   background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border-radius: 24rpx;
+  padding: 48rpx;
+  box-shadow: 0 8rpx 40rpx rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -210,21 +210,21 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 48rpx;
 }
-.logo-icon { font-size: 48px; }
-.logo-text { font-size: 20px; font-weight: 600; color: #333; margin-top: 8px; }
+.logo-icon { font-size: 96rpx; }
+.logo-text { font-size: 40rpx; font-weight: 600; color: #333; margin-top: 16rpx; }
 
 .tabs {
   display: flex;
-  margin-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 40rpx;
+  border-bottom: 2rpx solid #f0f0f0;
 }
 .tab {
   flex: 1;
-  padding: 12px 0;
+  padding: 24rpx 0;
   text-align: center;
-  font-size: 15px;
+  font-size: 30rpx;
   color: #999;
   position: relative;
 }
@@ -232,69 +232,69 @@ export default {
 .tab.active::after {
   content: '';
   position: absolute;
-  bottom: -1px;
+  bottom: -2rpx;
   left: 25%;
   right: 25%;
-  height: 2px;
+  height: 4rpx;
   background: #1677ff;
-  border-radius: 1px;
+  border-radius: 2rpx;
 }
 
 .form-section { flex: 1; }
 
-.input-group { margin-bottom: 16px; }
+.input-group { margin-bottom: 32rpx; }
 .login-card .input {
-  height: 44px;
-  min-height: 44px;
-  padding: 0 12px;
-  line-height: 44px;
+  height: 88rpx;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  line-height: 88rpx;
   background: #fff;
 }
 
 .login-success {
   position: fixed;
-  right: 20px;
-  bottom: 24px;
-  left: 20px;
+  right: 40rpx;
+  bottom: 48rpx;
+  left: 40rpx;
   z-index: 10;
-  padding: 10px 12px;
+  padding: 20rpx 24rpx;
   color: #2e7d32;
-  font-size: 13px;
+  font-size: 26rpx;
   background: #f1f8f3;
-  border: 1px solid #b7dfbf;
-  border-radius: 6px;
+  border: 2rpx solid #b7dfbf;
+  border-radius: 12rpx;
 }
 .login-home-link {
   display: block;
-  margin-top: 8px;
+  margin-top: 16rpx;
   text-align: center;
   text-decoration: none;
 }
 
-.wx-login { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0; }
-.wx-tip { font-size: 12px; color: #999; margin-top: 12px; }
+.wx-login { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40rpx 0; }
+.wx-tip { font-size: 24rpx; color: #999; margin-top: 24rpx; }
 
-.wx-bind .bind-info { font-size: 13px; color: #faad14; background: #fffbe6; padding: 10px; border-radius: 6px; margin-bottom: 16px; }
+.wx-bind .bind-info { font-size: 26rpx; color: #faad14; background: #fffbe6; padding: 20rpx; border-radius: 12rpx; margin-bottom: 32rpx; }
 
 .btn-wx {
   width: 100%;
   background: #07c160;
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 14px;
-  font-size: 16px;
+  border-radius: 12rpx;
+  padding: 28rpx;
+  font-size: 32rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 16rpx;
 }
 .btn-wx:disabled { opacity: 0.7; }
 
 .loading {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgba(255,255,255,0.3);
+  width: 36rpx;
+  height: 36rpx;
+  border: 4rpx solid rgba(255,255,255,0.3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -302,27 +302,27 @@ export default {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .demo-accounts {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  margin-top: 40rpx;
+  padding-top: 32rpx;
+  border-top: 2rpx solid #f0f0f0;
 }
-.demo-title { font-size: 12px; color: #999; display: block; margin-bottom: 8px; }
-.demo-row { display: flex; gap: 12px; }
+.demo-title { font-size: 24rpx; color: #999; display: block; margin-bottom: 16rpx; }
+.demo-row { display: flex; gap: 24rpx; }
 .demo-item {
   flex: 1;
-  padding: 8px;
+  padding: 16rpx;
   background: #fafafa;
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
+  border: 2rpx dashed #d9d9d9;
+  border-radius: 12rpx;
   text-align: center;
-  font-size: 12px;
+  font-size: 24rpx;
   color: #666;
 }
 
 .footer {
   text-align: center;
-  padding: 16px;
-  font-size: 12px;
+  padding: 32rpx;
+  font-size: 24rpx;
   color: #999;
 }
 </style>

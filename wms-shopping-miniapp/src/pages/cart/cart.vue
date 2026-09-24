@@ -36,12 +36,13 @@
 
 <script>
 import { useCartStore } from '@/store/cart.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() { return { defaultImg: '', items: [], total: 0 } },
   onShow() { this.$store = useCartStore(); this.load() },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     async load() {
       await this.$store.load()
       this.items = this.$store.items || []
@@ -58,7 +59,7 @@ export default {
 </script>
 
 <style scoped>
-.page { padding: 40rpx 20rpx; }
+.page { padding: 40rpx 20rpx; padding-bottom: calc(180rpx + env(safe-area-inset-bottom)); }
 .cart-item { display: flex; justify-content: space-between; padding: 24rpx 20rpx; background: #fff; border-radius: 16rpx; margin-bottom: 20rpx; }
 .item-left { display: flex; flex: 1; }
 .item-img { width: 160rpx; height: 160rpx; border-radius: 12rpx; background: #f0f0f0; margin-right: 20rpx; }
@@ -70,7 +71,7 @@ export default {
 .qty-btn { width: 56rpx; height: 56rpx; background: #f5f5f5; border-radius: 8rpx; font-size: 32rpx; }
 .qty-val { margin: 0 16rpx; font-size: 28rpx; min-width: 40rpx; text-align: center; }
 .delete-btn { font-size: 24rpx; color: #999; margin-top: 8rpx; }
-.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
+.bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
 .total-label { font-size: 26rpx; color: #333; }
 .total-price { font-size: 36rpx; color: #ff4d4f; font-weight: 700; }
 .btn-primary { background: #1677ff; color: #fff; border-radius: 40rpx; padding: 20rpx 40rpx; font-size: 30rpx; }

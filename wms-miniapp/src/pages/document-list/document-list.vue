@@ -194,49 +194,49 @@ export default {
 
 .filter-bar {
   display: flex;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 16rpx;
+  padding: 16rpx 32rpx;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 2rpx solid #f0f0f0;
 }
 .filter-picker { flex: 1; }
 .filter-item {
-  padding: 8px 12px;
+  padding: 16rpx 24rpx;
   background: #fafafa;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
+  border: 2rpx solid #d9d9d9;
+  border-radius: 12rpx;
+  font-size: 26rpx;
   color: #666;
   text-align: center;
 }
 
 .list-container { width: 100%; box-sizing: border-box; }
-.list { padding: 8px 16px 20px; display: flex; flex-direction: column; gap: 8px; }
+.list { padding: 16rpx 32rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
 .list-item {
   display: flex;
   justify-content: space-between;
   background: #fff;
-  border-radius: 8px;
-  padding: 12px 14px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
   text-decoration: none;
 }
 .list-item-hover { background: #fafafa; }
 .item-main { flex: 1; min-width: 0; }
-.item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-.doc-no { font-size: 14px; font-weight: 600; color: #333; font-family: monospace; }
-.item-meta { display: flex; gap: 10px; font-size: 11px; color: #999; flex-wrap: wrap; margin-bottom: 4px; }
-.meta { background: #f0f0f0; padding: 1px 6px; border-radius: 3px; }
-.item-stats { display: flex; gap: 12px; font-size: 12px; }
+.item-header { display: flex; align-items: center; gap: 16rpx; margin-bottom: 8rpx; flex-wrap: wrap; }
+.doc-no { font-size: 28rpx; font-weight: 600; color: #333; font-family: monospace; }
+.item-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; flex-wrap: wrap; margin-bottom: 8rpx; }
+.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
+.item-stats { display: flex; gap: 24rpx; font-size: 24rpx; }
 .stat { color: #666; }
-.arrow { font-size: 12px; color: #999; margin-left: 12px; }
+.arrow { font-size: 24rpx; color: #999; margin-left: 24rpx; }
 
 .loading, .loading-more, .empty-state {
   text-align: center;
-  padding: 30px;
+  padding: 60rpx;
   color: #999;
-  font-size: 14px;
+  font-size: 28rpx;
 }
-.empty-state { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.empty-state text:first-child { font-size: 48px; opacity: 0.5; }
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
+.empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
 </style>

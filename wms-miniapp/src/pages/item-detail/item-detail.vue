@@ -214,70 +214,70 @@ export default {
 
 <style scoped>
 .item-detail-page { background: #f5f5f5; min-height: 100vh; }
-.content { width: 100%; box-sizing: border-box; padding-bottom: 20px; }
+.content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
 .card {
   background: #fff;
-  border-radius: 10px;
-  margin: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 20rpx;
+  margin: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
 }
-.section-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 12px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.view-all { font-size: 13px; color: #1677ff; }
+.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin-bottom: 24rpx; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
+.view-all { font-size: 26rpx; color: #1677ff; }
 
-.info-grid { display: flex; flex-direction: column; gap: 10px; }
-.info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+.info-grid { display: flex; flex-direction: column; gap: 20rpx; }
+.info-row { display: flex; justify-content: space-between; padding: 16rpx 0; border-bottom: 2rpx solid #f0f0f0; }
 .info-row:last-child { border-bottom: none; }
-.info-label { color: #999; font-size: 14px; }
-.info-value { color: #333; font-size: 14px; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-label { color: #999; font-size: 28rpx; }
+.info-value { color: #333; font-size: 28rpx; text-align: right; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 24rpx;
 }
 .summary-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 12px;
+  padding: 32rpx 24rpx;
   background: #fafafa;
-  border-radius: 8px;
+  border-radius: 16rpx;
 }
-.summary-label { font-size: 12px; color: #999; }
-.summary-value { font-size: 18px; font-weight: 600; color: #333; margin-top: 4px; }
+.summary-label { font-size: 24rpx; color: #999; }
+.summary-value { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
 
-.distribution-list { display: flex; flex-direction: column; gap: 8px; }
+.distribution-list { display: flex; flex-direction: column; gap: 16rpx; }
 .dist-item {
   display: flex;
   justify-content: space-between;
-  padding: 12px;
+  padding: 24rpx;
   background: #fafafa;
-  border-radius: 8px;
+  border-radius: 16rpx;
 }
-.dist-main { display: flex; flex-direction: column; gap: 2px; }
-.dist-warehouse { font-size: 14px; font-weight: 500; color: #333; }
-.dist-location { font-size: 12px; color: #999; }
-.dist-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; }
+.dist-main { display: flex; flex-direction: column; gap: 4rpx; }
+.dist-warehouse { font-size: 28rpx; font-weight: 500; color: #333; }
+.dist-location { font-size: 24rpx; color: #999; }
+.dist-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; }
 .dist-qty { font-weight: 600; color: #333; }
 .dist-amt { color: #52c41a; }
 .dist-cost { color: #999; }
 
-.qr-section { text-align: center; padding: 10px 0; }
-.qr-image { width: 180px; height: 180px; border: 1px solid #f0f0f0; border-radius: 8px; }
+.qr-section { text-align: center; padding: 20rpx 0; }
+.qr-image { width: 360rpx; height: 360rpx; border: 2rpx solid #f0f0f0; border-radius: 16rpx; }
 .qr-placeholder {
-  width: 180px; height: 180px;
-  border: 2px dashed #d9d9d9;
-  border-radius: 8px;
+  width: 360rpx; height: 360rpx;
+  border: 4rpx dashed #d9d9d9;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #999;
-  font-size: 14px;
+  font-size: 28rpx;
 }
-.qr-hint { display: block; margin-top: 8px; font-size: 12px; color: #999; }
+.qr-hint { display: block; margin-top: 16rpx; font-size: 24rpx; color: #999; }
 
-.loading { text-align: center; padding: 40px; color: #999; }
+.loading { text-align: center; padding: 80rpx; color: #999; }
 </style>

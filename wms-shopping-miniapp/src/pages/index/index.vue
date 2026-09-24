@@ -41,6 +41,7 @@
 <script>
 import { products as productApi } from '@/api/market.js'
 import { useCartStore } from '@/store/cart.js'
+import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() {
@@ -60,7 +61,7 @@ export default {
   onPullDownRefresh() { this.load().finally(() => uni.stopPullDownRefresh()); },
   onReachBottom() { if (this.hasMore) this.loadMore(); },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     async loadCategories() {
       try { this.categories = await productApi.categories() } catch (e) {}
     },

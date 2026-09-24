@@ -96,67 +96,67 @@ export default {
 </script>
 
 <style scoped>
-.scan-page { padding: 20px; background: #f5f5f5; min-height: 100vh; box-sizing: border-box; }
-.scan-header { text-align: center; margin-bottom: 24px; }
-.scan-title { font-size: 22px; font-weight: 600; color: #333; display: block; margin-bottom: 8px; }
-.scan-desc { font-size: 14px; color: #999; }
+.scan-page { padding: 40rpx; background: #f5f5f5; min-height: 100vh; box-sizing: border-box; }
+.scan-header { text-align: center; margin-bottom: 48rpx; }
+.scan-title { font-size: 44rpx; font-weight: 600; color: #333; display: block; margin-bottom: 16rpx; }
+.scan-desc { font-size: 28rpx; color: #999; }
 
 .btn-scan {
   width: 100%;
   background: #1677ff;
   color: #fff;
   border: none;
-  border-radius: 10px;
-  padding: 18px;
-  font-size: 18px;
+  border-radius: 20rpx;
+  padding: 36rpx;
+  font-size: 36rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 16rpx;
+  margin-bottom: 40rpx;
 }
 .btn-scan:disabled { opacity: 0.7; }
 
 .last-scan {
   text-align: center;
-  padding: 12px;
+  padding: 24rpx;
   background: #e6f7ff;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  font-size: 14px;
+  border-radius: 16rpx;
+  margin-bottom: 48rpx;
+  font-size: 28rpx;
 }
 .last-scan .label { color: #1677ff; }
 
-.quick-actions { margin-bottom: 24px; }
+.quick-actions { margin-bottom: 48rpx; }
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 24rpx;
 }
 .action-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px 12px;
+  padding: 40rpx 24rpx;
   background: #fff;
-  border-radius: 10px;
+  border-radius: 20rpx;
   text-decoration: none;
-  border: 1px solid #f0f0f0;
+  border: 2rpx solid #f0f0f0;
 }
 .action-item-hover { background: #e6f7ff; border-color: #91d5ff; }
-.action-icon { font-size: 28px; margin-bottom: 8px; }
-.action-item text:last-child { font-size: 14px; color: #333; }
+.action-icon { font-size: 56rpx; margin-bottom: 16rpx; }
+.action-item text:last-child { font-size: 28rpx; color: #333; }
 
-.history-section { background: #fff; border-radius: 10px; padding: 16px; }
-.history-list { margin-top: 12px; }
+.history-section { background: #fff; border-radius: 20rpx; padding: 32rpx; }
+.history-list { margin-top: 24rpx; }
 .history-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 24rpx;
+  border-bottom: 2rpx solid #f0f0f0;
 }
 .history-item:last-child { border-bottom: none; }
-.history-item text:first-child { font-size: 14px; color: #333; }
-.arrow { font-size: 12px; color: #999; }
+.history-item text:first-child { font-size: 28rpx; color: #333; }
+.arrow { font-size: 24rpx; color: #999; }
 </style>

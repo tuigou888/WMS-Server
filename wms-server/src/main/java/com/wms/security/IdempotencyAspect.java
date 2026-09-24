@@ -37,8 +37,10 @@ public class IdempotencyAspect {
         this.requests = requests; this.mapper = mapper; this.transactions = new TransactionTemplate(transactionManager);
     }
 
-    @Around("@annotation(idempotent)")
-    public Object executeOnce(ProceedingJoinPoint joinPoint, Idempotent idempotent) throws Throwable {
+    // 不用 @annotation(idempotent) 参数绑定：运行时 JoinPointMatch 绑定失败会导致所有幂等接口 500，改为在通知内反射获取注解
+    @Around("@annotation(com.wms.security.Idempotent)")
+    public Object executeOnce(ProceedingJoinPoint joinPoint) throws Throwable {
+        Idempotent idempotent = ((MethodSignature) joinPoint.getSignature()).getMethod().getAnnotation(Idempotent.class);
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         HttpServletRequest request = attributes == null ? null : attributes.getRequest();
         String key = request == null ? null : request.getHeader("Idempotency-Key");

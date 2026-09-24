@@ -48,7 +48,7 @@ export default {
 .badge { color: #1677ff; font-size: 22rpx; border: 1rpx solid #1677ff; padding: 2rpx 12rpx; border-radius: 8rpx; }
 .edit-link { color: #1677ff; font-size: 26rpx; }
 .del-link { color: #ff4d4f; font-size: 26rpx; }
-.add-wrap { position: fixed; bottom: 40rpx; left: 40rpx; right: 40rpx; }
+.add-wrap { position: fixed; bottom: calc(40rpx + env(safe-area-inset-bottom)); left: 40rpx; right: 40rpx; }
 .btn-primary { border-radius: 40rpx; }
 .empty { padding: 100rpx; text-align: center; color: #999; }
 </style>

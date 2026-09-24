@@ -710,7 +710,8 @@ class MarketServiceIntegrationTest {
         assertEquals("顺丰", shipped.getLogisticsCompany());
         assertEquals("SF123456", shipped.getLogisticsNumber());
         assertNotNull(shipped.getShippedAt());
-        // 销量增加
+        // 销量增加（JPQL 批量更新绕过一级缓存，需 clear 后重读）
+        entityManager.clear();
         MarketProduct pAfter = products.findById(p.getId()).orElseThrow();
         assertEquals(salesBefore + order.getItems().get(0).getQuantity().longValue(), pAfter.getSalesCount());
         // 购物车被清空

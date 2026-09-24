@@ -14,6 +14,7 @@ const auth = useAuthStore()
 const rows = ref([])
 const page = ref(1)
 const total = ref(0)
+const loading = ref(false)
 const warehouses = ref([])
 const items = ref([])
 const transferOpen = ref(false)
@@ -21,7 +22,7 @@ const warehouseOpen = ref(false)
 const formState = ref({ lines: [{ quantity: 1, sourceLocationCode: 'A-01-01', targetLocationCode: 'A-01-01' }] })
 const warehouseFormState = ref({})
 
-const loadTransfers = (target = page.value) => api.transfers({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message))
+const loadTransfers = (target = page.value) => { loading.value = true; return api.transfers({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 const loadWarehouses = () => api.warehouses().then((x) => { warehouses.value = x }).catch((e) => message.error(e.message))
 
 onMounted(() => {
@@ -105,7 +106,7 @@ const columns = [
   <Typography.Paragraph v-if="warehouses.length < 2" type="warning">请先新增至少一个启用仓库，才能发起跨仓库调拨。</Typography.Paragraph>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: loadTransfers }" />
+    <a-table row-key="id" :loading="loading" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: loadTransfers }" />
   </Card>
 
   <a-modal v-model:open="transferOpen" title="新建调拨草稿" width="840" :destroy-on-close="true" @ok="createTransfer">

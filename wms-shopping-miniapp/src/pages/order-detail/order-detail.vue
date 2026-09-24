@@ -74,7 +74,7 @@
 
 <script>
 import { orders as orderApi } from '@/api/market.js'
-import { formatDateTime } from '@/utils/format.js'
+import { formatDateTime, formatPrice as money } from '@/utils/format.js'
 import { requestPayment, PaymentCancelled } from '@/utils/pay.js'
 
 export default {
@@ -95,7 +95,7 @@ export default {
     this.load()
   },
   methods: {
-    money(v) { return Number(v || 0).toFixed(2) },
+    money,
     fmtDate(v) { return formatDateTime(v) },
     async load() {
       try { this.order = await orderApi.detail(this.id) }
@@ -136,7 +136,7 @@ export default {
 </script>
 
 <style scoped>
-.page { padding: 20rpx 20rpx 140rpx; }
+.page { padding: 20rpx 20rpx; padding-bottom: calc(160rpx + env(safe-area-inset-bottom)); }
 .track-card { background: linear-gradient(135deg,#1677ff,#4096ff); color: #fff; border-radius: 16rpx; padding: 32rpx; margin-bottom: 20rpx; }
 .track-status { font-size: 40rpx; font-weight: 700; }
 .track-sub { font-size: 26rpx; opacity: 0.85; }
@@ -166,6 +166,6 @@ export default {
 .total-row { display: flex; justify-content: flex-end; align-items: baseline; padding-top: 20rpx; }
 .total-label { font-size: 26rpx; color: #666; }
 .total-price { font-size: 36rpx; color: #ff4d4f; font-weight: 700; }
-.action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; display: flex; gap: 20rpx; justify-content: flex-end; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
+.action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 20rpx 40rpx; padding-bottom: calc(20rpx + env(safe-area-inset-bottom)); display: flex; gap: 20rpx; justify-content: flex-end; box-shadow: 0 -2rpx 6rpx rgba(0,0,0,0.06); }
 .empty { padding: 100rpx 40rpx; text-align: center; color: #999; }
 </style>

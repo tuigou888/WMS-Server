@@ -272,54 +272,54 @@ export default {
 
 <style scoped>
 .doc-detail-page { background: #f5f5f5; min-height: 100vh; }
-.content { width: 100%; box-sizing: border-box; padding-bottom: 20px; }
+.content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
 .card {
   background: #fff;
-  border-radius: 10px;
-  margin: 12px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  border-radius: 20rpx;
+  margin: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
 }
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.doc-no { font-size: 16px; font-weight: 600; color: #333; font-family: monospace; }
-.header-info { display: flex; flex-direction: column; gap: 8px; }
-.info-row { display: flex; justify-content: space-between; font-size: 13px; }
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
+.doc-no { font-size: 32rpx; font-weight: 600; color: #333; font-family: monospace; }
+.header-info { display: flex; flex-direction: column; gap: 16rpx; }
+.info-row { display: flex; justify-content: space-between; font-size: 26rpx; }
 .info-row .label { color: #999; }
 .info-row text:last-child { color: #333; text-align: right; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.section-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 12px; }
+.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin-bottom: 24rpx; }
 
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 24rpx;
 }
 .summary-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px 12px;
+  padding: 32rpx 24rpx;
   background: #fafafa;
-  border-radius: 8px;
+  border-radius: 16rpx;
 }
-.summary-label { font-size: 12px; color: #999; }
-.summary-value { font-size: 18px; font-weight: 600; color: #333; margin-top: 4px; }
+.summary-label { font-size: 24rpx; color: #999; }
+.summary-value { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
 
-.lines-list { display: flex; flex-direction: column; gap: 10px; }
+.lines-list { display: flex; flex-direction: column; gap: 20rpx; }
 .line-item {
   background: #fafafa;
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 16rpx;
+  padding: 24rpx;
 }
-.line-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
-.line-code { font-size: 12px; color: #1677ff; background: #e6f7ff; padding: 1px 6px; border-radius: 3px; }
-.line-name { font-size: 14px; font-weight: 500; color: #333; }
-.line-meta { display: flex; gap: 10px; font-size: 11px; color: #999; margin-bottom: 8px; flex-wrap: wrap; }
-.meta { background: #f0f0f0; padding: 1px 6px; border-radius: 3px; }
-.line-qty-row { display: flex; gap: 16px; font-size: 12px; flex-wrap: wrap; }
+.line-header { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 8rpx; }
+.line-code { font-size: 24rpx; color: #1677ff; background: #e6f7ff; padding: 2rpx 12rpx; border-radius: 6rpx; }
+.line-name { font-size: 28rpx; font-weight: 500; color: #333; }
+.line-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; margin-bottom: 16rpx; flex-wrap: wrap; }
+.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
+.line-qty-row { display: flex; gap: 32rpx; font-size: 24rpx; flex-wrap: wrap; }
 .qty-label { color: #666; }
 .qty-diff { font-weight: 600; }
 
-.loading { text-align: center; padding: 40px; color: #999; }
+.loading { text-align: center; padding: 80rpx; color: #999; }
 </style>

@@ -94,7 +94,7 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<Map<String, Object>> profit(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
         boolean scoped=warehouseAccess.isWarehouseScoped();List<Long> ids=scoped?warehouseAccess.currentWarehouseIds():List.of(-1L);org.springframework.data.domain.Pageable pageable=PageRequest.of(Math.max(0,page-1),Math.min(100,Math.max(1,pageSize)));
-        org.springframework.data.domain.Page<InventoryTransaction> rows=scoped?transactions.pageDetailedByTransactionTypeAndWarehouses("out",ids,pageable):transactions.pageDetailedByTransactionType("out",pageable);Object[] totals=transactions.salesTotals(scoped,ids);
+        org.springframework.data.domain.Page<InventoryTransaction> rows=scoped?transactions.pageDetailedByTransactionTypeAndWarehouses("out",ids,pageable):transactions.pageDetailedByTransactionType("out",pageable);Object[] totals=transactions.salesTotals(scoped,ids);if(totals.length==1&&totals[0] instanceof Object[] inner)totals=inner;
         return ApiResponse.ok(Map.of("records",rows.getContent().stream().map(this::tx).toList(),"total",rows.getTotalElements(),"page",rows.getNumber()+1,"pageSize",rows.getSize(),"salesCount",totals[0],"totalSale",totals[1],"totalProfit",totals[2]));
     }
 
