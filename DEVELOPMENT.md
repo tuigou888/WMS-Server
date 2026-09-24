@@ -1,6 +1,6 @@
 # 开发与运行指南
 
-本项目是按 `README.md` 的仓储进销存场景实现的前后端分离系统：后端为 Spring Boot 3 / JPA，前端为 React / Vite / Ant Design。默认使用 H2 内存数据库，以便开箱体验；也支持通过环境变量切换 MySQL。
+本项目是按 `README.md` 的仓储进销存场景实现的前后端分离系统：后端为 Spring Boot 3 / JPA，Web 后台为 Vue 3 / Vite / Ant Design Vue，另有两个 uni-app 小程序端（仓储作业端 `wms-miniapp`、买家商城端 `wms-shopping-miniapp`）。默认使用 H2 内存数据库，以便开箱体验；也支持通过环境变量切换 MySQL。
 
 > 本文不替代 `README.md` 的业务说明；仅记录当前已落地的模块、开发启动方式和接口约定。
 
@@ -19,7 +19,9 @@
 - **单据号持久化**：基于 `document_sequences` 表 + 行锁取号，重启不重置。
 - **操作日志**：AOP 切面自动记录所有控制器操作到 `operation_logs` 表，管理员可在 `/logs` 页面查询。
 - **盘点过滤**：创建盘点单时可指定 `itemCodes` / `locationCodes` 进行部分盘点。
-- **工具**：物品二维码（PNG 或 Base64 Data URL）、物品档案 Excel 导入/导出。
+- **商城子系统（Market）**：买家端商品/购物车/订单/收藏/收货（`/market/**`，需登录），管理端商品上架、订单审核/发货/退款/统计（`/admin/market/**`）；微信支付 APIv3 + 回调验签；买家账号由 `POST /auth/wx-register` 开成 `CUSTOMER`；写操作带幂等控制（`idempotent_requests` 表）。
+- **请购**：`GET/POST /purchase-requests` + 审核/取消，走 `purchase-request:read/write/review` 权限。
+- **工具**：物品二维码（PNG 或 Base64 Data URL）、物品档案 Excel 导入/导出、OCR 识别占位接口（`ocr.mock` 开关驱动，prod 强制关闭）。
 
 ## 本地启动
 
@@ -96,6 +98,21 @@ Linux 移植版工具的旧版 `wcsc` 还可能无法编译 uni-app 自动追加
 
 Linux 移植版模拟器在部分网络请求中会把 JSON 响应作为字符串放入 `res.data`。统一请求层会先安全解析字符串 JSON，再判断 `code/message/data`，避免接口已返回 `code: 200` 但登录状态没有写入、页面没有跳转。
 
+### 买家商城小程序
+
+`wms-shopping-miniapp` 是独立的买家商城端（商品/购物车/下单/微信支付/收货），与仓储作业端构建脚本不同：
+
+```bash
+cd wms-shopping-miniapp
+npm install
+npm run build:wechat          # 产物 dist/build/mp-weixin（注意 npm run build 是 H5 构建）
+```
+
+- 买家端所有 `/market/**` 接口都需要 token：未登录先走 `POST /auth/wx-login`，未绑定则 `POST /auth/wx-register` 开 `CUSTOMER` 账号。
+- `POST /market/orders/{id}/mock-pay` 仅在 `wechat.pay.mock=true` 时可用，prod profile 强制 false。
+- **两个小程序的 `mp-weixin.appid` 目前是同一个值**：微信后台一个 appid 只对应一个小程序，上线前必须分别申请并填写，否则后上传的会覆盖前一个。
+- 发布前运行 `npm run check:release`（要求 appid 非空且 `VITE_API_BASE` 为 HTTPS）。
+
 ### 使用 MySQL
 
 ```bash
@@ -115,7 +132,7 @@ docker compose --env-file .env up --build
 
 容器默认将 Web `3000`、API `8088`、MySQL `3306` 绑定到宿主机 `127.0.0.1`；正式公网访问必须通过 HTTPS 反向代理。
 
-Compose 的 `prod` Profile 使用 Flyway 和 `ddl-auto=validate`。全新库会依次执行 `V1` 基线、`V2` 库存预占/冲销追溯、`V3` 历史 `reverse` 类型规范化和 `V4` 认证状态持久化；已有 Hibernate 管理的库会先基线为 V1，再执行后续迁移。上线前必须完成数据库备份、恢复抽检，并运行只读对账脚本留存结果：
+Compose 的 `prod` Profile 使用 Flyway 和 `ddl-auto=validate`。全新库会依次执行 `V1` 基线至 `V9`（库存预占/冲销追溯、历史 `reverse` 流水规范化、认证状态持久化、查询路径索引、仓库用户范围、盘点库存版本、冲销唯一约束、幂等请求记录）；已有 Hibernate 管理的库会先基线为 V1，再执行后续迁移。上线前必须完成数据库备份、恢复抽检，并运行只读对账脚本留存结果：
 
 ```bash
 WMS_DB_HOST=<host> WMS_DB_PORT=3306 WMS_DB_NAME=wms \
@@ -156,12 +173,13 @@ Content-Type: application/json
 Authorization: Bearer <token>
 ```
 
-Token 在当前服务进程内保存，有效期为 12 小时；退出登录或服务重启后失效。主要接口：
+Token 已持久化到 `auth_sessions` 表（库内仅存 SHA-256 摘要，明文 token 只在登录响应中出现一次），有效期 12 小时；`POST /auth/logout` 撤销当前会话，保存用户（`PUT /auth/users/{id}`）会踢掉该用户全部会话，被禁用的用户下次解析即失效。默认 H2 下 Token 随内存库一起丢失；切到 MySQL 后 Token 跨重启仍然有效。主要接口：
 
-- `POST /auth/login`、`GET /auth/me`、`POST /auth/logout`
-- `GET/POST/PUT /auth/users`（管理员）
+- `POST /auth/login`、`GET /auth/me`、`GET /auth/permissions`（角色矩阵）、`POST /auth/logout`
+- `GET/POST/PUT /auth/users`（需 `user:manage`）
+- `POST /auth/wx-login`、`POST /auth/wx-bind`、`POST /auth/wx-register`（免鉴权）
 
-除 `/auth/**`、`/health` 和 H2 Console 外，所有 API 都需要登录。未携带 Token 时返回 HTTP `401`。
+免鉴权路径仅限 `/auth/login`、`/auth/wx-login`、`/auth/wx-bind`、`/auth/wx-register`、`/health/**` 和两个微信支付回调（`/market/pay/notify`、`/market/pay/refund-notify`），dev 下另有 H2 Console；其余接口（**包括商城浏览类 `/market/**`**）均需登录。未携带 Token 时返回 HTTP `401`。
 
 ## 业务状态流
 
@@ -215,10 +233,15 @@ DRAFT -> REJECTED
 | 仓库 | `GET /warehouses`、`POST /warehouses`、`PUT /warehouses/{id}`；`includeDisabled=true` 可查看停用仓库 |
 | 扫码出入库 | `POST /stock/in/scan`、`POST /stock/out/scan` |
 | 库存 | `GET /inventory`、`GET /inventory/transactions`、`GET /inventory/warehouses` |
-| 报表 | `GET /reports/dashboard`、`GET /reports/stock-alert`、`GET /reports/profit`、`GET /reports/inventory-age`、`GET /reports/in-out-summary` |
+| 报表 | `GET /reports/dashboard`、`GET /reports/stock-alert`、`GET /reports/profit`、`GET /reports/anomalies`、`GET /reports/inventory-age`、`GET /reports/in-out-summary` |
 | 报损/报溢 | `GET/POST /adjustments`、`POST /adjustments/{id}/review`、`POST /adjustments/{id}/complete` |
 | 退货单 | `POST /documents`（type=`RETURN_IN`/`RETURN_OUT`） |
 | 反审/红冲 | `POST /documents/{id}/uncomplete`、`POST /documents/{id}/reverse` |
+| 请购 | `GET/POST /purchase-requests`、`POST /purchase-requests/{id}/review`、`POST /purchase-requests/{id}/cancel` |
+| 商城（买家） | `GET /market/products`、购物车 `/market/cart`、订单 `/market/orders`（`/prepay`、`/mock-pay`、`/cancel`、`/receive`）、收藏 `/market/favorites`；均为需登录 |
+| 商城（管理） | `/admin/market/products`（上架 `/shelf`）、`/admin/market/orders`（`/audit`、`/ship`、`/complete`、`/cancel`、`/refund`）、`/admin/market/customers`、`/admin/market/stats` |
+| 支付回调 | `POST /market/pay/notify`、`POST /market/pay/refund-notify`（免鉴权，APIv3 验签） |
+| OCR | `POST /ocr/recognize`（multipart；`ocr.mock` 开关驱动，prod 直接 400） |
 | 操作日志 | `GET /logs` |
 | 二维码 | `GET /qrcodes/items/{code}`、`GET /qrcodes/items/{code}/png` |
 | Excel | `GET /excel/items/export`、`POST /excel/items/import` |
@@ -236,8 +259,11 @@ DRAFT -> REJECTED
 ## 验证命令
 
 ```bash
-cd wms-server && mvn test
+cd wms-server && mvn test                 # 15 个测试类 / 177 个用例
 cd ../wms-web && npm run build
+cd ../wms-miniapp && npm run build:mp-weixin
+cd ../wms-shopping-miniapp && npm run build:wechat
+sh ops/release-check.sh                   # 一键发布检查（脏工作区需 RELEASE_ALLOW_DIRTY=YES）
 ```
 
-前端构建可能输出 Ant Design 主包体积警告，不影响构建结果。
+前端构建可能输出 Ant Design 主包体积警告，不影响构建结果。注意判断 `mvn test` 成败不要用管道（`| tail` 的退出码是 `tail` 的），写成 `mvn -o test > /tmp/t.log 2>&1; echo EXIT=$?` 再看日志。
