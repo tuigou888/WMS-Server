@@ -11,16 +11,24 @@ const statusColor = { SUCCESS: 'green', ERROR: 'red' }
 
 const data = ref([])
 const loading = ref(false)
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(20)
 const username = ref()
 const action = ref()
 const result = ref()
 
 const load = () => {
   loading.value = true
-  api.operationLogs({ username: username.value, action: action.value, result: result.value }).then((x) => { data.value = x }).catch((e) => message.error(e.message)).finally(() => { loading.value = false })
+  const query = { username: username.value, action: action.value, result: result.value, page: page.value, pageSize: pageSize.value }
+  api.operationLogs(query).then((x) => {
+    data.value = x.records
+    total.value = x.total
+  }).catch((e) => message.error(e.message)).finally(() => { loading.value = false })
 }
 
-watch([username, action, result], () => { load() }, { immediate: true })
+// 过滤条件变化时回到第一页，否则可能停在超出结果数的空页上
+watch([username, action, result], () => { page.value = 1; load() }, { immediate: true })
 
 const columns = [
   { title: '时间', dataIndex: 'operationAt', customRender: ({ text }) => dateTime(text) },
@@ -46,6 +54,6 @@ const columns = [
       <a-select v-model:value="result" placeholder="结果" allow-clear style="width: 120px;" :options="[{ value: 'SUCCESS', label: '成功' }, { value: 'ERROR', label: '失败' }]" />
       <Button type="primary" :icon="h(ReloadOutlined)" @click="load">查询</Button>
     </Space>
-    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)" :pagination="{ pageSize: 20 }" />
+    <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)" :pagination="{ current: page, total, pageSize, showSizeChanger: true, showTotal: (t) => `共 ${t} 条`, onChange: (p, s) => { page = p; pageSize = s; load() } }" />
   </Card>
 </template>

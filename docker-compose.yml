@@ -17,9 +17,16 @@ services:
   wms-server:
     build: ./wms-server
     restart: unless-stopped
-    ports: ["${WMS_API_BIND:-127.0.0.1:8088}:8088"]
+    ports: ["${WMS_API_BIND:-127.0.0.1:8088}:8088", "${WMS_MGMT_BIND:-127.0.0.1:9089}:9089"]
+    volumes: ["wms-logs:/app/logs"]
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      WMS_LOG_DIR: /app/logs
+      # 审计日志归档（A3②）：目录必须落在 wms-logs 卷内，否则容器重建即丢归档。
+      # DELETE_ENABLED 默认 false（只归档不删）；打开前确认归档文件已进备份。
+      AUDIT_ARCHIVE_DIR: /app/logs/archive
+      AUDIT_ARCHIVE_AFTER_DAYS: ${AUDIT_ARCHIVE_AFTER_DAYS:-365}
+      AUDIT_ARCHIVE_DELETE_ENABLED: ${AUDIT_ARCHIVE_DELETE_ENABLED:-false}
       DB_URL: jdbc:mysql://mysql:3306/wms?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
       DB_USERNAME: ${MYSQL_USER:?Set MYSQL_USER in .env}
       DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
@@ -53,6 +60,7 @@ services:
     depends_on: [wms-server]
 volumes:
   mysql-data:
+  wms-logs:
 secrets:
   wechat_pay_private_key:
     file: ${WECHAT_PAY_PRIVATE_KEY_FILE:?Set WECHAT_PAY_PRIVATE_KEY_FILE in .env}

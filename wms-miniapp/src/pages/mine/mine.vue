@@ -142,7 +142,7 @@ export default {
         const username = this.userStore.user?.username
         if (!username) return
         const data = await api.logs({ username, pageSize: 20 })
-        this.myLogs = data
+        this.myLogs = data.records
       } catch (e) {
         console.warn('加载操作日志失败:', e)
       }

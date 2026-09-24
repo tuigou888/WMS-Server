@@ -92,8 +92,8 @@ public class WechatPayNotifyController {
             return ok();
         } catch (Exception e) {
             log.error("支付回调处理失败：{}", e.getMessage(), e);
-            // 返回 5xx 触发微信按 15s/15s/30s/... 频次重试
-            return fail(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+            // 返回 5xx 触发微信按 15s/15s/30s/... 频次重试；本接口免鉴权，只回固定文案，细节留在日志
+            return fail(HttpStatus.INTERNAL_SERVER_ERROR, "支付回调处理失败");
         }
     }
 
@@ -151,13 +151,13 @@ public class WechatPayNotifyController {
             return ok();
         } catch (WechatPayException e) {
             log.warn("退款回调验签或解密失败：{}", e.getMessage(), e);
-            return fail(HttpStatus.BAD_REQUEST, e.getMessage());
+            return fail(HttpStatus.BAD_REQUEST, "退款回调验签或解密失败");
         } catch (BusinessException e) {
             log.error("退款回调业务处理失败：{}", e.getMessage(), e);
-            return fail(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+            return fail(HttpStatus.INTERNAL_SERVER_ERROR, "退款回调业务处理失败");
         } catch (Exception e) {
             log.error("退款回调处理失败：{}", e.getMessage(), e);
-            return fail(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+            return fail(HttpStatus.INTERNAL_SERVER_ERROR, "退款回调处理失败");
         }
     }
 

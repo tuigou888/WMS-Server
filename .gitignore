@@ -1,5 +1,6 @@
 # Java
 wms-server/target/
+wms-server/logs/
 *.class
 wms-server/node_modules/
 

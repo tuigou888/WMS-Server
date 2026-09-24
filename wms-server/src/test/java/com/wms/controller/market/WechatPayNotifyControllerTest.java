@@ -7,6 +7,7 @@ import com.wms.model.entity.market.MarketCustomer;
 import com.wms.model.entity.market.MarketOrder;
 import com.wms.service.market.MarketService;
 import com.wms.service.market.WechatPayService;
+import com.wechat.pay.java.core.exception.WechatPayException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,9 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 微信支付回调控制器测试。
@@ -116,6 +120,36 @@ class WechatPayNotifyControllerTest {
         assertEquals(qtyAfterFirst, qtyAfterSecond);
         // 第二次回调不应改 transactionId
         assertEquals("TX_A", second.getTransactionId());
+    }
+
+    /** 回调接口免鉴权：异常细节（订单号、SQL、验签内部信息）只能进日志，不能回给调用方。 */
+    @Test
+    void notify_doesNotEchoExceptionDetail() {
+        WechatPayService pay = mock(WechatPayService.class);
+        when(pay.isMock()).thenReturn(false);
+        when(pay.handleNotify(any(), any(), any(), any(), any())).thenThrow(
+                new IllegalStateException("更新失败 order_no=CKD20260923001 sql=update market_order set ..."));
+
+        ResponseEntity<Map<String, Object>> response =
+                new WechatPayNotifyController(pay, mock(MarketService.class)).notify(new MockHttpServletRequest(), "{}");
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "5xx 才能触发微信重试");
+        assertEquals("支付回调处理失败", response.getBody().get("message"));
+    }
+
+    /** 退款回调同理：验签失败返回固定 400 文案，不回显 SDK 异常内容。 */
+    @Test
+    void refundNotify_doesNotEchoSignatureDetail() {
+        WechatPayService pay = mock(WechatPayService.class);
+        when(pay.isMock()).thenReturn(false);
+        when(pay.handleRefundNotify(any(), any(), any(), any(), any())).thenThrow(
+                new WechatPayException("验签失败：serial=SERIAL-SECRET timestamp=1700000000") {});
+
+        ResponseEntity<Map<String, Object>> response = new WechatPayNotifyController(pay, mock(MarketService.class))
+                .refundNotify(new MockHttpServletRequest(), "{}");
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode(), "验签失败不应让微信持续重试");
+        assertEquals("退款回调验签或解密失败", response.getBody().get("message"));
     }
 
     // ======================== 辅助方法 ========================

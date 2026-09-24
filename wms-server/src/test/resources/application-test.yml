@@ -17,6 +17,11 @@ wechat:
     # 测试环境走模拟支付通路，不激活真实微信支付 SDK（避免缺商户参数导致上下文加载失败）
     mock: true
 
+audit:
+  archive:
+    # 关掉自动归档：定时任务会在测试期间往仓库写文件。AuditArchiveServiceTest 直接调 runOnce() 并指定 @TempDir 目录。
+    enabled: false
+
 logging:
   level:
     com.wms: WARN

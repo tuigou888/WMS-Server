@@ -25,10 +25,16 @@
 | PROD-004 | P0 | 小程序 AppID 为空，API 默认地址仍为 localhost，生产发布配置未完成 | 代码防护已完成，待配置 |
 | PROD-005 | P0 | Compose 未提供 HTTPS 网关，MySQL/API 端口直接映射到宿主机 | 默认暴露面已收紧，HTTPS 待接入 |
 | PROD-006 | P0 | MySQL 全新部署、历史库升级、备份恢复尚未完成发布环境演练 | 工具已补齐，待发布环境演练 |
-| PROD-007 | P1 | 健康检查不验证数据库和外部依赖，缺少监控、告警和日志轮转 | 探针已修复，监控待接入 |
+| PROD-007 | P1 | 缺少指标采集、日志落盘与轮转、告警（存活/就绪探针已具备） | 仓库侧最小集已落地（actuator+prometheus、logback 轮转、traceId），采集与告警待接入 |
 | PROD-008 | P1 | 登录页仍保留演示账号和默认用户名 | 已修复 |
 | PROD-009 | P1 | OCR 接口仍返回 mock 识别结果 | 已隔离，待接入真实 OCR |
 | PROD-010 | P1 | 当前工作区存在大量未提交改动，缺少可追溯发布基线 | 检查脚本已补齐，提交/打标签待执行 |
+| PROD-011 | P0 | 支付/退款回调把原始异常 message 回给未鉴权调用方，可回显内部信息与单号 | 已修复（四处固定文案 + 2 条断言测试），真实回调验签待 C5 |
+| PROD-012 | P0 | `DocumentRequest.partnerId` 无 `@NotNull`，入库须供应商、出库须客户的规则可被绕过 | 未改，属接口契约变更需业务确认（证据见 A2） |
+| PROD-013 | P1 | `operation_logs`/`inventory_transactions`/过期 `wechat_bind_tickets` 无保留与归档策略，`GET /logs` 仍全表入内存后切片 | 分页已下推并三端同步；`operation_logs` 保留期 + 每日归档已落地（删除默认关闭），归档异地备份与票据清理仍待办 |
+| PROD-014 | P1 | V5 索引只在 H2 上验证过，MySQL 8 未实跑；生产连接池为 Hikari 默认 10 未调参 | 连接池/慢 SQL/日志级别已显式化，MySQL 实跑待 C1/C2 |
+| PROD-015 | P1 | 三个 `@Scheduled`（预占过期、取消后退款、审计日志归档）无分布式锁，多副本重复扫描并产生错误日志噪音 | 行锁+状态机已防重复扣货/退款；归档任务重复跑只产生冗余 CSV，扩多实例前仍需加锁 |
+| PROD-016 | P2 | 文档与现实不符：AGENTS.md 未记 `wms-shopping-miniapp`（但被 `ops/release-check.sh` 构建）、"4 个测试类"实际 15 类 177 测试、"OCR 返回 mock"已改为配置驱动且 prod 直接 400 | 已同步（AGENTS.md + CLAUDE.md，CLAUDE.md 原写 React 18/内存 TokenStore 亦已纠正） |
 
 ## 3. 整改顺序
 
@@ -221,16 +227,78 @@
 - 备用处理：若 Linux 工具仍未读取配置，再更新/重装包含 `@swc/core-linux-x64-gnu`（或对应架构）绑定的版本。
 - 状态：项目侧已加入 SWC 兼容配置，待 Linux 开发者工具重新导入并编译复核。
 
+### 2026-09-24：完成上线前整改清单 A1、A3①、A4、A5、A6
+
+- A1 支付回调脱敏：四处异常响应改固定文案，状态码语义不变（验签失败 400 终止重试、业务异常 5xx 保留重试），补 2 条断言响应体固定的 Mockito 用例。
+- A3① 审计日志：`GET /logs` 改服务端分页 `{records,total,page,pageSize}`（1 起算、`pageSize` 钳制 1..200），删除无调用方的全表 `search(...)`；`wms-web/LogsPage.vue` 与作业端 `mine.vue` 同步新形状（原清单判断"小程序端不受影响"是错的，已修正）。
+- A4 可观测性：actuator + Prometheus 注册表、`logback-spring.xml` 落盘轮转、`TraceIdFilter` 关联单次请求日志；管理端口 `9089` 与 compose 绑定同步。
+- A5 生产参数：Hikari 池、连接超时、`max-lifetime`、泄漏检测、慢 SQL 阈值与日志级别全部显式化并可用环境变量覆盖。
+- A6 文档：AGENTS.md 与 CLAUDE.md 纠误（买家端小程序缺失章节、测试规模、OCR 现况、`/logs` 契约、React/内存 Token/JWT 等 stale 描述），`.gitignore` 补 `wms-server/logs/`。
+- 实测发现并已修复的两个自身缺陷：独立管理端口仍会过 Spring Security 链（actuator 无 token 一律 401，采集器不可用）→ 新增 `SecurityConfig.managementPortChain` 按 `localPort` 精确放行；Hibernate 6 以 INFO 打慢语句，`LOG_LEVEL_SLOW_SQL` 默认 WARN 会把慢日志吃干净 → 默认改 INFO。
+- 验证：`mvn -o test` 173/173 通过；默认 profile 启动后确认 `:9089/actuator/health`、`/actuator/prometheus` 免 token 返回 200，业务端口 actuator 仍 401，`logs/wms-server.log` 单次请求 16 行日志共享同一 traceId，阈值 1ms 下出现 `SQL_SLOW` 记录；`RELEASE_ALLOW_DIRTY=YES sh ops/release-check.sh` 通过（后端 + Web + 两个小程序构建）。
+- 未完成并需要人来决策的三项：A2 往来单位必填（会改变现有表单与老草稿的可提交性）、A3② 审计日志保留与清理（删审计数据需合规签字）、A7 定时任务分布式锁（扩多实例前必做）。
+
+### 2026-09-24：完成 A3② 审计日志保留期与每日归档
+
+- 决策采集时得到两个互相冲突的回答：保留期选了"永久保留、只归档不删"，处理方式又选了"先导出归档再删"。删除不可逆，按可回溯那一侧实现：归档默认执行，删除由 `audit.archive.delete-enabled` 显式打开（默认 false），且只删本轮已 `fsync` 落盘的归档行。
+- 新增 `service/AuditArchiveService`（每日 `0 30 3`，`audit.archive.enabled` 控制是否自动跑）+ `OperationLogRepository.findArchiveBatch`（主键游标 + `operation_at <` 上限，不用 offset 翻页）；配置项 `audit.archive.{enabled,after-days,cron,dir,batch-size,delete-enabled}` 全部支持环境变量覆盖，compose 显式把归档目录钉在 `wms-logs` 卷内的 `/app/logs/archive`。
+- 实现中自查到的两个问题：归档文件名只到秒，同秒二次触发会复用路径并再写一遍表头 → 改为占用即加 `-2/-3` 后缀；水位若在 CSV 落盘前推进，崩溃会留下"水位超前于文件内容"的静默丢失 → 每批 `flush + getFD().sync()` 后才写水位。
+- 安全：`target/path/message/requestBody` 都源自请求内容，导出的 CSV 会被 Excel 打开，故对首字符 `= + - @ Tab` 前置单引号并把内嵌换行压成空格，避免审计日志变成公式注入载体。
+- 未改 `V5__query_path_indexes.sql` 里"operation_logs 无任何清理逻辑"那句注释：已应用的迁移脚本一改就校验和失配、Flyway 拒绝启动。归档目录 `logs/` 已在 `.gitignore` 内，不会污染发布检查。
+- 验证：`mvn -o -Dtest=AuditArchiveServiceTest test` 4/4 通过（默认不删、二次运行水位生效、删除只动已归档行、公式与引号转义）；全量 `mvn -o test` 177/177、15 个测试类通过。测试 profile 关掉 `audit.archive.enabled`，用例直接 `new` 被测对象并注入 `@TempDir`，不写共享单例。
+- 仍开放：归档文件的异地备份（B4）、`wechat_bind_tickets` 过期行清理（本次按用户限定只做 `operation_logs`）、多实例下的调度锁（A7）。
+
 ## 5. 当前仍不能自动关闭的事项
 
 - PROD-002：需要 MySQL 多实例并发登录和 V4 Flyway 迁移演练。
 - PROD-003/004：需要真实微信 AppID、支付商户参数、HTTPS 域名、真机支付/退款/通知验收。
 - PROD-005：需要外部 HTTPS 网关、证书续期和公网限流策略。
 - PROD-006：需要发布环境完成 MySQL 新库、历史库升级、备份恢复和库存对账。
-- PROD-007：需要接入监控、日志集中化和告警规则。
+- PROD-007：仓库侧指标/日志/traceId 已具备，仍需外部采集、集中化与告警规则落地。
 - PROD-009：如果业务需要 OCR，需要接入真实服务；否则保持生产入口关闭。
 - PROD-010：需要人工审阅当前工作区，提交并创建可回滚版本标签。
+- PROD-012：需要业务确认出入库是否允许无往来单位，属接口契约变更（详见 A2）。
+- PROD-013：`operation_logs` 保留期与每日归档已在仓库侧闭环（删除默认关闭）；仍需运维确认归档文件的存放/备份保留策略（B4），以及是否真要打开 `AUDIT_ARCHIVE_DELETE_ENABLED`。`wechat_bind_tickets` 过期行清理未在本次范围。
+- PROD-015：扩容多实例前必须给三个 `@Scheduled` 加分布式锁或独立调度实例（详见 A7）。
 
 ## 6. 关闭标准
 
 整改项只有同时满足以下条件才可关闭：代码或配置已修改；相关异常路径有测试；生产文档已同步；验证命令通过；涉及库存、金额或支付的改动完成对账或真实联调。
+
+## 7. 上线前整改清单（Go / No-Go）
+
+清单日期：2026-09-23，A 组执行与验证于 2026-09-24。A 组在仓库内即可闭环；B/C/D 组需要环境、外部资源与人工演练配合，**缺一不可放行**。
+
+### A. 仓库内可闭环（代码 / 配置）
+
+- [x] **A1 回调异常脱敏**（PROD-011，P0）：**已完成**。`WechatPayNotifyController` 四处 catch 路径改回固定文案（"支付回调验签或解密失败"/"支付回调处理失败"/"退款回调…"），状态码语义保留：验签失败回 400 让微信停止重试，业务/未知异常回 5xx 让其按 15s/15s/30s… 重试，细节只进 `log.error`。验证：新增 2 条纯 Mockito 用例直接断言响应体固定（`WechatPayNotifyControllerTest`，8/8 通过），全量 173 用例绿。真实回调闭环仍在 C5。
+- [ ] **A2 往来单位必填**（PROD-012，P0）：**未动，卡在一个业务决策**。现状证据：`DocumentsPage.vue:142` 把该字段标注为"（可选）"且 `allow-clear`；两个小程序的建单表单根本不提交 `partnerId`；`ReportController` 不读往来单位；`DocumentService.createDocument` 是 `r.partnerId()==null ? null : partner(...)`。因此直接加 `@NotNull` 会让现有 Web/小程序表单和老草稿一起 400。要推进必须先回答"出入库是否真的允许无往来单位"。**验证方式**：决策后新增 400 用例 + `python3 test-artifacts/run_api_regression.py` 全绿。
+- [x] **A3① 审计日志服务端分页**（PROD-013，P1）：**已完成**。`OperationLogRepository.searchPage(...)` + `PageRequest`，`GET /logs` 返回 `{records,total,page,pageSize}`（`page` 从 1 起算、`pageSize` 钳制 1..200），并删除已无调用方的全表 `search(...)`。三端已同步：`wms-web/LogsPage.vue` 接服务端分页控件、作业端 `mine.vue` 改取 `data.records`。**注意**：清单原写"小程序端已传 `pageSize:20`，不受影响"是错的——该页把响应直接当数组渲染，形状变更后必须显式取 `records`，已修正。
+- [x] **A3② 保留与归档**（PROD-013，P1）：**已完成（删除默认关闭）**。决策口径：审计数据**永久保留、只归档不删**，删除作为可选能力显式打开。新增 `AuditArchiveService`：`audit.archive.after-days`（默认 365）为保留期，每日 `0 30 3` 由 `@Scheduled` 跑一轮，把 `operationAt` 早于保留期、且主键大于水位的日志按批（`batch-size` 500）导出成 `${audit.archive.dir:-logs/archive}/operation_logs-<时间戳>.csv`（容器内即 `wms-logs` 卷）。按**主键游标**而非 offset 翻页，删除后不会漏行；每批 `fsync` 后才推进 `.operation_logs.watermark`，因此水位之后的数据不会丢，最坏情况是同批重复导出（冗余而非缺失）。**删除仅在 `audit.archive.delete-enabled=true` 时发生，且只删本轮已成功写入 CSV 的那批**；默认 false。CSV 文本字段全部加引号转义，首字符为 `= + - @ Tab` 者前置单引号，避免 `target/path/message` 被构造成 Excel 公式。归档失败只记 error、不影响业务，下一轮从水位续跑。验证：`AuditArchiveServiceTest` 4 用例（默认不删、二次运行空、删除只动已归档行、公式与引号转义）+ 全量 `mvn -o test` 绿。**仍留的口子**：归档文件的异地备份属 B4；`wechat_bind_tickets` 过期行清理不在本次范围（用户限定只处理 `operation_logs`）。
+- [x] **A4 可观测性最小集**（PROD-007，P1）：**已完成并实测**。`spring-boot-starter-actuator` + `micrometer-registry-prometheus`（版本由 parent 管理，`1.13.14` 已确认可解析）；`management` 独立端口 `9089` 只暴露 `health,info,prometheus` 且 `show-details: never`；`logback-spring.xml` 落 `logs/wms-server.log`（50MB/30 天/2GB）；`TraceIdFilter` 写 MDC 并回写 `X-Trace-Id`，非法头值一律丢弃重新生成。验证：无 token `curl :9089/actuator/health` → `{"status":"UP"}`、`/actuator/prometheus` → 200；一次请求的 16 行日志全部带同一 `[trace:req-777]`；伪造 `X-Trace-Id: fake] [forgery 123` 被拒并回退为自生成 id；业务端口 `/api/v1/actuator/**` 仍 401。**过程中修掉两个真实缺陷**：① 独立管理端口并不会自动绕过 Spring Security，actuator 一律 401，Prometheus 根本抓不到 → 新增 `SecurityConfig.managementPortChain` 按 `localPort` 精确放行（未配独立端口时匹配器恒 false，随机端口测试行为不变）；② 轮转仅按大小+日期命名，跨天验证留到 C 组。
+- [x] **A5 生产参数显式化**（PROD-014，P1）：**已完成**。`application-prod.yml` 补 Hikari 六项（`pool-name`、`maximum-pool-size` 默认 20、`minimum-idle`、`connection-timeout`、`max-lifetime` 默认 29min 且注释要求小于 MySQL `wait_timeout`、`leak-detection-threshold`）与 `logging.level`；慢 SQL 阈值 `SLOW_SQL_THRESHOLD_MS:200` 用方括号键写入 `spring.jpa.properties.hibernate`。验证：`configprops` 显示绑定后的键名大小写未被宽松绑定破坏；同形式的 `"[use_sql_comments]"` 实测让日志 SQL 带上 `/* */`，证明该写法确实交付给 Hibernate；阈值调到 1ms 后日志出现 `org.hibernate.SQL_SLOW - Slow query took 2 milliseconds`。**同时修掉一个自己埋的坑**：Hibernate 6 用 INFO 打慢语句，原默认 `LOG_LEVEL_SLOW_SQL:WARN` 会把慢日志全吃掉，已改为 INFO。MySQL 8 上的执行计划与连接池水位仍待 C1/C2。
+- [x] **A6 文档纠误**（PROD-016，P2）：**已完成**。AGENTS.md 补 `wms-shopping-miniapp` 结构与"两端 appid 相同"的上线硬门槛、买家端 `/market/**` 需 token、`mockPay` 边界；测试规模改为真实 14 类 173 用例；`ocr/recognize` 改写为配置驱动（prod 直接 400）；`GET /logs` 契约与新增管理端口/日志说明同步；部署段纠正"root 密码默认 wms_password"（现为 `.env` 强制项）。CLAUDE.md 同步纠误（原写 React 18 + Recharts、"内存 TokenStore 重启即丢"、"permitAll 覆盖整个 `/auth/**`"、"security 用 JWT"，均与代码不符）。`.gitignore` 补 `wms-server/logs/`，否则本地启动即污染发布检查。验证：`RELEASE_ALLOW_DIRTY=YES sh ops/release-check.sh` 通过（后端 + 三个前端构建）。
+- [ ] **A7（可选，扩多实例前必做）**（PROD-015，P1）：给三个 `@Scheduled`（预占过期、取消后退款、A3② 新增的审计日志归档）加 ShedLock 或独立调度实例，避免副本数增长后重复扫描与日志噪音放大。归档任务多副本并发不会丢数据（各写各的 CSV、删除按批幂等），但会产出重复归档文件，且多实例各自维护独立水位，因此在 A7 落地前应只在一个实例上开启 `audit.archive.enabled`。
+
+### B. 环境与外部资源（仓库外，需人配合）
+
+- [ ] **B1 HTTPS 网关**（PROD-005，P0）：反代 + 证书 + 自动续期 + HSTS + 安全响应头；公网只开 443；compose 三服务保持 `127.0.0.1` 绑定不变。回调地址 `WECHAT_PAY_NOTIFY_URL` / `REFUND_NOTIFY_URL` 必须是该域名下的 HTTPS。
+- [ ] **B2 微信侧凭据**（PROD-003/004，P0）：AppID/Secret、商户号、API 证书序列号、APIv3 密钥（32 位）、商户私钥与微信支付公钥文件（挂 `secrets/`，已 gitignore）、小程序合法域名白名单。
+      注意硬门槛：**prod profile 缺 `WECHAT_APPID/WECHAT_SECRET` 直接启动失败**（`ProductionSafetyConfig`），compose 又把商户变量标为必填。所以"先只上内网 Web、暂不接微信"这条路需要先做一个决策：拿到真实 AppID，还是把该校验放宽为"未配置即禁用商城模块"。不决策就没有降级方案。
+- [ ] **B3 监控与告警落地**（PROD-007，P0）：采集 A4 暴露的指标，配 DB 连接池、磁盘、5xx 比例、支付回调失败、库存对账差异告警；日志集中化；主机 NTP 校时（对账与预占过期都依赖时间）。
+- [ ] **B4 备份调度**（PROD-006，P0）：`ops/backup-mysql.sh` 进 cron，明确保留份数、异地存放、加密与访问控制；恢复用 `ops/restore-mysql.sh`。
+
+### C. 发布环境演练（必须留证据，不接受口头确认）
+
+- [ ] **C1 全新库部署**：空 MySQL 8 起 compose，确认 Flyway V1→V5 全部应用、`ddl-auto: validate` 通过、`ProductionBootstrapConfig` 用临时 `WMS_BOOTSTRAP_ADMIN_*` 建出首个管理员，**建号后立即从 `.env` 删除该两项并重启验证**。
+- [ ] **C2 历史库升级**：对 Hibernate `ddl-auto: update` 时代的老库做 `baseline-on-migrate` 演练，确认 V2/V4/V5 在真实数据上可重放；记录 V5 前后的关键查询执行计划（`inventory_transactions` 的 `reference_no`、`market_order.refund_no`、`operation_logs` 过滤）。
+- [ ] **C3 恢复演练 + 对账**：备份文件恢复到隔离实例 → `ops/reconcile-mysql.sh` 核对库存与流水一致，出具差异为 0 的记录。
+- [ ] **C4 并发与容量**：出库/调拨并发不超卖、预占过期释放正确、`LoginRateLimiter` 在多实例下共享窗口生效；给出目标 TPS 下的响应时间与连接池水位。
+- [ ] **C5 真实微信闭环**：真机支付 → 回调 → 发货 → 退款 → 退款回调，含回调重复投递与乱序（幂等）验证；`WechatPayNotifyController` 的 REFUNDING 中间态可查询。
+- [ ] **C6 回滚演练**：镜像 tag 回退 + 数据库回滚点（Flyway 无 undo，回滚依赖 C3 的备份点），并演练一次实际回退。
+
+### D. 基线与放行
+
+- [ ] **D1 提交与打标签**：本仓库已有提交 `d4aafd0`（V5 索引迁移 + 交易查询下推 + 收藏事务修复 + AGENTS.md）并推送 `origin/master`，PROD-010 的"工作区未提交"部分已缓解；仍缺**可回滚版本标签**（当前 `git tag` 为空），且本评估文档尚未提交。要求：跑 `sh ops/release-check.sh`（不得用 `RELEASE_ALLOW_DIRTY=YES` 绕过）通过后建 tag（PROD-010）。
+- [ ] **D2 关闭复核**：逐项对照第 6 节关闭标准，涉及库存、金额、支付的项必须有对账或真实联调证据。
+- [ ] **D3 放行结论**：按第 1 节场景表重新判定 —— 目标为"单实例正式生产"时，A/B/C 组全绿即可放行；目标为"多实例高可用"时额外要求 A7 与 C4 多实例结论。

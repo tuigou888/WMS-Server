@@ -26,6 +26,23 @@ server:
   servlet:
     context-path: /api/v1
 
+# 独立管理端口：避开 /api/v1 上下文路径。注意它同样会经过 Spring Security 链（实测无 token 是 401），
+# 放行由 SecurityConfig.managementPortChain 按 localPort 精确处理，业务端口不受影响。
+# compose 默认只把它绑到 127.0.0.1，由内网的采集器抓取，不对公网开放。
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9089}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 wechat:
   appid: ${WECHAT_APPID:}
   secret: ${WECHAT_SECRET:}
@@ -52,6 +69,18 @@ wechat:
 
 ocr:
   mock: ${OCR_MOCK:true}
+
+# 审计日志归档（A3②）：operation_logs 只由 AOP 追加、没有清理逻辑，超保留期的行每日导出成 CSV。
+# 归档目录默认落在日志目录下（容器里即 wms-logs 卷内的 /app/logs/archive），随日志一起备份。
+# delete-enabled 刻意默认 false：只归档不删。确认归档文件已进入备份后再显式打开删除。
+audit:
+  archive:
+    enabled: ${AUDIT_ARCHIVE_ENABLED:true}
+    after-days: ${AUDIT_ARCHIVE_AFTER_DAYS:365}
+    cron: ${AUDIT_ARCHIVE_CRON:0 30 3 * * *}
+    dir: ${AUDIT_ARCHIVE_DIR:logs/archive}
+    batch-size: ${AUDIT_ARCHIVE_BATCH_SIZE:500}
+    delete-enabled: ${AUDIT_ARCHIVE_DELETE_ENABLED:false}
 
 logging:
   level:
