@@ -136,10 +136,11 @@ export default {
         if (this.keyword) params.keyword = this.keyword
         if (this.warehouseIndex > 0) params.warehouseId = this.warehouses[this.warehouseIndex - 1].id
 
-        const data = await api.inventory(params)
+        const pageData = await api.inventory(params)
+        const data = pageData.records || []
         if (reset) this.list = []
         this.list.push(...data)
-        this.hasMore = data.length >= this.pageSize
+        this.hasMore = data.length === this.pageSize && this.list.length < pageData.total
         this.page++
       } catch (e) {
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })

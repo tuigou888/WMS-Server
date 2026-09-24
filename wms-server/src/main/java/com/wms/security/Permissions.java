@@ -61,6 +61,8 @@ public final class Permissions {
     public static final String ORDER_EXECUTE = "order:execute";
     /** 后台：客户档案读 */
     public static final String CUSTOMER_READ = "customer:read";
+    /** 后台：读取全量商城客户档案；买家不得持有该权限。 */
+    public static final String CUSTOMER_READ_ALL = "customer:read-all";
     /** 后台：客户档案写（新增/编辑/删除） */
     public static final String CUSTOMER_WRITE = "customer:write";
 }

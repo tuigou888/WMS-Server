@@ -5,6 +5,7 @@ import com.wms.common.BusinessException;
 import com.wms.model.entity.Location;
 import com.wms.repository.LocationRepository;
 import com.wms.repository.WarehouseRepository;
+import com.wms.service.WarehouseAccessService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,10 +22,12 @@ public class LocationController {
 
     private final LocationRepository locations;
     private final WarehouseRepository warehouses;
+    private final WarehouseAccessService warehouseAccess;
 
-    public LocationController(LocationRepository locations, WarehouseRepository warehouses) {
+    public LocationController(LocationRepository locations, WarehouseRepository warehouses, WarehouseAccessService warehouseAccess) {
         this.locations = locations;
         this.warehouses = warehouses;
+        this.warehouseAccess = warehouseAccess;
     }
 
     @GetMapping
@@ -32,12 +35,13 @@ public class LocationController {
     public ApiResponse<List<Map<String, Object>>> list(@RequestParam(required = false) Long warehouseId) {
         List<Location> values;
         if (warehouseId != null) {
+            warehouseAccess.require(warehouseId);
             if (!warehouses.existsById(warehouseId)) {
                 throw new BusinessException("仓库不存在");
             }
             values = locations.findByWarehouseId(warehouseId);
         } else {
-            values = locations.findAllWithWarehouse();
+            values = locations.findAllWithWarehouse().stream().filter(l -> warehouseAccess.canAccess(l.getWarehouse().getId())).toList();
         }
         return ApiResponse.ok(values.stream().map(LocationController::view).toList());
     }

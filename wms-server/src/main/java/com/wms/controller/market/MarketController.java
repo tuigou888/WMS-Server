@@ -97,7 +97,7 @@ public class MarketController {
     }
 
     // ==================== 购物车 ====================
-    @PostMapping("/cart")
+    @com.wms.security.Idempotent @PostMapping("/cart")
     public ApiResponse<Map<String, Object>> addCart(@Valid @RequestBody MarketCartAddRequest req) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
@@ -152,7 +152,7 @@ public class MarketController {
                 .map(MarketController::view).toList());
     }
 
-    @PostMapping("/customers")
+    @com.wms.security.Idempotent @PostMapping("/customers")
     public ApiResponse<Map<String, Object>> saveCustomer(@Valid @RequestBody MarketCustomerRequest req) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
@@ -176,7 +176,7 @@ public class MarketController {
     }
 
     // ==================== 订单 ====================
-    @PostMapping("/orders")
+    @com.wms.security.Idempotent @PostMapping("/orders")
     public ApiResponse<Map<String, Object>> createOrder(@Valid @RequestBody MarketOrderCreateRequest req) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
@@ -218,14 +218,14 @@ public class MarketController {
     }
 
     /** mock 模式专用：跳过 requestPayment 直接确认支付落单。 */
-    @PostMapping("/orders/{id}/mock-pay")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/mock-pay")
     public ApiResponse<Map<String, Object>> mockPay(@PathVariable Long id) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
         return ApiResponse.ok("支付成功", view(service.confirmMockPay(user, id)));
     }
 
-    @PostMapping("/orders/{id}/cancel")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/cancel")
     public ApiResponse<Void> cancel(@PathVariable Long id) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
@@ -233,7 +233,7 @@ public class MarketController {
         return ApiResponse.ok("已取消", null);
     }
 
-    @PostMapping("/orders/{id}/receive")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/receive")
     public ApiResponse<Map<String, Object>> receive(@PathVariable Long id) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
@@ -252,7 +252,7 @@ public class MarketController {
     }
 
     // ==================== 商品收藏 ====================
-    @PostMapping("/favorites/{productId}")
+    @com.wms.security.Idempotent @PostMapping("/favorites/{productId}")
     public ApiResponse<Map<String, Object>> toggleFavorite(@PathVariable Long productId) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();

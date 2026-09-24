@@ -25,7 +25,7 @@ public final class RolePermissions {
             WAREHOUSE_MANAGE, USER_MANAGE, LOG_VIEW, REPORT_VIEW,
             QRCODE_READ, EXCEL_READ, EXCEL_WRITE, OCR_USE, LOCATION_READ,
             MARKET_BUY, MARKET_READ, PRODUCT_READ, PRODUCT_WRITE,
-            ORDER_READ, ORDER_REVIEW, ORDER_EXECUTE, CUSTOMER_READ, CUSTOMER_WRITE);
+            ORDER_READ, ORDER_REVIEW, ORDER_EXECUTE, CUSTOMER_READ, CUSTOMER_READ_ALL, CUSTOMER_WRITE);
 
     private static final Set<String> WAREHOUSE = Set.of(
             INVENTORY_READ, INVENTORY_WRITE,
@@ -41,7 +41,7 @@ public final class RolePermissions {
 
     /** 小程序买家：仅可浏览/下单/读自有订单与收货人档案。 */
     private static final Set<String> CUSTOMER = Set.of(
-            MARKET_BUY, MARKET_READ, CUSTOMER_READ);
+            MARKET_BUY, MARKET_READ);
 
     /** 采购专员只能维护采购申请和基础档案，不具备审批或库存执行权。 */
     private static final Set<String> PROCUREMENT = Set.of(
@@ -51,11 +51,11 @@ public final class RolePermissions {
             INVENTORY_READ, DOCUMENT_READ, DOCUMENT_REVIEW, TRANSFER_READ, TRANSFER_REVIEW,
             STOCKTAKE_READ, STOCKTAKE_REVIEW, ADJUSTMENT_READ, ADJUSTMENT_REVIEW,
             PURCHASE_READ, PURCHASE_REVIEW, ITEM_READ, PARTNER_READ, LOCATION_READ, LOG_VIEW, REPORT_VIEW,
-            PRODUCT_READ, ORDER_READ, CUSTOMER_READ);
+            PRODUCT_READ, ORDER_READ, CUSTOMER_READ, CUSTOMER_READ_ALL);
     /** 财务角色读取经营数据及商城订单，不具备履约和库存操作权。 */
-    private static final Set<String> FINANCE = Set.of(REPORT_VIEW, INVENTORY_READ, DOCUMENT_READ, PURCHASE_READ, ORDER_READ, CUSTOMER_READ);
+    private static final Set<String> FINANCE = Set.of(REPORT_VIEW, INVENTORY_READ, DOCUMENT_READ, PURCHASE_READ, ORDER_READ, CUSTOMER_READ, CUSTOMER_READ_ALL);
     /** 客服维护客户档案、查看订单和商品；退款、审核、发货仍需专门职责。 */
-    private static final Set<String> CUSTOMER_SERVICE = Set.of(PRODUCT_READ, ORDER_READ, CUSTOMER_READ, CUSTOMER_WRITE);
+    private static final Set<String> CUSTOMER_SERVICE = Set.of(PRODUCT_READ, ORDER_READ, CUSTOMER_READ, CUSTOMER_READ_ALL, CUSTOMER_WRITE);
 
     private static final Map<String, Set<String>> MATRIX = Map.ofEntries(
             Map.entry("ADMIN", ALL), Map.entry("WAREHOUSE", WAREHOUSE), Map.entry("PROCUREMENT", PROCUREMENT),

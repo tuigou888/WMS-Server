@@ -12,6 +12,8 @@ const label = { DRAFT: ['草稿', 'default'], APPROVED: ['已审核', 'blue'], R
 
 const auth = useAuthStore()
 const rows = ref([])
+const page = ref(1)
+const total = ref(0)
 const warehouses = ref([])
 const warehouseId = ref()
 const detail = ref(null)
@@ -20,7 +22,7 @@ watch(drawerOpen, (v) => { if (!v) detail.value = null })
 watch(detail, (v) => { drawerOpen.value = !!v })
 const counts = ref({})
 
-const load = () => api.stocktakes().then((x) => { rows.value = x }).catch((e) => message.error(e.message))
+const load = (target = page.value) => api.stocktakes({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message))
 
 onMounted(() => {
   load()
@@ -40,7 +42,7 @@ const action = async (f) => {
     message.success('操作成功')
     load()
     if (detail.value) {
-      const latest = (await api.stocktakes()).find((x) => x.id === detail.value.id)
+      const latest = (await api.stocktakes({ page: page.value, pageSize: 20 })).records.find((x) => x.id === detail.value.id)
       if (latest) open(latest)
     }
   } catch (e) {
@@ -105,7 +107,7 @@ const detailColumns = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" />
+    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
   </Card>
 
   <a-drawer v-model:open="drawerOpen" :title="detail?.stocktakeNo" width="760">

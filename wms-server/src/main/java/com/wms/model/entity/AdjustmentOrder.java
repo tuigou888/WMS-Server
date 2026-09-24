@@ -23,7 +23,7 @@ public class AdjustmentOrder extends AuditableEntity {
 
     public Long getId(){return id;}
     public String getAdjustmentNo(){return adjustmentNo;} public void setAdjustmentNo(String v){adjustmentNo=v;}
-    public String getStatus(){return status;} public void setStatus(String v){status=v;}
+    public String getStatus(){return status;} public void setStatus(String v){status=DocumentStateMachine.transition(status,v);}
     public String getAction(){return action;} public void setAction(String v){action=v;}
     public Warehouse getWarehouse(){return warehouse;} public void setWarehouse(Warehouse v){warehouse=v;}
     public String getReason(){return reason;} public void setReason(String v){reason=v;}

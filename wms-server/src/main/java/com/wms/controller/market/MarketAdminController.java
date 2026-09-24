@@ -13,6 +13,7 @@ import com.wms.repository.market.*;
 import com.wms.security.Permissions;
 import com.wms.security.SecurityUtils;
 import com.wms.service.market.MarketService;
+import com.wms.service.WarehouseAccessService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
@@ -31,16 +32,19 @@ public class MarketAdminController {
     private final MarketCustomerRepository customers;
     private final MarketOrderLogRepository orderLogs;
     private final com.wms.repository.UserAccountRepository users;
+    private final WarehouseAccessService warehouseAccess;
 
     public MarketAdminController(MarketService service,
                                  MarketProductRepository products,
                                  MarketOrderRepository orders,
                                  MarketCustomerRepository customers,
                                  MarketOrderLogRepository orderLogs,
-                                 com.wms.repository.UserAccountRepository users) {
+                                 com.wms.repository.UserAccountRepository users,
+                                 WarehouseAccessService warehouseAccess) {
         this.service = service; this.products = products;
         this.orders = orders; this.customers = customers;
         this.orderLogs = orderLogs; this.users = users;
+        this.warehouseAccess = warehouseAccess;
     }
 
     private UserAccount currentUser() {
@@ -65,7 +69,7 @@ public class MarketAdminController {
                 "page", p.getNumber() + 1, "pageSize", p.getSize()));
     }
 
-    @PostMapping("/products")
+    @com.wms.security.Idempotent @PostMapping("/products")
     public ApiResponse<Map<String, Object>> create(@Valid @RequestBody MarketProductRequest req) {
         SecurityUtils.require(Permissions.PRODUCT_WRITE);
         return ApiResponse.ok("创建成功", MarketController.view(service.saveProduct(req)));
@@ -78,7 +82,7 @@ public class MarketAdminController {
         return ApiResponse.ok("更新成功", MarketController.view(service.updateProduct(id, req)));
     }
 
-    @PostMapping("/products/{id}/shelf")
+    @com.wms.security.Idempotent @PostMapping("/products/{id}/shelf")
     public ApiResponse<Map<String, Object>> shelf(@PathVariable Long id,
                                                    @Valid @RequestBody MarketShelfRequest req) {
         SecurityUtils.require(Permissions.PRODUCT_WRITE);
@@ -101,8 +105,11 @@ public class MarketAdminController {
             @RequestParam(required = false) String status) {
         SecurityUtils.require(Permissions.ORDER_READ);
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(100, Math.max(1, pageSize)));
-        Page<MarketOrder> p = orders.searchAdmin(keyword,
-                (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status), pageable);
+        MarketOrderStatus orderStatus = (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status);
+        List<Long> warehouseIds = warehouseAccess.currentWarehouseIds();
+        Page<MarketOrder> p = warehouseAccess.isWarehouseScoped()
+                ? (warehouseIds.isEmpty() ? Page.empty(pageable) : orders.searchAdminInWarehouses(keyword, orderStatus, warehouseIds, pageable))
+                : orders.searchAdmin(keyword, orderStatus, pageable);
         return ApiResponse.ok(pageOf(p));
     }
 
@@ -110,6 +117,7 @@ public class MarketAdminController {
     public ApiResponse<Map<String, Object>> detail(@PathVariable Long id) {
         SecurityUtils.require(Permissions.ORDER_READ);
         MarketOrder o = orders.findDetailedById(id).orElseThrow(() -> new BusinessException("订单不存在"));
+        warehouseAccess.require(o.getWarehouse().getId());
         Map<String, Object> view = MarketController.view(o);
         view.put("logs", orderLogs.findByOrderIdOrderByIdAsc(id).stream()
                 .map(MarketController::view).toList());
@@ -117,7 +125,7 @@ public class MarketAdminController {
     }
 
     /** 审核：approve=true 通过，approve=false 拒绝并置为 CANCELLED/REJECTED。 */
-    @PostMapping("/orders/{id}/audit")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/audit")
     public ApiResponse<Map<String, Object>> audit(@PathVariable Long id,
                                                    @Valid @RequestBody MarketOrderAuditRequest req) {
         SecurityUtils.require(Permissions.ORDER_REVIEW);
@@ -126,7 +134,7 @@ public class MarketAdminController {
     }
 
     /** 发货：填写物流公司/单号后触发库存扣减。 */
-    @PostMapping("/orders/{id}/ship")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/ship")
     public ApiResponse<Map<String, Object>> ship(@PathVariable Long id,
                                                   @Valid @RequestBody MarketOrderShipRequest req) {
         SecurityUtils.require(Permissions.ORDER_EXECUTE);
@@ -135,7 +143,7 @@ public class MarketAdminController {
     }
 
     /** 确认收货（与用户端 receive 一致，管理员也可代点）。 */
-    @PostMapping("/orders/{id}/complete")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/complete")
     public ApiResponse<Map<String, Object>> complete(@PathVariable Long id) {
         SecurityUtils.require(Permissions.ORDER_EXECUTE);
         MarketOrder o = service.complete(id, SecurityUtils.username());
@@ -143,7 +151,7 @@ public class MarketAdminController {
     }
 
     /** 强制取消（任意可取消状态）。已审核/已发货的订单已扣库存，取消时自动回滚（IN 流水）。 */
-    @PostMapping("/orders/{id}/cancel")
+    @com.wms.security.Idempotent @PostMapping("/orders/{id}/cancel")
     public ApiResponse<Map<String, Object>> cancel(@PathVariable Long id,
                                                     @RequestBody(required = false) Map<String, String> body) {
         SecurityUtils.require(Permissions.ORDER_REVIEW);
@@ -168,7 +176,7 @@ public class MarketAdminController {
     public ApiResponse<Map<String, Object>> customers(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        SecurityUtils.require(Permissions.CUSTOMER_READ);
+        SecurityUtils.require(Permissions.CUSTOMER_READ_ALL);
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(100, Math.max(1, pageSize)));
         Page<MarketCustomer> p = customers.findAll(pageable);
         return ApiResponse.ok(Map.of("records", p.getContent().stream().map(MarketController::view).toList(),
@@ -176,7 +184,7 @@ public class MarketAdminController {
     }
 
     // ==================== 客户管理 ====================
-    @PostMapping("/customers")
+    @com.wms.security.Idempotent @PostMapping("/customers")
     public ApiResponse<Map<String, Object>> createCustomer(@Valid @RequestBody MarketCustomerRequest req) {
         SecurityUtils.require(Permissions.CUSTOMER_WRITE);
         return ApiResponse.ok("创建成功", MarketController.view(service.saveCustomer(null, req)));
@@ -200,21 +208,25 @@ public class MarketAdminController {
     @GetMapping("/stats")
     public ApiResponse<Map<String, Object>> stats() {
         SecurityUtils.require(Permissions.REPORT_VIEW);
+        boolean scoped = warehouseAccess.isWarehouseScoped();
+        List<Long> warehouseIds = warehouseAccess.currentWarehouseIds();
         Map<String, Object> m = new LinkedHashMap<>();
         // 核心指标
-        m.put("totalSales", orders.sumCompletedAmount());
-        m.put("todayOrders", orders.countTodayOrders());
-        m.put("todaySales", orders.sumTodayAmount());
+        m.put("totalSales", scoped ? (warehouseIds.isEmpty() ? java.math.BigDecimal.ZERO : orders.sumCompletedAmountInWarehouses(warehouseIds)) : orders.sumCompletedAmount());
+        m.put("todayOrders", scoped ? (warehouseIds.isEmpty() ? 0L : orders.countTodayOrdersInWarehouses(warehouseIds)) : orders.countTodayOrders());
+        m.put("todaySales", scoped ? (warehouseIds.isEmpty() ? java.math.BigDecimal.ZERO : orders.sumTodayAmountInWarehouses(warehouseIds)) : orders.sumTodayAmount());
         m.put("totalProducts", products.count());
         m.put("totalCustomers", customers.count());
         // 各状态订单数
         Map<String, Long> statusCounts = new LinkedHashMap<>();
         for (MarketOrderStatus s : MarketOrderStatus.values()) {
-            statusCounts.put(s.name(), orders.countByStatus(s));
+            statusCounts.put(s.name(), scoped ? (warehouseIds.isEmpty() ? 0L : orders.countByStatusInWarehouses(s, warehouseIds)) : orders.countByStatus(s));
         }
         m.put("statusCounts", statusCounts);
         // 商品销量 Top 10
-        List<Object[]> rows = orders.topProducts(PageRequest.of(0, 10));
+        List<Object[]> rows = scoped
+                ? (warehouseIds.isEmpty() ? List.of() : orders.topProductsInWarehouses(warehouseIds, PageRequest.of(0, 10)))
+                : orders.topProducts(PageRequest.of(0, 10));
         List<Map<String, Object>> top = new ArrayList<>();
         for (Object[] row : rows) {
             Map<String, Object> t = new LinkedHashMap<>();

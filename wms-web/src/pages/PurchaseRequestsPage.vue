@@ -11,13 +11,15 @@ const statusMap = { DRAFT: ['草稿', 'default'], APPROVED: ['已批准', 'succe
 
 const auth = useAuthStore()
 const rows = ref([])
+const page = ref(1)
+const total = ref(0)
 const createOpen = ref(false)
 const warehouses = ref([])
 const suppliers = ref([])
 const items = ref([])
 const createForm = ref({ warehouseId: undefined, supplierId: undefined, requiredDate: '', remark: '', lines: [] })
 
-const load = () => api.purchaseRequests().then((x) => { rows.value = x }).catch((e) => message.error(e.message || '加载失败'))
+const load = (target = page.value) => api.purchaseRequests({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message || '加载失败'))
 const loadReferences = async () => {
   try {
     const [warehouseRows, supplierRows, itemPage] = await Promise.all([api.warehouses(), api.partners('SUPPLIER'), api.items({ page: 1, pageSize: 100 })])
@@ -77,7 +79,7 @@ const innerCols = [
     <template #extra>
       <a-space><Typography.Text type="secondary">库存预警建议可作为申请数量依据</Typography.Text><Button v-if="hasPerm(auth.user, 'purchase-request:write')" type="primary" :icon="h(PlusOutlined)" @click="openCreate">新建申请</Button></a-space>
     </template>
-    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :expandable="{ expandedRowRender: (r) => h(Table, { size: 'small', pagination: false, rowKey: 'itemCode', dataSource: r.lines, columns: normalizeColumns(innerCols) }) }" />
+    <a-table row-key="id" :data-source="rows" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" :expandable="{ expandedRowRender: (r) => h(Table, { size: 'small', pagination: false, rowKey: 'itemCode', dataSource: r.lines, columns: normalizeColumns(innerCols) }) }" />
   </Card>
 
   <a-modal v-model:open="createOpen" title="新建采购申请" width="860" ok-text="提交申请" @ok="submit">

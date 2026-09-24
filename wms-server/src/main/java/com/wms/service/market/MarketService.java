@@ -14,7 +14,9 @@ import com.wms.repository.*;
 import com.wms.repository.market.*;
 import com.wms.service.DocumentNumberService;
 import com.wms.service.InventoryCostCalculator;
+import com.wms.service.InventoryReservationGuard;
 import com.wms.service.TransactionType;
+import com.wms.service.WarehouseAccessService;
 import com.wechat.pay.java.service.refund.model.Refund;
 import com.wechat.pay.java.service.refund.model.Status;
 import org.slf4j.Logger;
@@ -54,6 +56,8 @@ public class MarketService {
     private final WechatPayService wechatPay;
     private final TransactionTemplate transactionTemplate;
     private final TransactionTemplate requiresNewTransactionTemplate;
+    private final WarehouseAccessService warehouseAccess;
+    private final InventoryReservationGuard reservationGuard;
 
     public MarketService(MarketProductRepository products, MarketCartRepository carts,
                          MarketCustomerRepository customers, MarketOrderRepository orders,
@@ -65,7 +69,9 @@ public class MarketService {
                          InventoryReservationRepository reservations,
                          DocumentNumberService numbers,
                          @Lazy WechatPayService wechatPay,
-                         PlatformTransactionManager transactionManager) {
+                         PlatformTransactionManager transactionManager,
+                         WarehouseAccessService warehouseAccess,
+                         InventoryReservationGuard reservationGuard) {
         this.products = products; this.carts = carts;
         this.customers = customers; this.orders = orders; this.orderLogs = orderLogs;
         this.favorites = favorites;
@@ -78,6 +84,8 @@ public class MarketService {
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.requiresNewTransactionTemplate = new TransactionTemplate(transactionManager);
         this.requiresNewTransactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.warehouseAccess = warehouseAccess;
+        this.reservationGuard = reservationGuard;
     }
 
     // ======================== 商品管理（后台） ========================
@@ -285,17 +293,15 @@ public class MarketService {
 
     /** 拉起支付参数（小程序 requestPayment 所需）。真实模式调微信下单，mock 模式返回模拟参数。
      *  P1-2：仅以 readOnly 事务查询订单，微信下单 HTTP 调用在事务外完成，避免长事务持锁。 */
-    @Transactional(readOnly = true)
     public Map<String, Object> prepay(UserAccount user, Long orderId) {
-        MarketOrder order = orders.findById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
-        if (!Objects.equals(order.getUser().getId(), user.getId())) throw new BusinessException("无权操作");
-        if (!MarketOrderStatus.PENDING.equals(order.getOrderStatus()) && !MarketOrderStatus.AUDITED.equals(order.getOrderStatus())) {
-            throw new BusinessException("当前订单状态不可支付");
-        }
-        if (!MarketPayStatus.UNPAID.equals(order.getPayStatus())) throw new BusinessException("当前支付状态不可支付");
-        assertReservationPayable(order, reservations.findByOrderIdOrderByIdAsc(order.getId()), LocalDateTime.now());
-        // 触发 items 加载（readOnly 事务内），避免事务外懒加载异常
-        order.getItems().size();
+        MarketOrder order = transactionTemplate.execute(status -> {
+            MarketOrder found = orders.findDetailedById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+            if (!Objects.equals(found.getUser().getId(), user.getId())) throw new BusinessException("无权操作");
+            if (!MarketOrderStatus.PENDING.equals(found.getOrderStatus()) && !MarketOrderStatus.AUDITED.equals(found.getOrderStatus())) throw new BusinessException("当前订单状态不可支付");
+            if (!MarketPayStatus.UNPAID.equals(found.getPayStatus())) throw new BusinessException("当前支付状态不可支付");
+            assertReservationPayable(found, reservations.findByOrderIdOrderByIdAsc(found.getId()), LocalDateTime.now());
+            return found;
+        });
         return wechatPay.prepay(order, user);
     }
 
@@ -341,9 +347,11 @@ public class MarketService {
         if (MarketOrderStatus.REJECTED.equals(st)) {
             throw new BusinessException("订单已拒绝，支付回调需人工核实退款");
         }
-        List<InventoryReservation> held=reservations.findByOrderIdForUpdate(order.getId());
+        List<InventoryReservation> held=reservations.findByOrderIdOrderByIdAsc(order.getId());
         assertReservationPayable(order,held,LocalDateTime.now());
         deductStock(order, "支付扣库存");
+        held=reservations.findByOrderIdForUpdate(order.getId());
+        assertReservationPayable(order,held,LocalDateTime.now());
         consumeReservations(held);
         order.setOrderStatus(MarketOrderStatus.AUDITED);
         order.setPayStatus(MarketPayStatus.PAID);
@@ -483,9 +491,11 @@ public class MarketService {
         if (approve) {
             if (!isPayOnline) {
                 // 非在线支付订单：审核通过时扣减库存（FIFO 出库）
-                List<InventoryReservation> held=reservations.findByOrderIdForUpdate(order.getId());
+                List<InventoryReservation> held=reservations.findByOrderIdOrderByIdAsc(order.getId());
                 assertReservationPayable(order,held,LocalDateTime.now());
                 deductStock(order, "审核扣库存");
+                held=reservations.findByOrderIdForUpdate(order.getId());
+                assertReservationPayable(order,held,LocalDateTime.now());
                 consumeReservations(held);
             }
             order.setOrderStatus(MarketOrderStatus.AUDITED);
@@ -510,14 +520,12 @@ public class MarketService {
     @Transactional
     public MarketOrder ship(Long orderId, String logisticsCompany, String logisticsNumber, String operator) {
         MarketOrder order = orders.findForUpdateById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        warehouseAccess.require(order.getWarehouse().getId());
         if (!MarketOrderStatus.AUDITED.equals(order.getOrderStatus())) throw new BusinessException("订单未审核通过，不能发货");
         if (!MarketPayStatus.PAID.equals(order.getPayStatus())) throw new BusinessException("订单未支付，不能发货");
         // 库存已在审核/支付阶段扣减（deductStock），此处仅更新物流与销量
         for (MarketOrderItem oi : order.getItems()) {
-            products.findByItemId(oi.getItem().getId()).ifPresent(p -> {
-                p.setSalesCount((p.getSalesCount() == null ? 0L : p.getSalesCount()) + oi.getQuantity().longValue());
-                products.save(p);
-            });
+            products.incrementSalesByItemId(oi.getItem().getId(), oi.getQuantity().longValue());
         }
 
         order.setOrderStatus(MarketOrderStatus.SHIPPED);
@@ -533,6 +541,7 @@ public class MarketService {
     @Transactional
     public MarketOrder complete(Long orderId, String operator) {
         MarketOrder order = orders.findForUpdateById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        warehouseAccess.require(order.getWarehouse().getId());
         return completeLocked(order, operator);
     }
 
@@ -583,7 +592,7 @@ public class MarketService {
     private void holdInventory(MarketOrder order) {
         LocalDateTime now=LocalDateTime.now(),expiresAt=now.plusMinutes(30); Map<Long,BigDecimal> quantities=new LinkedHashMap<>();Map<Long,Item> orderItems=new LinkedHashMap<>();
         for(MarketOrderItem line:order.getItems()){quantities.merge(line.getItem().getId(),line.getQuantity(),BigDecimal::add);orderItems.put(line.getItem().getId(),line.getItem());}
-        for(Map.Entry<Long,BigDecimal> entry:quantities.entrySet()){Long itemId=entry.getKey();BigDecimal requested=entry.getValue();List<Inventory> lots=inventories.findFifoForOut(itemId,order.getWarehouse().getId());BigDecimal physical=lots.stream().map(Inventory::getQuantity).reduce(BigDecimal.ZERO,BigDecimal::add);BigDecimal held=reservations.sumHeldQuantity(itemId,order.getWarehouse().getId(),now);BigDecimal available=physical.subtract(held);if(available.compareTo(requested)<0)throw new BusinessException("库存不足："+orderItems.get(itemId).getName()+"（可售 "+available.stripTrailingZeros().toPlainString()+"）");reservations.save(new InventoryReservation(order,orderItems.get(itemId),order.getWarehouse(),requested,expiresAt));}
+        for(Map.Entry<Long,BigDecimal> entry:quantities.entrySet()){Long itemId=entry.getKey();BigDecimal requested=entry.getValue();InventoryReservationGuard.Snapshot protection=reservationGuard.lock(itemId,order.getWarehouse().getId());reservationGuard.requireAvailable(protection,null,requested,"库存不足："+orderItems.get(itemId).getName()+"（可售 "+protection.availableExcluding(null).stripTrailingZeros().toPlainString()+"）");reservations.save(new InventoryReservation(order,orderItems.get(itemId),order.getWarehouse(),requested,expiresAt));}
     }
     /** 新订单必须整单存在有效 HELD 预占；仅为上线前历史待支付单保留无预占兼容路径。 */
     private void assertReservationPayable(MarketOrder order,List<InventoryReservation> held,LocalDateTime now){if(held.isEmpty()){log.warn("订单 {} 没有库存预占，按历史订单兼容路径处理",order.getOrderNo());return;}Map<Long,BigDecimal> expected=new LinkedHashMap<>(),actual=new LinkedHashMap<>();for(MarketOrderItem line:order.getItems())expected.merge(line.getItem().getId(),line.getQuantity(),BigDecimal::add);for(InventoryReservation r:held){if(!InventoryReservationStatus.HELD.equals(r.getStatus())||r.getExpiresAt()==null||!r.getExpiresAt().isAfter(now))throw new BusinessException("订单库存预占已失效，请重新下单");actual.merge(r.getItem().getId(),r.getQuantity(),BigDecimal::add);}if(expected.size()!=actual.size()||expected.entrySet().stream().anyMatch(e->actual.get(e.getKey())==null||e.getValue().compareTo(actual.get(e.getKey()))!=0))throw new BusinessException("订单库存预占明细不完整，无法支付");}
@@ -601,11 +610,9 @@ public class MarketService {
         Warehouse warehouse = order.getWarehouse();
         for (MarketOrderItem oi : order.getItems()) {
             BigDecimal remaining = oi.getQuantity();
-            List<Inventory> lots = inventories.findFifoForOut(oi.getItem().getId(), warehouse.getId());
-            BigDecimal sum = lots.stream().map(Inventory::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (sum.compareTo(remaining) < 0) {
-                throw new BusinessException("库存不足：" + oi.getItemName() + "（可用 " + sum + "）");
-            }
+            InventoryReservationGuard.Snapshot protection = reservationGuard.lock(oi.getItem().getId(), warehouse.getId());
+            reservationGuard.requireAvailable(protection, order.getId(), remaining, "库存不足或其他订单已预占：" + oi.getItemName());
+            List<Inventory> lots = protection.lots();
             for (Inventory inv : lots) {
                 if (remaining.signum() <= 0) break;
                 BigDecimal take = inv.getQuantity().min(remaining);
@@ -649,7 +656,7 @@ public class MarketService {
                 if (addQty.signum() <= 0) continue;
                 Inventory inv = inventories.findForUpdate(oi.getItem().getId(), warehouse.getId(),
                                 outTx.getLocation() == null ? null : outTx.getLocation().getId(), outTx.getBatchNo())
-                        .orElseGet(() -> new Inventory(oi.getItem(), warehouse, outTx.getLocation(), outTx.getBatchNo()));
+                        .orElseThrow(() -> new BusinessException("原出库库存记录不存在，无法回滚：" + oi.getItemCode()));
                 BigDecimal unitCost = outTx.getUnitCost() == null ? BigDecimal.ZERO : outTx.getUnitCost();
                 BigDecimal addCost = outTx.getTotalCostAmount() == null
                         ? unitCost.multiply(addQty).setScale(2, RoundingMode.HALF_UP)

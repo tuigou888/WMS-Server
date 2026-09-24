@@ -62,4 +62,8 @@ public interface MarketProductRepository extends JpaRepository<MarketProduct, Lo
     @Modifying
     @Query("update MarketProduct p set p.viewCount = p.viewCount + 1 where p.id = :id")
     void incrementView(@Param("id") Long id);
+
+    @Modifying
+    @Query("update MarketProduct p set p.salesCount = p.salesCount + :quantity where p.item.id = :itemId")
+    int incrementSalesByItemId(@Param("itemId") Long itemId, @Param("quantity") long quantity);
 }

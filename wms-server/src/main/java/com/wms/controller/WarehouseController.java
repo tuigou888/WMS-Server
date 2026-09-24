@@ -7,6 +7,7 @@ import com.wms.model.entity.Warehouse;
 import com.wms.repository.WarehouseRepository;
 import com.wms.security.Permissions;
 import com.wms.security.SecurityUtils;
+import com.wms.service.WarehouseAccessService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,9 +21,11 @@ import java.util.Map;
 @RequestMapping("/warehouses")
 public class WarehouseController {
     private final WarehouseRepository warehouses;
+    private final WarehouseAccessService warehouseAccess;
 
-    public WarehouseController(WarehouseRepository warehouses) {
+    public WarehouseController(WarehouseRepository warehouses, WarehouseAccessService warehouseAccess) {
         this.warehouses = warehouses;
+        this.warehouseAccess = warehouseAccess;
     }
 
     @GetMapping
@@ -32,6 +35,7 @@ public class WarehouseController {
             SecurityUtils.require(Permissions.WAREHOUSE_MANAGE);
         }
         List<Warehouse> values = includeDisabled ? warehouses.findAll() : warehouses.findByStatusTrueOrderByNameAsc();
+        values = values.stream().filter(w -> warehouseAccess.canAccess(w.getId())).toList();
         return ApiResponse.ok(values.stream().map(WarehouseController::view).toList());
     }
 

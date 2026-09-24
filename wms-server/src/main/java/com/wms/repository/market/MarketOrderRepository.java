@@ -34,6 +34,16 @@ public interface MarketOrderRepository extends JpaRepository<MarketOrder, Long> 
             + "and (:status is null or o.orderStatus = :status) order by o.createdAt desc")
     Page<MarketOrder> searchAdmin(@Param("keyword") String keyword, @Param("status") MarketOrderStatus status, Pageable pageable);
 
+    @Query(value = "select distinct o from MarketOrder o left join fetch o.user left join fetch o.warehouse left join fetch o.customer left join fetch o.items i left join fetch i.item left join fetch i.item.category "
+            + "where o.warehouse.id in :warehouseIds and (:keyword is null or :keyword = '' "
+            + "or lower(o.orderNo) like lower(concat('%', :keyword, '%')) or lower(o.receiverName) like lower(concat('%', :keyword, '%')) "
+            + "or lower(o.receiverPhone) like lower(concat('%', :keyword, '%'))) and (:status is null or o.orderStatus = :status) order by o.createdAt desc",
+            countQuery = "select count(o) from MarketOrder o where o.warehouse.id in :warehouseIds and (:keyword is null or :keyword = '' "
+                    + "or lower(o.orderNo) like lower(concat('%', :keyword, '%')) or lower(o.receiverName) like lower(concat('%', :keyword, '%')) "
+                    + "or lower(o.receiverPhone) like lower(concat('%', :keyword, '%'))) and (:status is null or o.orderStatus = :status)")
+    Page<MarketOrder> searchAdminInWarehouses(@Param("keyword") String keyword, @Param("status") MarketOrderStatus status,
+                                               @Param("warehouseIds") List<Long> warehouseIds, Pageable pageable);
+
     @Query("select distinct o from MarketOrder o left join fetch o.user left join fetch o.warehouse left join fetch o.customer left join fetch o.items i left join fetch i.item left join fetch i.item.category where o.id = :id")
     Optional<MarketOrder> findDetailedById(@Param("id") Long id);
 
@@ -64,21 +74,38 @@ public interface MarketOrderRepository extends JpaRepository<MarketOrder, Long> 
     @Query("select coalesce(sum(o.totalAmount),0) from MarketOrder o where o.orderStatus = 'COMPLETED'")
     java.math.BigDecimal sumCompletedAmount();
 
+    @Query("select coalesce(sum(o.totalAmount),0) from MarketOrder o where o.orderStatus = 'COMPLETED' and o.warehouse.id in :warehouseIds")
+    java.math.BigDecimal sumCompletedAmountInWarehouses(@Param("warehouseIds") List<Long> warehouseIds);
+
     /** 今日下单数 */
     @Query("select count(o) from MarketOrder o where cast(o.createdAt as date) = current_date and o.orderStatus <> 'CANCELLED'")
     long countTodayOrders();
+
+    @Query("select count(o) from MarketOrder o where cast(o.createdAt as date) = current_date and o.orderStatus <> 'CANCELLED' and o.warehouse.id in :warehouseIds")
+    long countTodayOrdersInWarehouses(@Param("warehouseIds") List<Long> warehouseIds);
 
     /** 今日销售额 */
     @Query("select coalesce(sum(o.totalAmount),0) from MarketOrder o where cast(o.createdAt as date) = current_date and o.orderStatus <> 'CANCELLED'")
     java.math.BigDecimal sumTodayAmount();
 
+    @Query("select coalesce(sum(o.totalAmount),0) from MarketOrder o where cast(o.createdAt as date) = current_date and o.orderStatus <> 'CANCELLED' and o.warehouse.id in :warehouseIds")
+    java.math.BigDecimal sumTodayAmountInWarehouses(@Param("warehouseIds") List<Long> warehouseIds);
+
     /** 各状态订单数 */
     @Query("select count(o) from MarketOrder o where o.orderStatus = :status")
     long countByStatus(@Param("status") MarketOrderStatus status);
+
+    @Query("select count(o) from MarketOrder o where o.orderStatus = :status and o.warehouse.id in :warehouseIds")
+    long countByStatusInWarehouses(@Param("status") MarketOrderStatus status, @Param("warehouseIds") List<Long> warehouseIds);
 
     /** 商品销量 Top N（已完成订单的明细聚合） */
     @Query("select i.itemName as name, i.itemCode as code, coalesce(sum(i.quantity),0) as qty, coalesce(sum(i.subtotal),0) as amount "
             + "from MarketOrderItem i where i.order.orderStatus = 'COMPLETED' "
             + "group by i.itemName, i.itemCode order by qty desc")
     List<Object[]> topProducts(@Param("limit") Pageable pageable);
+
+    @Query("select i.itemName as name, i.itemCode as code, coalesce(sum(i.quantity),0) as qty, coalesce(sum(i.subtotal),0) as amount "
+            + "from MarketOrderItem i where i.order.orderStatus = 'COMPLETED' and i.order.warehouse.id in :warehouseIds "
+            + "group by i.itemName, i.itemCode order by qty desc")
+    List<Object[]> topProductsInWarehouses(@Param("warehouseIds") List<Long> warehouseIds, Pageable pageable);
 }

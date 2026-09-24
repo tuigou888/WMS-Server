@@ -187,24 +187,10 @@ export default {
         this.dashboard = dashboard
         this.alerts = alerts
 
-        // 处理 profit 数据生成月度趋势
-        if (profit.length > 0) {
-          const monthly = {}
-          profit.forEach(tx => {
-            const month = tx.transactionAt ? tx.transactionAt.slice(0, 7) : '未知'
-            if (!monthly[month]) monthly[month] = { cost: 0, sale: 0, profit: 0 }
-            monthly[month].cost += parseFloat(tx.totalCostAmount) || 0
-            monthly[month].sale += parseFloat(tx.saleAmount) || 0
-            monthly[month].profit += parseFloat(tx.profit) || 0
-          })
-          this.monthlyProfit = Object.entries(monthly)
-            .map(([month, v]) => ({ month, ...v }))
-            .sort((a, b) => b.month.localeCompare(a.month))
-            .slice(0, 6)
-        }
+        this.monthlyProfit = dashboard?.monthlyProfit || []
 
         // 近期流水
-        this.recentTransactions = profit.slice(0, 20)
+        this.recentTransactions = dashboard?.recentTransactions || profit.records || []
 
         // 分类分布
         this.categoryDistribution = dashboard?.categoryDistribution || []

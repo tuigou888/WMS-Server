@@ -17,7 +17,7 @@ public class StockDocument extends AuditableEntity {
  @Column(name="reversal_of_document_id") private Long reversalOfDocumentId;
  @OneToMany(mappedBy="document",cascade=CascadeType.ALL,orphanRemoval=true) private List<StockDocumentLine> lines=new ArrayList<>();
  public Long getId(){return id;} public String getDocumentNo(){return documentNo;} public void setDocumentNo(String v){documentNo=v;} public String getType(){return type;} public void setType(String v){type=v;}
- public String getStatus(){return status;} public void setStatus(String v){status=v;} public BusinessPartner getPartner(){return partner;} public void setPartner(BusinessPartner v){partner=v;}
+ public String getStatus(){return status;} public void setStatus(String v){status=DocumentStateMachine.transition(status,v);} public BusinessPartner getPartner(){return partner;} public void setPartner(BusinessPartner v){partner=v;}
  public Warehouse getWarehouse(){return warehouse;} public void setWarehouse(Warehouse v){warehouse=v;} public LocalDate getBusinessDate(){return businessDate;} public void setBusinessDate(LocalDate v){businessDate=v;}
  public String getRemark(){return remark;} public void setRemark(String v){remark=v;} public String getReviewer(){return reviewer;} public void setReviewer(String v){reviewer=v;} public String getReviewRemark(){return reviewRemark;} public void setReviewRemark(String v){reviewRemark=v;}
  public Long getReversalOfDocumentId(){return reversalOfDocumentId;} public void setReversalOfDocumentId(Long v){reversalOfDocumentId=v;}

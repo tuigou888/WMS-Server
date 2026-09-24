@@ -6,14 +6,33 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     @Query("select i from Inventory i join fetch i.item join fetch i.warehouse left join fetch i.location")
     List<Inventory> findAllDetailed();
+
+    @Query("select i from Inventory i join fetch i.item join fetch i.warehouse left join fetch i.location where i.warehouse.id=:warehouseId")
+    List<Inventory> findAllDetailedByWarehouseId(@Param("warehouseId") Long warehouseId);
+
+    @Query("select i from Inventory i join fetch i.item item left join fetch item.category left join fetch item.defaultWarehouse join fetch i.warehouse left join fetch i.location order by i.id")
+    Stream<Inventory> streamAllDetailed();
+
+    @Query("select i from Inventory i join fetch i.item item left join fetch item.category left join fetch item.defaultWarehouse join fetch i.warehouse left join fetch i.location where i.warehouse.id in :warehouseIds order by i.id")
+    Stream<Inventory> streamAllDetailedByWarehouseIds(@Param("warehouseIds") List<Long> warehouseIds);
+
+    @Query("select i from Inventory i join fetch i.item join fetch i.warehouse left join fetch i.location order by i.updatedAt desc, i.id desc")
+    Page<Inventory> findAllDetailed(Pageable pageable);
+
+    @Query(value = "select i from Inventory i join fetch i.item join fetch i.warehouse left join fetch i.location where i.warehouse.id in :warehouseIds order by i.updatedAt desc, i.id desc",
+            countQuery = "select count(i) from Inventory i where i.warehouse.id in :warehouseIds")
+    Page<Inventory> findAllDetailedByWarehouseIds(@Param("warehouseIds") List<Long> warehouseIds, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Inventory i where i.item.id = :itemId and i.warehouse.id = :warehouseId "

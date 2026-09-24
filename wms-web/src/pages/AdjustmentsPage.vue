@@ -12,6 +12,8 @@ const statuses = { DRAFT: ['草稿', 'default'], APPROVED: ['已审核', 'blue']
 
 const auth = useAuthStore()
 const data = ref([])
+const page = ref(1)
+const total = ref(0)
 const items = ref([])
 const warehouses = ref([])
 const open = ref(false)
@@ -22,7 +24,7 @@ watch(detail, (v) => { drawerOpen.value = !!v })
 const formState = ref({ action: 'LOSS', lines: [{ quantity: 1 }] })
 const formRef = ref()
 
-const load = () => api.adjustments().then((x) => { data.value = x }).catch((e) => message.error(e.message))
+const load = (target = page.value) => api.adjustments({ page: target, pageSize: 20 }).then((x) => { data.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message))
 
 onMounted(() => {
   load()
@@ -91,7 +93,7 @@ const detailCols = [
   </div>
 
   <Card class="table-card">
-    <a-table row-key="id" :data-source="data" :columns="normalizeColumns(columns)" />
+    <a-table row-key="id" :data-source="data" :columns="normalizeColumns(columns)" :pagination="{ current: page, pageSize: 20, total, onChange: load }" />
   </Card>
 
   <a-modal v-model:open="open" title="新建报损 / 报溢草稿" width="850" :destroy-on-close="true" @ok="save">

@@ -7,6 +7,7 @@ import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.LocationRepository;
 import com.wms.repository.WarehouseRepository;
+import com.wms.service.WarehouseAccessService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,25 +25,28 @@ public class InventoryController {
     private final InventoryTransactionRepository transactions;
     private final WarehouseRepository warehouses;
     private final LocationRepository locations;
+    private final WarehouseAccessService warehouseAccess;
 
     public InventoryController(InventoryRepository i, InventoryTransactionRepository t,
-                               WarehouseRepository w, LocationRepository l) {
+                               WarehouseRepository w, LocationRepository l, WarehouseAccessService warehouseAccess) {
         inventories = i;
         transactions = t;
         warehouses = w;
         locations = l;
+        this.warehouseAccess = warehouseAccess;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('inventory:read')")
-    public ApiResponse<List<Map<String, Object>>> list(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "1000") int pageSize) {
-        List<Inventory> all = inventories.findAllDetailed();
-        int max = Math.min(Math.max(pageSize, 1), 1000);
-        int start = page > 0 ? Math.min((page - 1) * max, all.size()) : 0;
-        int end = Math.min(start + max, all.size());
-        return ApiResponse.ok(all.subList(start, end).stream().map(this::inventoryView).toList());
+    public ApiResponse<Map<String, Object>> list(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "100") int pageSize) {
+        PageRequest pageable = PageRequest.of(Math.max(0, page - 1), Math.min(Math.max(pageSize, 1), 200));
+        org.springframework.data.domain.Page<Inventory> result = warehouseAccess.isWarehouseScoped()
+                ? inventories.findAllDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds(), pageable)
+                : inventories.findAllDetailed(pageable);
+        return ApiResponse.ok(Map.of("records", result.getContent().stream().map(this::inventoryView).toList(),
+                "total", result.getTotalElements(), "page", result.getNumber() + 1, "pageSize", result.getSize()));
     }
 
     @GetMapping("/transactions")
@@ -52,6 +56,7 @@ public class InventoryController {
         int size = Math.min(Math.max(limit, 0), 500);
         if (size == 0) return ApiResponse.ok(List.of());
         return ApiResponse.ok(transactions.findRecentDetailedLimited(PageRequest.of(0, size)).stream()
+                .filter(t -> warehouseAccess.canAccess(t.getWarehouse().getId()))
                 .map(this::transactionView)
                 .toList());
     }
@@ -59,7 +64,7 @@ public class InventoryController {
     @GetMapping("/warehouses")
     @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> warehouseList() {
-        return ApiResponse.ok(warehouses.findByStatusTrueOrderByNameAsc().stream()
+        return ApiResponse.ok(warehouses.findByStatusTrueOrderByNameAsc().stream().filter(w -> warehouseAccess.canAccess(w.getId()))
                 .map(w -> Map.<String, Object>of("id", w.getId(), "code", w.getCode(), "name", w.getName()))
                 .toList());
     }
@@ -67,7 +72,7 @@ public class InventoryController {
     @GetMapping("/{itemId}")
     @PreAuthorize("hasAuthority('inventory:read')")
     public ApiResponse<List<Map<String, Object>>> byItem(@PathVariable Long itemId) {
-        return ApiResponse.ok(inventories.findByItemId(itemId).stream()
+        return ApiResponse.ok(inventories.findByItemId(itemId).stream().filter(i -> warehouseAccess.canAccess(i.getWarehouse().getId()))
                 .map(this::inventoryView)
                 .toList());
     }

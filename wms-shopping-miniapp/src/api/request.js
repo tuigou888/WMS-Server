@@ -5,6 +5,32 @@ const STORED_BASE = uni.getStorageSync('wms_api_base')
 const BASE_URL = STORED_BASE || ENV_BASE || (import.meta.env.DEV ? 'http://localhost:8088/api/v1' : '')
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
+const IDEMPOTENCY_CACHE_KEY = 'wms_idempotency_pending'
+
+function sortForHash(value) {
+  if (Array.isArray(value)) return value.map(sortForHash)
+  if (value && typeof value === 'object') return Object.keys(value).sort().reduce((out, key) => { out[key] = sortForHash(value[key]); return out }, {})
+  return value
+}
+
+function requestIdentity(method, url, data) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) return null
+  const input = `${method.toUpperCase()}:${url}:${JSON.stringify(sortForHash(data == null ? null : data)) || 'null'}`
+  let a = 2166136261, b = 2246822519
+  for (let i = 0; i < input.length; i++) { const code = input.charCodeAt(i); a = Math.imul(a ^ code, 16777619); b = Math.imul(b ^ code, 3266489917) }
+  const scope = `${method.toUpperCase()}:${url}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`
+  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  let key = pending[scope]
+  if (!key) { key = `wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`; pending[scope] = key; uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending) }
+  return { scope, key }
+}
+
+function clearRequestIdentity(identity) {
+  if (!identity) return
+  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  delete pending[identity.scope]
+  uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending)
+}
 
 export function getBaseUrl() { return BASE_URL }
 
@@ -60,6 +86,8 @@ export function request(options) {
     responseType: responseType || 'json',
     timeout: 15000,
   }
+  const identity = requestIdentity(method, url, data)
+  if (identity && !opts.header['Idempotency-Key']) opts.header['Idempotency-Key'] = identity.key
   if (token) opts.header.Authorization = `Bearer ${token}`
   return new Promise((resolve, reject) => {
     uni.request({
@@ -80,8 +108,10 @@ export function request(options) {
           if (body.code != null && body.code !== 200 && body.code !== 0) {
             return reject(new RequestError(body.message || '业务异常', body.code, body))
           }
+          clearRequestIdentity(identity)
           return resolve(body.data)
         }
+        clearRequestIdentity(identity)
         resolve(body)
       },
       fail: (err) => reject(new RequestError(err.errMsg || '网络错误', -1, err)),

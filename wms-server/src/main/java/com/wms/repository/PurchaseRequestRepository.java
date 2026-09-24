@@ -1,5 +1,8 @@
-package com.wms.repository; import com.wms.model.entity.PurchaseRequest; import org.springframework.data.jpa.repository.*; import java.util.*;
+package com.wms.repository; import com.wms.model.entity.PurchaseRequest; import jakarta.persistence.LockModeType; import org.springframework.data.domain.Page; import org.springframework.data.domain.Pageable; import org.springframework.data.jpa.repository.*; import org.springframework.data.repository.query.Param; import java.util.*;
 public interface PurchaseRequestRepository extends JpaRepository<PurchaseRequest,Long>{ @Query("select distinct p from PurchaseRequest p join fetch p.warehouse left join fetch p.supplier left join fetch p.lines l join fetch l.item order by p.createdAt desc") List<PurchaseRequest> findAllDetailed();  @Query("select distinct p from PurchaseRequest p join fetch p.warehouse left join fetch p.supplier left join fetch p.lines l join fetch l.item where p.id=:id") Optional<PurchaseRequest> findDetailedById(Long id);
+ @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select p from PurchaseRequest p where p.id=:id") Optional<PurchaseRequest> findForUpdateById(@Param("id") Long id);
+ @Query("select p.id from PurchaseRequest p where (:scoped=false or p.warehouse.id in :warehouseIds) order by p.createdAt desc, p.id desc") Page<Long> pageIds(@Param("scoped") boolean scoped,@Param("warehouseIds") List<Long> warehouseIds,Pageable pageable);
+ @Query("select distinct p from PurchaseRequest p join fetch p.warehouse left join fetch p.supplier left join fetch p.lines l join fetch l.item where p.id in :ids") List<PurchaseRequest> findDetailedByIdIn(@Param("ids") Collection<Long> ids);
  @Query("select case when count(l) > 0 then true else false end from PurchaseRequestLine l where l.item.id=:itemId") boolean existsLineByItemId(Long itemId);
  boolean existsBySupplierId(Long supplierId);
 }

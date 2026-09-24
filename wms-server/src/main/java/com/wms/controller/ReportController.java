@@ -7,8 +7,10 @@ import com.wms.model.entity.Item;
 import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.ItemRepository;
+import com.wms.service.WarehouseAccessService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -28,22 +30,25 @@ public class ReportController {
     private final InventoryRepository inventories;
     private final InventoryTransactionRepository transactions;
     private final ItemRepository items;
+    private final WarehouseAccessService warehouseAccess;
 
-    public ReportController(InventoryRepository i, InventoryTransactionRepository t, ItemRepository items) {
+    public ReportController(InventoryRepository i, InventoryTransactionRepository t, ItemRepository items, WarehouseAccessService warehouseAccess) {
         inventories = i;
         transactions = t;
         this.items = items;
+        this.warehouseAccess = warehouseAccess;
     }
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAuthority('report:view')")
+    @Transactional(readOnly = true)
     public ApiResponse<Map<String, Object>> dashboard() {
-        List<Inventory> all = inventories.findAllDetailed();
-        List<Map<String, Object>> alerts = smartAlerts(all);
-        BigDecimal qty = all.stream().map(Inventory::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal amount = all.stream().map(Inventory::getTotalAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<ItemStock> stock = currentStockByItem();
+        List<Map<String, Object>> alerts = smartAlerts(stock);
+        BigDecimal qty = stock.stream().map(x -> x.quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal amount = stock.stream().map(x -> x.amount).reduce(BigDecimal.ZERO, BigDecimal::add);
         LocalDate today = LocalDate.now();
-        List<InventoryTransaction> todayTxns = transactions.findDetailedBetween(today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        List<InventoryTransaction> todayTxns = visibleTransactions(transactions.findDetailedBetween(today.atStartOfDay(), today.plusDays(1).atStartOfDay()));
         BigDecimal inbound = todayTxns.stream()
                 .filter(t -> t.getQuantity().signum()>0)
                 .map(InventoryTransaction::getTotalCostAmount)
@@ -54,14 +59,14 @@ public class ReportController {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal sales = todayTxns.stream().filter(t -> "out".equals(t.getTransactionType())).map(InventoryTransaction::getSaleAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
 
-        List<Map<String, Object>> categoryDist = categoryDistribution(all);
-        List<Map<String, Object>> valueByCategory = valueByCategory(all);
+        List<Map<String, Object>> categoryDist = categoryDistribution(stock);
+        List<Map<String, Object>> valueByCategory = valueByCategory(stock);
         List<Map<String, Object>> dailyTrend = dailyTrendData();
         List<Map<String, Object>> monthlyProfit = monthlyProfitData();
-        List<Map<String, Object>> topItemsByValue = topItemsByValue(all, 8);
+        List<Map<String, Object>> topItemsByValue = topItemsByValue(stock, 8);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("stockItemCount", all.stream().filter(x -> x.getQuantity().signum() > 0).map(x->x.getItem().getId()).distinct().count());
+        result.put("stockItemCount", stock.stream().filter(x -> x.quantity.signum() > 0).count());
         result.put("totalQuantity", qty);
         result.put("totalAmount", amount);
         result.put("todayInboundAmount", inbound);
@@ -80,25 +85,28 @@ public class ReportController {
 
     @GetMapping("/stock-alert")
     @PreAuthorize("hasAuthority('report:view')")
+    @Transactional(readOnly = true)
     public ApiResponse<List<Map<String, Object>>> stockAlert() {
-        return ApiResponse.ok(smartAlerts(inventories.findAllDetailed()));
+        return ApiResponse.ok(smartAlerts(currentStockByItem()));
     }
 
     @GetMapping("/profit")
     @PreAuthorize("hasAuthority('report:view')")
-    public ApiResponse<List<Map<String, Object>>> profit() {
-        return ApiResponse.ok(transactions.findByTransactionType("out").stream().map(this::tx).toList());
+    public ApiResponse<Map<String, Object>> profit(@RequestParam(defaultValue="1") int page,@RequestParam(defaultValue="20") int pageSize) {
+        boolean scoped=warehouseAccess.isWarehouseScoped();List<Long> ids=scoped?warehouseAccess.currentWarehouseIds():List.of(-1L);org.springframework.data.domain.Pageable pageable=PageRequest.of(Math.max(0,page-1),Math.min(100,Math.max(1,pageSize)));
+        org.springframework.data.domain.Page<InventoryTransaction> rows=scoped?transactions.pageDetailedByTransactionTypeAndWarehouses("out",ids,pageable):transactions.pageDetailedByTransactionType("out",pageable);Object[] totals=transactions.salesTotals(scoped,ids);
+        return ApiResponse.ok(Map.of("records",rows.getContent().stream().map(this::tx).toList(),"total",rows.getTotalElements(),"page",rows.getNumber()+1,"pageSize",rows.getSize(),"salesCount",totals[0],"totalSale",totals[1],"totalProfit",totals[2]));
     }
 
     @GetMapping("/anomalies")
     @PreAuthorize("hasAuthority('report:view')")
     public ApiResponse<List<Map<String, Object>>> anomalies() {
-        List<Inventory> all = inventories.findAllDetailed();
-        List<InventoryTransaction> recentTxns = transactions.findRecentDetailed();
+        LocalDateTime since = LocalDate.now().minusDays(30).atStartOfDay();
+        List<InventoryTransaction> recentTxns = visibleTransactions(transactions.findDetailedBetween(since, LocalDate.now().plusDays(1).atStartOfDay()));
         List<Map<String, Object>> result = new ArrayList<>();
 
         // 检测1：连续3天库存下降
-        result.addAll(detectContinuousDecline(all, recentTxns));
+        result.addAll(detectContinuousDecline(recentTxns));
 
         // 检测2：出库流水缺少库位（事务实体无批次号字段，库位缺失同样意味着库存无法追溯）
         result.addAll(detectMissingLocation(recentTxns));
@@ -110,16 +118,12 @@ public class ReportController {
     }
 
     /** 智能预警：结合安全库存、出库趋势、建议补货量 */
-    private List<Map<String, Object>> smartAlerts(List<Inventory> inventory) {
-        Map<Long, BigDecimal> sums = inventory.stream()
-                .collect(Collectors.groupingBy(x -> x.getItem().getId(),
-                        Collectors.mapping(Inventory::getQuantity, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
-
+    private List<Map<String, Object>> smartAlerts(List<ItemStock> inventory) {
         // 近7天出库量统计
         LocalDate today = LocalDate.now();
         LocalDate weekAgo = today.minusDays(7);
-        List<InventoryTransaction> weekTxns = transactions.findByTransactionAtBetween(
-                weekAgo.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        List<InventoryTransaction> weekTxns = visibleTransactions(transactions.findDetailedBetween(
+                weekAgo.atStartOfDay(), today.plusDays(1).atStartOfDay()));
         Map<Long, BigDecimal> weekOutbound = new HashMap<>();
         for (InventoryTransaction t : weekTxns) {
             if ("out".equals(t.getTransactionType()) || "transfer_out".equals(t.getTransactionType())) {
@@ -128,35 +132,35 @@ public class ReportController {
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Item i : items.findAll()) {
-            if (!i.getStatus()) continue;
-            BigDecimal current = sums.getOrDefault(i.getId(), BigDecimal.ZERO);
-            if (current.compareTo(i.getSafetyStock()) >= 0) continue;
+        for (ItemStock i : inventory) {
+            if (!i.enabled || (warehouseAccess.isWarehouseScoped() && !i.hasInventory)) continue;
+            BigDecimal current = i.quantity;
+            if (current.compareTo(i.safetyStock) >= 0) continue;
 
-            BigDecimal weekOut = weekOutbound.getOrDefault(i.getId(), BigDecimal.ZERO);
+            BigDecimal weekOut = weekOutbound.getOrDefault(i.id, BigDecimal.ZERO);
             BigDecimal dailyAvg = weekOut.divide(BigDecimal.valueOf(7), 2, RoundingMode.HALF_UP);
-            BigDecimal suggestedOrder = i.getSafetyStock().subtract(current).add(dailyAvg.multiply(BigDecimal.valueOf(3)))
+            BigDecimal suggestedOrder = i.safetyStock.subtract(current).add(dailyAvg.multiply(BigDecimal.valueOf(3)))
                     .max(BigDecimal.ZERO).setScale(0, RoundingMode.HALF_UP);
 
             String priority;
-            if (current.compareTo(i.getSafetyStock().multiply(new BigDecimal("0.5"))) < 0
+            if (current.compareTo(i.safetyStock.multiply(new BigDecimal("0.5"))) < 0
                     || (dailyAvg.compareTo(BigDecimal.ZERO) > 0
-                    && dailyAvg.compareTo(i.getSafetyStock().multiply(new BigDecimal("0.2"))) > 0)) {
+                    && dailyAvg.compareTo(i.safetyStock.multiply(new BigDecimal("0.2"))) > 0)) {
                 priority = "HIGH";
-            } else if (current.compareTo(i.getSafetyStock()) < 0) {
+            } else if (current.compareTo(i.safetyStock) < 0) {
                 priority = "MEDIUM";
             } else {
                 priority = "LOW";
             }
 
             Map<String, Object> alert = new LinkedHashMap<>();
-            alert.put("itemId", i.getId());
-            alert.put("itemCode", i.getCode());
-            alert.put("itemName", i.getName());
-            alert.put("unit", i.getUnit());
-            alert.put("safetyStock", i.getSafetyStock());
+            alert.put("itemId", i.id);
+            alert.put("itemCode", i.code);
+            alert.put("itemName", i.name);
+            alert.put("unit", i.unit);
+            alert.put("safetyStock", i.safetyStock);
             alert.put("currentStock", current);
-            alert.put("shortage", i.getSafetyStock().subtract(current));
+            alert.put("shortage", i.safetyStock.subtract(current));
             alert.put("priority", priority);
             alert.put("dailyAvgOut", dailyAvg);
             alert.put("suggestedOrder", suggestedOrder);
@@ -171,7 +175,7 @@ public class ReportController {
     }
 
     /** 检测连续3天库存下降 */
-    private List<Map<String, Object>> detectContinuousDecline(List<Inventory> all, List<InventoryTransaction> recentTxns) {
+    private List<Map<String, Object>> detectContinuousDecline(List<InventoryTransaction> recentTxns) {
         List<Map<String, Object>> result = new ArrayList<>();
         // 按物品分组并按日期排序
         Map<Long, List<InventoryTransaction>> byItem = recentTxns.stream()
@@ -256,11 +260,11 @@ public class ReportController {
     }
 
     /** 按分类统计库存数量分布 */
-    private List<Map<String, Object>> categoryDistribution(List<Inventory> inventory) {
+    private List<Map<String, Object>> categoryDistribution(List<ItemStock> inventory) {
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (Inventory inv : inventory) {
-            String catName = inv.getItem().getCategory() == null ? "未分类" : inv.getItem().getCategory().getName();
-            byCategory.merge(catName, inv.getQuantity(), BigDecimal::add);
+        for (ItemStock item : inventory) {
+            if (!item.hasInventory) continue;
+            byCategory.merge(item.categoryName, item.quantity, BigDecimal::add);
         }
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map.Entry<String, BigDecimal> entry : byCategory.entrySet()) {
@@ -273,11 +277,11 @@ public class ReportController {
     }
 
     /** 按分类统计库存金额分布 */
-    private List<Map<String, Object>> valueByCategory(List<Inventory> inventory) {
+    private List<Map<String, Object>> valueByCategory(List<ItemStock> inventory) {
         Map<String, BigDecimal> byCategory = new LinkedHashMap<>();
-        for (Inventory inv : inventory) {
-            String catName = inv.getItem().getCategory() == null ? "未分类" : inv.getItem().getCategory().getName();
-            byCategory.merge(catName, inv.getTotalAmount(), BigDecimal::add);
+        for (ItemStock item : inventory) {
+            if (!item.hasInventory) continue;
+            byCategory.merge(item.categoryName, item.amount, BigDecimal::add);
         }
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map.Entry<String, BigDecimal> entry : byCategory.entrySet()) {
@@ -290,8 +294,8 @@ public class ReportController {
     private List<Map<String, Object>> monthlyProfitData() {
         LocalDate today = LocalDate.now();
         LocalDate start = today.minusMonths(5).withDayOfMonth(1);
-        List<InventoryTransaction> txns = transactions.findByTransactionAtBetween(
-                start.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        List<InventoryTransaction> txns = visibleTransactions(transactions.findDetailedBetween(
+                start.atStartOfDay(), today.plusDays(1).atStartOfDay()));
 
         Map<String, BigDecimal[]> monthly = new LinkedHashMap<>();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM");
@@ -321,8 +325,8 @@ public class ReportController {
     private List<Map<String, Object>> dailyTrendData() {
         LocalDate today = LocalDate.now();
         LocalDate start = today.minusDays(13);
-        List<InventoryTransaction> txns = transactions.findByTransactionAtBetween(
-                start.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        List<InventoryTransaction> txns = visibleTransactions(transactions.findDetailedBetween(
+                start.atStartOfDay(), today.plusDays(1).atStartOfDay()));
 
         Map<LocalDate, Map<String, BigDecimal>> grouped = new LinkedHashMap<>();
         for (int i = 0; i < 14; i++) {
@@ -352,67 +356,36 @@ public class ReportController {
     }
 
     /** 库存金额TOP N物品 */
-    private List<Map<String, Object>> topItemsByValue(List<Inventory> inventory, int limit) {
-        Map<Long, Map<String, Object>> aggregated = new LinkedHashMap<>();
-        for (Inventory inv : inventory) {
-            Long itemId = inv.getItem().getId();
-            aggregated.computeIfAbsent(itemId, k -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("itemCode", inv.getItem().getCode());
-                m.put("itemName", inv.getItem().getName());
-                m.put("unit", inv.getItem().getUnit());
-                m.put("value", BigDecimal.ZERO);
-                m.put("quantity", BigDecimal.ZERO);
-                return m;
-            });
-            Map<String, Object> m = aggregated.get(itemId);
-            m.put("value", ((BigDecimal) m.get("value")).add(inv.getTotalAmount()));
-            m.put("quantity", ((BigDecimal) m.get("quantity")).add(inv.getQuantity()));
-        }
-        return aggregated.values().stream()
-                .sorted((a, b) -> ((BigDecimal) b.get("value")).compareTo((BigDecimal) a.get("value")))
+    private List<Map<String, Object>> topItemsByValue(List<ItemStock> inventory, int limit) {
+        return inventory.stream().filter(x -> x.hasInventory)
+                .sorted((a, b) -> b.amount.compareTo(a.amount))
                 .limit(limit)
-                .map(m -> Map.of("itemCode", m.get("itemCode"), "itemName", m.get("itemName"),
-                        "unit", m.get("unit"), "value", m.get("value"), "quantity", m.get("quantity")))
+                .map(m -> Map.<String,Object>of("itemCode", m.code, "itemName", m.name,
+                        "unit", m.unit, "value", m.amount, "quantity", m.quantity))
                 .toList();
     }
 
     /** 库龄分析（G7）：按物品/仓库统计库存分布在 0-30/30-60/60-90/>90 天的批次，识别呆滞料。 */
     @GetMapping("/inventory-age")
     @PreAuthorize("hasAuthority('report:view')")
+    @Transactional(readOnly = true)
     public ApiResponse<List<Map<String, Object>>> inventoryAge() {
-        List<Inventory> all = inventories.findAllDetailed();
-        List<InventoryTransaction> txns = transactions.findRecentDetailed();
         LocalDate today = LocalDate.now();
 
-        Map<String,List<AgeLayer>> remainingLayers = remainingFifoLayers(txns);
+        Map<String,List<AgeLayer>> remainingLayers;
+        try (java.util.stream.Stream<InventoryTransaction> txns = transactions.streamDetailedOrdered()) {
+            remainingLayers = remainingFifoLayers(txns.filter(t -> warehouseAccess.canAccess(t.getWarehouse().getId())));
+        }
 
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Inventory inv : all) {
-            if (inv.getQuantity() == null || inv.getQuantity().signum() <= 0) continue;
-            List<AgeLayer> layers=remainingLayers.getOrDefault(stockKey(inv.getItem().getId(),inv.getWarehouse().getId(),inv.getLocation()==null?null:inv.getLocation().getId(),inv.getBatchNo()),List.of());
-            long ageDays = layerAgeDays(inv,layers,today);
-            String bucket = ageDays < 30 ? "0-30" : ageDays < 60 ? "30-60" : ageDays < 90 ? "60-90" : ">90";
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("itemCode", inv.getItem().getCode());
-            m.put("itemName", inv.getItem().getName());
-            m.put("unit", inv.getItem().getUnit());
-            m.put("warehouseName", inv.getWarehouse().getName());
-            m.put("locationCode", inv.getLocation() == null ? null : inv.getLocation().getCode());
-            m.put("batchNo", inv.getBatchNo());
-            m.put("quantity", inv.getQuantity());
-            m.put("amount", inv.getTotalAmount());
-            m.put("earliestInDate", earliestLayerDate(inv,layers,today));
-            m.put("ageDays", ageDays);
-            m.put("bucket", bucket);
-            result.add(m);
-        }
+        java.util.stream.Stream<Inventory> inventoryStream=warehouseAccess.isWarehouseScoped()?inventories.streamAllDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds()):inventories.streamAllDetailed();
+        try(inventoryStream){inventoryStream.forEach(inv->{if(inv.getQuantity()==null||inv.getQuantity().signum()<=0)return;List<AgeLayer> layers=remainingLayers.getOrDefault(stockKey(inv.getItem().getId(),inv.getWarehouse().getId(),inv.getLocation()==null?null:inv.getLocation().getId(),inv.getBatchNo()),List.of());long ageDays=layerAgeDays(inv,layers,today);String bucket=ageDays<30?"0-30":ageDays<60?"30-60":ageDays<90?"60-90":">90";Map<String,Object> m=new LinkedHashMap<>();m.put("itemCode",inv.getItem().getCode());m.put("itemName",inv.getItem().getName());m.put("unit",inv.getItem().getUnit());m.put("warehouseName",inv.getWarehouse().getName());m.put("locationCode",inv.getLocation()==null?null:inv.getLocation().getCode());m.put("batchNo",inv.getBatchNo());m.put("quantity",inv.getQuantity());m.put("amount",inv.getTotalAmount());m.put("earliestInDate",earliestLayerDate(inv,layers,today));m.put("ageDays",ageDays);m.put("bucket",bucket);result.add(m);});}
         result.sort((a, b) -> Long.compare((long) b.get("ageDays"), (long) a.get("ageDays")));
         return ApiResponse.ok(result);
     }
 
     /** 以带符号流水构建每个库存键真实剩余的 FIFO 入库层，出库会逐层消费而非只看当前库存。 */
-    private Map<String,List<AgeLayer>> remainingFifoLayers(List<InventoryTransaction> txns){Map<String,Deque<AgeLayer>> layers=new HashMap<>();for(InventoryTransaction t:txns.stream().sorted(Comparator.comparing(InventoryTransaction::getTransactionAt).thenComparing(InventoryTransaction::getId)).toList()){String key=stockKey(t.getItem().getId(),t.getWarehouse().getId(),t.getLocation()==null?null:t.getLocation().getId(),t.getBatchNo());Deque<AgeLayer> queue=layers.computeIfAbsent(key,x->new ArrayDeque<>());if(t.getQuantity().signum()>0){queue.addLast(new AgeLayer(t.getTransactionAt().toLocalDate(),t.getQuantity()));continue;}BigDecimal consume=t.getQuantity().abs();while(consume.signum()>0&&!queue.isEmpty()){AgeLayer first=queue.getFirst();BigDecimal used=first.quantity.min(consume);first.quantity=first.quantity.subtract(used);consume=consume.subtract(used);if(first.quantity.signum()==0)queue.removeFirst();}}Map<String,List<AgeLayer>> result=new HashMap<>();layers.forEach((k,v)->result.put(k,new ArrayList<>(v)));return result;}
+    private Map<String,List<AgeLayer>> remainingFifoLayers(java.util.stream.Stream<InventoryTransaction> txns){Map<String,Deque<AgeLayer>> layers=new HashMap<>();txns.forEach(t->{String key=stockKey(t.getItem().getId(),t.getWarehouse().getId(),t.getLocation()==null?null:t.getLocation().getId(),t.getBatchNo());Deque<AgeLayer> queue=layers.computeIfAbsent(key,x->new ArrayDeque<>());if(t.getQuantity().signum()>0){queue.addLast(new AgeLayer(t.getTransactionAt().toLocalDate(),t.getQuantity()));return;}BigDecimal consume=t.getQuantity().abs();while(consume.signum()>0&&!queue.isEmpty()){AgeLayer first=queue.getFirst();BigDecimal used=first.quantity.min(consume);first.quantity=first.quantity.subtract(used);consume=consume.subtract(used);if(first.quantity.signum()==0)queue.removeFirst();}});Map<String,List<AgeLayer>> result=new HashMap<>();layers.forEach((k,v)->result.put(k,new ArrayList<>(v)));return result;}
     private long layerAgeDays(Inventory inv,List<AgeLayer> layers,LocalDate today){BigDecimal remaining=inv.getQuantity(),weighted=BigDecimal.ZERO;for(AgeLayer layer:layers){if(remaining.signum()<=0)break;BigDecimal q=layer.quantity.min(remaining);weighted=weighted.add(BigDecimal.valueOf(ChronoUnit.DAYS.between(layer.date,today)).multiply(q));remaining=remaining.subtract(q);}if(remaining.signum()>0){LocalDate fallback=inv.getUpdatedAt()==null?today:inv.getUpdatedAt().toLocalDate();weighted=weighted.add(BigDecimal.valueOf(ChronoUnit.DAYS.between(fallback,today)).multiply(remaining));}return weighted.divide(inv.getQuantity(),0,RoundingMode.HALF_UP).longValue();}
     private LocalDate earliestLayerDate(Inventory inv,List<AgeLayer> layers,LocalDate today){return layers.isEmpty()?(inv.getUpdatedAt()==null?today:inv.getUpdatedAt().toLocalDate()):layers.getFirst().date;}
     private static final class AgeLayer { private final LocalDate date; private BigDecimal quantity; private AgeLayer(LocalDate date,BigDecimal quantity){this.date=date;this.quantity=quantity;} }
@@ -463,17 +436,22 @@ public class ReportController {
         LocalDate monthStart = period == null || period.isBlank()
                 ? today.withDayOfMonth(1) : LocalDate.parse(period + "-01");
         LocalDate monthEnd = monthStart.plusMonths(1);
-        // 期末不可读取当前 inventory 快照：从所有历史流水按带符号的数量/成本重建，才能稳定查询历史月份。
-        List<InventoryTransaction> allTx = transactions.findDetailedBetween(LocalDate.of(1970,1,1).atStartOfDay(), monthEnd.atStartOfDay());
-        Map<Long,Map<String,Object>> totals=new LinkedHashMap<>();
-        for(InventoryTransaction t:allTx){Map<String,Object> row=totals.computeIfAbsent(t.getItem().getId(),x->{Map<String,Object> r=new LinkedHashMap<>();r.put("itemCode",t.getItem().getCode());r.put("itemName",t.getItem().getName());r.put("unit",t.getItem().getUnit());r.put("openingQuantity",BigDecimal.ZERO);r.put("openingAmount",BigDecimal.ZERO);r.put("inQuantity",BigDecimal.ZERO);r.put("inAmount",BigDecimal.ZERO);r.put("outQuantity",BigDecimal.ZERO);r.put("outAmount",BigDecimal.ZERO);return r;});BigDecimal q=t.getQuantity(),cost=t.getTotalCostAmount();LocalDate d=t.getTransactionAt().toLocalDate();if(d.isBefore(monthStart)){row.put("openingQuantity",((BigDecimal)row.get("openingQuantity")).add(q));row.put("openingAmount",((BigDecimal)row.get("openingAmount")).add(q.signum()>=0?cost:cost.negate()));}else if(d.isBefore(monthEnd)){if(q.signum()>=0){row.put("inQuantity",((BigDecimal)row.get("inQuantity")).add(q));row.put("inAmount",((BigDecimal)row.get("inAmount")).add(cost));}else{row.put("outQuantity",((BigDecimal)row.get("outQuantity")).add(q.abs()));row.put("outAmount",((BigDecimal)row.get("outAmount")).add(cost));}}}
-        List<Map<String,Object>> result=new ArrayList<>();for(Map<String,Object> row:totals.values()){BigDecimal openingQty=(BigDecimal)row.remove("openingQuantity"),openingAmt=(BigDecimal)row.remove("openingAmount"),inQty=(BigDecimal)row.get("inQuantity"),inAmt=(BigDecimal)row.get("inAmount"),outQty=(BigDecimal)row.get("outQuantity"),outAmt=(BigDecimal)row.get("outAmount");row.put("openingQuantity",openingQty);row.put("endingQuantity",openingQty.add(inQty).subtract(outQty));row.put("endingAmount",openingAmt.add(inAmt).subtract(outAmt));result.add(row);}
+        boolean scoped=warehouseAccess.isWarehouseScoped();
+        List<Long> warehouseIds=scoped?warehouseAccess.currentWarehouseIds():List.of(-1L);
+        List<Object[]> aggregates=transactions.aggregateInOutSummary(monthStart.atStartOfDay(),monthEnd.atStartOfDay(),scoped,warehouseIds);
+        List<Map<String,Object>> result=new ArrayList<>();
+        for(Object[] row:aggregates){BigDecimal openingQty=decimal(row[4]),openingAmount=decimal(row[5]),inQty=decimal(row[6]),inAmount=decimal(row[7]),outQty=decimal(row[8]),outAmount=decimal(row[9]);Map<String,Object> view=new LinkedHashMap<>();view.put("itemCode",row[1]);view.put("itemName",row[2]);view.put("unit",row[3]);view.put("openingQuantity",openingQty);view.put("inQuantity",inQty);view.put("inAmount",inAmount);view.put("outQuantity",outQty);view.put("outAmount",outAmount);view.put("endingQuantity",openingQty.add(inQty).subtract(outQty));view.put("endingAmount",openingAmount.add(inAmount).subtract(outAmount));result.add(view);}
         return ApiResponse.ok(result);
     }
 
     private String stockKey(Long itemId, Long warehouseId, Long locationId) {
         return itemId + "@" + warehouseId + "@" + (locationId == null ? "-" : locationId);
     }
+    private List<ItemStock> currentStockByItem(){Map<Long,ItemStock> grouped=new LinkedHashMap<>();for(Item item:items.findAll())grouped.put(item.getId(),new ItemStock(item));boolean scoped=warehouseAccess.isWarehouseScoped();java.util.stream.Stream<Inventory> stream=scoped?inventories.streamAllDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds()):inventories.streamAllDetailed();try(stream){stream.forEach(inv->{ItemStock value=grouped.get(inv.getItem().getId());if(value!=null)value.add(inv);});}return new ArrayList<>(grouped.values());}
+    private List<Inventory> visibleInventory(List<Inventory> rows) { return rows.stream().filter(i -> warehouseAccess.canAccess(i.getWarehouse().getId())).toList(); }
+    private List<InventoryTransaction> visibleTransactions(List<InventoryTransaction> rows) { return rows.stream().filter(t -> warehouseAccess.canAccess(t.getWarehouse().getId())).toList(); }
+    private BigDecimal decimal(Object value) { return value instanceof BigDecimal amount ? amount : value == null ? BigDecimal.ZERO : new BigDecimal(value.toString()); }
+    private static final class ItemStock{private final Long id;private final String code,name,unit,categoryName;private final BigDecimal safetyStock;private final boolean enabled;private BigDecimal quantity=BigDecimal.ZERO,amount=BigDecimal.ZERO;private boolean hasInventory;private ItemStock(Item i){id=i.getId();code=i.getCode();name=i.getName();unit=i.getUnit();categoryName=i.getCategory()==null?"未分类":i.getCategory().getName();safetyStock=i.getSafetyStock();enabled=Boolean.TRUE.equals(i.getStatus());}private void add(Inventory i){quantity=quantity.add(i.getQuantity());amount=amount.add(i.getTotalAmount());hasInventory=true;}}
     private String stockKey(Long itemId,Long warehouseId,Long locationId,String batchNo){return stockKey(itemId,warehouseId,locationId)+"@"+(batchNo==null?"-":batchNo);}
 
     /** 增强的库存流水视图（含变动前库存） */

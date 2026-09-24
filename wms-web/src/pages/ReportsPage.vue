@@ -15,19 +15,26 @@ const anomalyLabel = { CONTINUOUS_DECLINE: '连续出库下降', MISSING_BATCH: 
 const tab = ref('profit')
 const alerts = ref([])
 const profit = ref([])
+const profitSummary = ref({ salesCount: 0, totalSale: 0, totalProfit: 0 })
+const profitPage = ref(1)
+const profitTotal = ref(0)
 const anomalies = ref([])
 const loading = ref(true)
 
 onMounted(() => {
   loading.value = true
-  Promise.all([api.alerts(), api.profit(), api.anomalies()])
-    .then(([a, p, an]) => { alerts.value = a; profit.value = p; anomalies.value = an })
+  Promise.all([api.alerts(), api.profit({ page: 1, pageSize: 20 }), api.anomalies()])
+    .then(([a, p, an]) => { alerts.value = a; profit.value = p.records; profitSummary.value = p; profitPage.value = p.page; profitTotal.value = p.total; anomalies.value = an })
     .catch((e) => message.error(e.message))
     .finally(() => { loading.value = false })
 })
 
-const totalSale = () => profit.value.reduce((s, x) => s + Number(x.saleAmount || 0), 0)
-const totalProfit = () => profit.value.reduce((s, x) => s + Number(x.profit || 0), 0)
+const totalSale = () => Number(profitSummary.value.totalSale || 0)
+const totalProfit = () => Number(profitSummary.value.totalProfit || 0)
+const loadProfitPage = async (page) => {
+  try { const result = await api.profit({ page, pageSize: 20 }); profit.value = result.records; profitSummary.value = result; profitPage.value = result.page; profitTotal.value = result.total }
+  catch (e) { message.error(e.message) }
+}
 
 const alertCols = [
   { title: '物品编码', dataIndex: 'itemCode' },
@@ -68,7 +75,7 @@ const profitCols = [
   </div>
 
   <Row :gutter="18">
-    <Col :span="8"><Card class="metric-card"><Statistic title="销售出库笔数" :value="profit.length" /></Card></Col>
+    <Col :span="8"><Card class="metric-card"><Statistic title="销售出库笔数" :value="profitSummary.salesCount" /></Card></Col>
     <Col :span="8"><Card class="metric-card"><Statistic title="销售金额" :value="totalSale()" :precision="2" prefix="¥" /></Card></Col>
     <Col :span="8">
       <Card class="metric-card">
@@ -88,6 +95,6 @@ const profitCols = [
   </Card>
 
   <Card title="销售利润明细" class="table-card" style="margin-top: 18px;">
-    <a-table row-key="id" :loading="loading" :data-source="profit" :columns="normalizeColumns(profitCols)" />
+    <a-table row-key="id" :loading="loading" :data-source="profit" :columns="normalizeColumns(profitCols)" :pagination="{ current: profitPage, pageSize: 20, total: profitTotal, onChange: loadProfitPage }" />
   </Card>
 </template>

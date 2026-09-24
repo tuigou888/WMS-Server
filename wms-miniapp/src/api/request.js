@@ -7,6 +7,41 @@ const IS_LOCAL_API = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(?:\/|$)/.t
 const TOKEN_KEY = 'wms_token'
 const USER_KEY = 'wms_user'
 const WAREHOUSE_KEY = 'wms_warehouse'
+const IDEMPOTENCY_CACHE_KEY = 'wms_idempotency_pending'
+
+function requestIdentity(method, url, data) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) return null
+  const body = JSON.stringify(sortForHash(data == null ? null : data)) || 'null'
+  const input = `${method.toUpperCase()}:${url}:${body}`
+  let a = 2166136261, b = 2246822519
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i)
+    a = Math.imul(a ^ code, 16777619)
+    b = Math.imul(b ^ code, 3266489917)
+  }
+  const scope = `${method.toUpperCase()}:${url}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`
+  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  let key = pending[scope]
+  if (!key) {
+    key = `wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`
+    pending[scope] = key
+    uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending)
+  }
+  return { scope, key }
+}
+
+function sortForHash(value) {
+  if (Array.isArray(value)) return value.map(sortForHash)
+  if (value && typeof value === 'object') return Object.keys(value).sort().reduce((out, key) => { out[key] = sortForHash(value[key]); return out }, {})
+  return value
+}
+
+function clearRequestIdentity(identity) {
+  if (!identity) return
+  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  delete pending[identity.scope]
+  uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending)
+}
 
 class RequestError extends Error {
   constructor(message, code, response) {
@@ -63,6 +98,8 @@ async function request(options) {
     responseType: responseType || 'json',
     timeout: 15000,
   }
+  const identity = requestIdentity(method, url, data)
+  if (identity && !requestOptions.header['Idempotency-Key']) requestOptions.header['Idempotency-Key'] = identity.key
 
   if (token) {
     requestOptions.header.Authorization = `Bearer ${token}`
@@ -94,11 +131,13 @@ async function request(options) {
 
         if (apiRes && typeof apiRes === 'object' && 'code' in apiRes) {
           if (apiRes.code === 200) {
+            clearRequestIdentity(identity)
             resolve(apiRes.data)
           } else {
             reject(new RequestError(apiRes.message || '请求失败', apiRes.code, res))
           }
         } else {
+          clearRequestIdentity(identity)
           resolve(apiRes)
         }
       },

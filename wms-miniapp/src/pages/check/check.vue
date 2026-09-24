@@ -91,7 +91,8 @@ export default {
       this.loading = true
       try {
         const params = { page: this.page, pageSize: this.pageSize }
-        const data = await api.stocktakes(params)
+        const pageData = await api.stocktakes(params)
+        const data = pageData.records || []
         if (reset) this.list = []
         this.list.push(...data)
         this.hasMore = data.length >= this.pageSize

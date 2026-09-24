@@ -6,6 +6,7 @@ import { api } from '../api/wms'
 import { permissionLabel, roleLabel } from '../utils/labels'
 
 const rows = ref([])
+const warehouseOptions = ref([])
 const matrix = ref(null)
 const open = ref(false)
 const editing = ref(null)
@@ -15,12 +16,13 @@ const load = () => api.users().then((x) => { rows.value = x }).catch((e) => mess
 
 onMounted(() => {
   load()
+  api.warehouses(true).then((items) => { warehouseOptions.value = items.map((w) => ({ value: w.id, label: `${w.name}（${w.code}）` })) }).catch((e) => message.error(e.message))
   api.permissions().then((m) => { matrix.value = m }).catch((e) => message.error(e.message))
 })
 
 const show = (u) => {
   editing.value = u || null
-  formState.value = { role: 'WAREHOUSE', enabled: true, ...(u || {}) }
+  formState.value = { role: 'WAREHOUSE', enabled: true, warehouseIds: [], ...(u || {}) }
   open.value = true
 }
 
@@ -83,6 +85,9 @@ const matrixColumns = () => [...matrixCols, ...Object.keys(matrix.value?.roles |
       </a-form-item>
       <a-form-item name="role" label="角色" :rules="[{ required: true }]">
         <a-select v-model:value="formState.role" :options="roleOptions" />
+      </a-form-item>
+      <a-form-item v-if="formState.role === 'WAREHOUSE'" name="warehouseIds" label="可操作仓库" :rules="[{ required: true, type: 'array', min: 1, message: '至少分配一个仓库' }]">
+        <a-select v-model:value="formState.warehouseIds" mode="multiple" :options="warehouseOptions" placeholder="选择此用户可访问的仓库" />
       </a-form-item>
       <a-form-item name="enabled" label="状态">
         <a-switch v-model:checked="formState.enabled" checked-children="启用" un-checked-children="停用" />

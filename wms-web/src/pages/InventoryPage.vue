@@ -1,5 +1,5 @@
 <script setup>
-import { h, onMounted, ref, watch } from 'vue'
+import { h, ref, watch } from 'vue'
 import { Card, Segmented, Table, Tag, Typography, message } from 'ant-design-vue'
 import { api } from '../api/wms'
 import { dateTime, money, number } from '../utils/format'
@@ -7,22 +7,24 @@ import { normalizeColumns } from '../utils/table'
 
 const tab = ref('stock')
 const stock = ref([])
+const stockPage = ref(1)
+const stockTotal = ref(0)
 const transactions = ref([])
 const stockLoading = ref(false)
 const txLoading = ref(false)
-const stockLoaded = ref(false)
 const txLoaded = ref(false)
 
-const loadStock = async () => {
-  if (stockLoaded.value) return
+const loadStock = async (target = stockPage.value) => {
   stockLoading.value = true
   try {
-    stock.value = await api.inventory()
+    const result = await api.inventory({ page: target, pageSize: 20 })
+    stock.value = result.records
+    stockPage.value = result.page
+    stockTotal.value = result.total
   } catch (e) {
     message.error(e.message)
   } finally {
     stockLoading.value = false
-    stockLoaded.value = true
   }
 }
 
@@ -38,8 +40,6 @@ const loadTx = async () => {
     txLoaded.value = true
   }
 }
-
-onMounted(() => { api.inventory().catch((e) => message.error(e.message)) })
 
 watch(tab, (t) => { if (t === 'stock') loadStock(); else loadTx() }, { immediate: true })
 
@@ -78,7 +78,7 @@ const txCols = [
     <template #title>
       <Segmented v-model:value="tab" :options="[{ label: '库存查询', value: 'stock' }, { label: '库存流水', value: 'transactions' }]" />
     </template>
-    <a-table v-if="tab === 'stock'" row-key="id" :loading="stockLoading" :data-source="stock" :columns="normalizeColumns(stockCols)" />
+    <a-table v-if="tab === 'stock'" row-key="id" :loading="stockLoading" :data-source="stock" :columns="normalizeColumns(stockCols)" :pagination="{ current: stockPage, pageSize: 20, total: stockTotal, onChange: loadStock }" />
     <a-table v-else row-key="id" :loading="txLoading" :data-source="transactions" :columns="normalizeColumns(txCols)" />
   </Card>
 </template>

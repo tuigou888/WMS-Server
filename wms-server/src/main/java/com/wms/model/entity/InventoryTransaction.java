@@ -1,7 +1,7 @@
 package com.wms.model.entity;
 import jakarta.persistence.*;
 import java.math.BigDecimal; import java.time.LocalDateTime;
-@Entity @Table(name="inventory_transactions")
+@Entity @Table(name="inventory_transactions",uniqueConstraints=@UniqueConstraint(name="uk_tx_reversal_once",columnNames="reversal_of_transaction_id"))
 public class InventoryTransaction extends AuditableEntity {
  @Id @GeneratedValue(strategy=GenerationType.IDENTITY) private Long id;
  @ManyToOne(optional=false,fetch=FetchType.LAZY) private Item item; @ManyToOne(optional=false,fetch=FetchType.LAZY) private Warehouse warehouse; @ManyToOne(fetch=FetchType.LAZY) private Location location;

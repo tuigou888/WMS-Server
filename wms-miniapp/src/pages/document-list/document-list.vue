@@ -11,7 +11,7 @@
     </view>
 
     <!-- 列表 -->
-    <scroll-view class="list-container" scroll-y :style="{ height: listHeight + 'px' }" @refresh="onRefresh" :refresher-enabled="true" :refresher-triggered="refreshing">
+    <scroll-view class="list-container" scroll-y :style="{ height: listHeight + 'px' }" @refresh="onRefresh" @scrolltolower="loadMore" :refresher-enabled="true" :refresher-triggered="refreshing">
       <view v-if="loading && list.length === 0" class="loading">加载中...</view>
 
       <view v-else-if="list.length === 0" class="empty-state">
@@ -61,6 +61,8 @@ export default {
       loadingMore: false,
       refreshing: false,
       hasMore: true,
+      page: 1,
+      pageSize: 20,
       listHeight: 0,
       typeIndex: 0,
       statusIndex: 0,
@@ -134,33 +136,36 @@ export default {
     },
     async loadList(reset = false) {
       if (reset) {
+        this.page = 1
+        this.list = []
         this.hasMore = true
       }
+      if (this.loading || this.loadingMore || !this.hasMore) return
+      this.loadingMore = this.list.length > 0
       this.loading = true
       try {
-        let data = []
+        let pageData = { records: [] }
         let kind = 'document'
+        const params = { page: this.page, pageSize: this.pageSize }
         if (this.typeIndex === 3) {
-          data = await api.transfers({})
+          pageData = await api.transfers(params)
           kind = 'transfer'
         } else if (this.typeIndex === 4) {
-          data = await api.stocktakes({})
+          pageData = await api.stocktakes(params)
           kind = 'stocktake'
         } else {
-          data = await api.documents({})
-          if (this.typeIndex === 1) {
-            data = data.filter(d => IN_TYPES.includes(d.type))
-          } else if (this.typeIndex === 2) {
-            data = data.filter(d => OUT_TYPES.includes(d.type))
-          }
+          pageData = await api.documents(params)
         }
-        if (!Array.isArray(data)) data = data.records || []
+        let data = pageData.records || []
+        if (this.typeIndex === 1) data = data.filter(d => IN_TYPES.includes(d.type))
+        else if (this.typeIndex === 2) data = data.filter(d => OUT_TYPES.includes(d.type))
         const statusMap = { 1: 'DRAFT', 2: 'APPROVED', 3: 'COMPLETED', 4: 'CANCELLED' }
         if (this.statusIndex > 0 && statusMap[this.statusIndex]) {
           data = data.filter(d => d.status === statusMap[this.statusIndex])
         }
-        this.list = data.map(d => this.enrichDoc(d, kind))
-        this.hasMore = false
+        this.list.push(...data.map(d => this.enrichDoc(d, kind)))
+        this.hasMore = (pageData.records || []).length === this.pageSize
+        this.page++
       } catch (e) {
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })
       } finally {
@@ -169,6 +174,9 @@ export default {
         this.refreshing = false
         uni.stopPullDownRefresh()
       }
+    },
+    loadMore() {
+      if (!this.loading && !this.loadingMore && this.hasMore) this.loadList(false)
     },
     onRefresh() {
       this.refreshing = true
