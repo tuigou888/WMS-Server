@@ -1,24 +1,11 @@
 services:
-  mysql:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: wms
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-    ports: ["${WMS_MYSQL_BIND:-127.0.0.1:3306}:3306"]
-    volumes: ["mysql-data:/var/lib/mysql"]
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
   wms-server:
     build: ./wms-server
     restart: unless-stopped
     ports: ["${WMS_API_BIND:-127.0.0.1:8088}:8088", "${WMS_MGMT_BIND:-127.0.0.1:9089}:9089"]
     volumes: ["wms-logs:/app/logs"]
+    # 服务器宿主机自建 MySQL：容器内用 host.docker.internal 访问（Linux 必须显式映射 host-gateway）
+    extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       SPRING_PROFILES_ACTIVE: prod
       WMS_LOG_DIR: /app/logs
@@ -27,9 +14,9 @@ services:
       AUDIT_ARCHIVE_DIR: /app/logs/archive
       AUDIT_ARCHIVE_AFTER_DAYS: ${AUDIT_ARCHIVE_AFTER_DAYS:-365}
       AUDIT_ARCHIVE_DELETE_ENABLED: ${AUDIT_ARCHIVE_DELETE_ENABLED:-false}
-      DB_URL: jdbc:mysql://mysql:3306/wms?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      DB_USERNAME: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      DB_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      DB_URL: ${DB_URL:?Set DB_URL in .env}
+      DB_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       DB_DRIVER: com.mysql.cj.jdbc.Driver
       WECHAT_MOCK: "false"
       WECHAT_PAY_MOCK: "false"
@@ -52,16 +39,12 @@ services:
         target: wechat_pay_private_key
       - source: wechat_pay_public_key
         target: wechat_pay_public_key
-    depends_on:
-      mysql:
-        condition: service_healthy
   wms-web:
     build: ./wms-web
     restart: unless-stopped
     ports: ["${WMS_WEB_BIND:-127.0.0.1:3000}:80"]
     depends_on: [wms-server]
 volumes:
-  mysql-data:
   wms-logs:
 secrets:
   wechat_pay_private_key:
