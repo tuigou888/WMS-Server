@@ -7,7 +7,7 @@ import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.Use
  @PostMapping("/login") public ApiResponse<Map<String,Object>> login(@Valid @RequestBody LoginRequest request,HttpServletRequest http){String username=normalizeUsername(request.username());String key=rateKey(http,username);if(rateLimiter.isBlocked(key))throw new RateLimitedException("登录失败次数过多，请 "+LoginRateLimiter.WINDOW.toMinutes()+" 分钟后再试");UserAccount user=users.findByUsername(username).orElse(null);if(user==null||!Boolean.TRUE.equals(user.getEnabled())||!encoder.matches(request.password(),user.getPassword())){rateLimiter.recordFailure(key);throw new BusinessException("用户名或密码错误");}rateLimiter.reset(key);String token=tokens.issue(user);log.info("登录成功: username={}, role={}", user.getUsername(), user.getRole());return ApiResponse.ok("登录成功",view(user,token));}
 
   @PostMapping("/wx-login") public ApiResponse<Map<String,Object>> wxLogin(@Valid @RequestBody WxLoginRequest request){
-    String openid = wechat.getOpenid(request.code());
+    String openid = wechat.getOpenid(request.code(), request.app());
     UserAccount user = users.findByOpenid(openid).orElse(null);
     if (user != null) {
       if (!Boolean.TRUE.equals(user.getEnabled())) throw new BusinessException("账号已禁用");

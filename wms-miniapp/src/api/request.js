@@ -169,7 +169,7 @@ const api = {
 
   // 认证
   login: (data) => api.post('/auth/login', data),
-  wxLogin: (code) => api.post('/auth/wx-login', { code }),
+  wxLogin: (code) => api.post('/auth/wx-login', { code, app: 'warehouse' }),
   wxBind: (data) => api.post('/auth/wx-bind', data),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),

@@ -46,6 +46,9 @@ management:
 wechat:
   appid: ${WECHAT_APPID:}
   secret: ${WECHAT_SECRET:}
+  # 作业端小程序（wms-miniapp）独立的 appid/secret，wx-login 传 app=warehouse 时启用
+  warehouse-appid: ${WECHAT_WAREHOUSE_APPID:}
+  warehouse-secret: ${WECHAT_WAREHOUSE_SECRET:}
   mock: ${WECHAT_MOCK:false}
   pay:
     # 无 Profile 的本地开发默认走 mock；prod Profile 会强制为 false，且安全检查会拒绝覆盖。

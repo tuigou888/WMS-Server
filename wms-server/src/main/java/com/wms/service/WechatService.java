@@ -18,6 +18,13 @@ public class WechatService {
     @Value("${wechat.secret:}")
     private String secret;
 
+    /** 作业端小程序（wms-miniapp）独立的 appid/secret；openid 加 wh: 前缀与商城端命名空间隔离 */
+    @Value("${wechat.warehouse-appid:}")
+    private String warehouseAppid;
+
+    @Value("${wechat.warehouse-secret:}")
+    private String warehouseSecret;
+
     @Value("${wechat.mock:false}")
     private boolean mock;
 
@@ -31,7 +38,11 @@ public class WechatService {
 
     public record SessionResult(String openid, String sessionKey, Integer errcode, String errmsg) {}
 
-    public String getOpenid(String code) {
+    public String getOpenid(String code) { return getOpenid(code, null); }
+
+    /** app="warehouse" 走作业端配置，openid 加 wh: 前缀；其余（含空）走商城端，openid 原样。 */
+    public String getOpenid(String code, String app) {
+        boolean warehouse = "warehouse".equals(app);
         if (mock) {
             // mock 模式把 code 直接当 openid，仅允许 dev/test 环境使用；生产误开等于任何人可用任意 code 登录
             String[] profiles = environment.getActiveProfiles();
@@ -39,19 +50,21 @@ public class WechatService {
             if (!isDev) {
                 throw new BusinessException("生产环境禁止启用 wechat.mock，请配置真实的 WECHAT_APPID / WECHAT_SECRET");
             }
-            return code;
+            return warehouse ? "wh:" + code : code;
         }
-        if (appid.isBlank() || secret.isBlank()) {
-            throw new BusinessException("微信小程序未配置：缺少 wechat.appid 或 wechat.secret");
+        String useAppid = warehouse ? warehouseAppid : appid;
+        String useSecret = warehouse ? warehouseSecret : secret;
+        if (useAppid.isBlank() || useSecret.isBlank()) {
+            throw new BusinessException("微信小程序未配置：缺少 wechat." + (warehouse ? "warehouse-appid 或 warehouse-secret" : "appid 或 secret"));
         }
         String url = "https://api.weixin.qq.com/sns/jscode2session?appid={appid}&secret={secret}&js_code={code}&grant_type=authorization_code";
         SessionResult result = restClient.get()
-                .uri(url, appid, secret, code)
+                .uri(url, useAppid, useSecret, code)
                 .retrieve()
                 .body(SessionResult.class);
         if (result == null || result.errcode() != null && result.errcode() != 0) {
             throw new BusinessException("微信登录失败: " + (result != null ? result.errmsg() : "无响应"));
         }
-        return result.openid();
+        return warehouse ? "wh:" + result.openid() : result.openid();
     }
 }

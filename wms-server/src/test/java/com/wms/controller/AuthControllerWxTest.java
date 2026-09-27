@@ -110,4 +110,21 @@ class AuthControllerWxTest {
         assertEquals("new-customer-openid", user.getOpenid());
         assertThrows(com.wms.common.BusinessException.class, () -> authController.wxRegister(new WxRegistrationRequest(ticket, "wx_customer_two", "customer123", "客户"), req()));
     }
+
+    @Test
+    void wxLoginWarehouseAppUsesNamespacedOpenid() {
+        // 作业端(app=warehouse)与商城端 openid 命名空间隔离：同一 code 在两端产生不同身份
+        var mallResp = authController.wxLogin(new WxLoginRequest("shared-code"));
+        assertTrue((Boolean) mallResp.data().get("needBind"));
+        var whResp = authController.wxLogin(new WxLoginRequest("shared-code", "warehouse"));
+        assertTrue((Boolean) whResp.data().get("needBind"));
+        // 作业端凭据绑定 operator 后，openid 带 wh: 前缀；商城端同一 code 仍是独立身份
+        authController.wxBind(new WxBindRequest((String) whResp.data().get("bindTicket"), "operator", "operator123"), req());
+        assertEquals("wh:shared-code", users.findByUsername("operator").orElseThrow().getOpenid());
+        assertTrue(users.findByOpenid("shared-code").isEmpty());
+        // 作业端再次登录免绑直登
+        var again = authController.wxLogin(new WxLoginRequest("shared-code", "warehouse"));
+        assertEquals(200, again.code());
+        assertEquals("operator", again.data().get("username"));
+    }
 }
