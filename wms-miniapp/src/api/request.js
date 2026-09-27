@@ -95,9 +95,10 @@ async function request(options) {
       'Content-Type': 'application/json',
       ...header,
     },
-    responseType: responseType || 'json',
     timeout: 15000,
   }
+  // wx.request 的 responseType 只接受 text/arraybuffer，传 'json' 属非法枚举，会导致部分基础库上回调不触发
+  if (responseType === 'arraybuffer') requestOptions.responseType = 'arraybuffer'
   const identity = requestIdentity(method, url, data)
   if (identity && !requestOptions.header['Idempotency-Key']) requestOptions.header['Idempotency-Key'] = identity.key
 

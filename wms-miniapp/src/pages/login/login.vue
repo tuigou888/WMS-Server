@@ -1,11 +1,14 @@
 <template>
   <view class="login-page">
-    <view class="login-card">
-      <view class="logo">
+    <view class="brand-hero">
+      <view class="logo-badge">
         <text class="logo-icon">📦</text>
-        <text class="logo-text">WMS 仓库管理</text>
       </view>
+      <text class="logo-text">WMS 仓库管理</text>
+      <text class="logo-sub">仓库进销存 · 工业效率作业台</text>
+    </view>
 
+    <view class="login-card">
       <view class="tabs">
         <view class="tab" :class="{ active: tab === 'wx' }" @tap="tab = 'wx'">微信一键登录</view>
         <view class="tab" :class="{ active: tab === 'pwd' }" @tap="tab = 'pwd'">账号密码登录</view>
@@ -190,45 +193,62 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(180deg, #f5f5f5 0%, #eef2f7 100%);
-  padding: 40rpx;
   box-sizing: border-box;
 }
 
+/* 品牌头部：主蓝渐变 */
+.brand-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 88rpx 48rpx 150rpx;
+  background: linear-gradient(135deg, var(--wms-primary), var(--wms-primary-deep));
+  border-radius: 0 0 40rpx 40rpx;
+  color: #fff;
+}
+.logo-badge {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 36rpx;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2rpx solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24rpx;
+}
+.logo-icon { font-size: 72rpx; line-height: 1; }
+.logo-text { font-size: 44rpx; font-weight: 600; color: #fff; letter-spacing: 2rpx; }
+.logo-sub { font-size: 24rpx; color: rgba(255, 255, 255, 0.75); letter-spacing: 4rpx; margin-top: 16rpx; }
+
+/* 表单上浮卡片 */
 .login-card {
   flex: 1;
-  background: #fff;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
   border-radius: 24rpx;
-  padding: 48rpx;
-  box-shadow: 0 8rpx 40rpx rgba(0,0,0,0.08);
+  margin: -100rpx 24rpx 0;
+  padding: 48rpx 32rpx;
+  box-shadow: 0 8rpx 32rpx rgba(31, 35, 41, 0.08);
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
-.logo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 48rpx;
-}
-.logo-icon { font-size: 96rpx; }
-.logo-text { font-size: 40rpx; font-weight: 600; color: #333; margin-top: 16rpx; }
-
 .tabs {
   display: flex;
   margin-bottom: 40rpx;
-  border-bottom: 2rpx solid #f0f0f0;
+  border-bottom: 2rpx solid var(--wms-border);
 }
 .tab {
   flex: 1;
   padding: 24rpx 0;
   text-align: center;
   font-size: 30rpx;
-  color: #999;
+  color: var(--wms-ink-3);
   position: relative;
 }
-.tab.active { color: #1677ff; font-weight: 600; }
+.tab.active { color: var(--wms-primary); font-weight: 600; }
 .tab.active::after {
   content: '';
   position: absolute;
@@ -236,7 +256,7 @@ export default {
   left: 25%;
   right: 25%;
   height: 4rpx;
-  background: #1677ff;
+  background: var(--wms-primary);
   border-radius: 2rpx;
 }
 
@@ -248,8 +268,11 @@ export default {
   min-height: 88rpx;
   padding: 0 24rpx;
   line-height: 88rpx;
-  background: #fff;
+  background: var(--wms-card);
 }
+
+.login-card .btn-primary,
+.login-card .btn-wx { width: 100%; }
 
 .login-success {
   position: fixed;
@@ -257,12 +280,13 @@ export default {
   bottom: 48rpx;
   left: 40rpx;
   z-index: 10;
-  padding: 20rpx 24rpx;
-  color: #2e7d32;
+  padding: 24rpx;
+  color: var(--wms-success);
   font-size: 26rpx;
-  background: #f1f8f3;
-  border: 2rpx solid #b7dfbf;
-  border-radius: 12rpx;
+  background: var(--wms-success-bg);
+  border: 2rpx solid var(--wms-success);
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(31, 35, 41, 0.08);
 }
 .login-home-link {
   display: block;
@@ -272,29 +296,38 @@ export default {
 }
 
 .wx-login { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40rpx 0; }
-.wx-tip { font-size: 24rpx; color: #999; margin-top: 24rpx; }
+.wx-tip { font-size: 24rpx; color: var(--wms-ink-3); margin-top: 24rpx; text-align: center; }
 
-.wx-bind .bind-info { font-size: 26rpx; color: #faad14; background: #fffbe6; padding: 20rpx; border-radius: 12rpx; margin-bottom: 32rpx; }
+.wx-bind .bind-info {
+  font-size: 26rpx;
+  color: var(--wms-warning);
+  background: var(--wms-warning-bg);
+  border-left: 6rpx solid var(--wms-warning);
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  margin-bottom: 32rpx;
+}
 
 .btn-wx {
-  width: 100%;
-  background: #07c160;
+  background: var(--wms-success);
   color: #fff;
   border: none;
   border-radius: 12rpx;
-  padding: 28rpx;
+  padding: 24rpx;
   font-size: 32rpx;
+  font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(82, 196, 26, 0.25);
 }
-.btn-wx:disabled { opacity: 0.7; }
+.btn-wx:disabled { opacity: 0.7; box-shadow: none; }
 
 .loading {
   width: 36rpx;
   height: 36rpx;
-  border: 4rpx solid rgba(255,255,255,0.3);
+  border: 4rpx solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -304,25 +337,25 @@ export default {
 .demo-accounts {
   margin-top: 40rpx;
   padding-top: 32rpx;
-  border-top: 2rpx solid #f0f0f0;
+  border-top: 2rpx solid var(--wms-border);
 }
-.demo-title { font-size: 24rpx; color: #999; display: block; margin-bottom: 16rpx; }
+.demo-title { font-size: 24rpx; color: var(--wms-ink-3); display: block; margin-bottom: 16rpx; }
 .demo-row { display: flex; gap: 24rpx; }
 .demo-item {
   flex: 1;
   padding: 16rpx;
-  background: #fafafa;
-  border: 2rpx dashed #d9d9d9;
+  background: var(--wms-bg);
+  border: 2rpx dashed var(--wms-border);
   border-radius: 12rpx;
   text-align: center;
   font-size: 24rpx;
-  color: #666;
+  color: var(--wms-ink-2);
 }
 
 .footer {
   text-align: center;
-  padding: 32rpx;
+  padding: 32rpx 24rpx;
   font-size: 24rpx;
-  color: #999;
+  color: var(--wms-ink-3);
 }
 </style>

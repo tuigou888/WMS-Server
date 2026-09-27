@@ -19,7 +19,7 @@
       </view>
 
       <!-- 今日看板 -->
-      <view v-if="dashboard" class="dashboard-card">
+      <view v-if="dashboard" class="card dashboard-card">
         <text class="section-title">今日概览</text>
         <view class="dashboard-grid">
           <view class="stat-item">
@@ -50,7 +50,7 @@
       </view>
 
       <!-- 功能菜单 -->
-      <view class="menu-section">
+      <view class="card menu-section">
         <text class="section-title">常用功能</text>
         <view class="menu-grid">
           <navigator v-for="item in menus" :key="item.key" :url="item.url" class="menu-item" hover-class="menu-item-hover">
@@ -61,7 +61,7 @@
       </view>
 
       <!-- 预警提示 -->
-      <view v-if="alerts && alerts.length > 0" class="alert-card">
+      <view v-if="alerts && alerts.length > 0" class="card alert-card">
         <view class="alert-header">
           <text class="section-title">库存预警</text>
           <navigator url="/pages/reports/reports" class="view-all">查看全部</navigator>
@@ -145,10 +145,8 @@ export default {
   },
   methods: {
     setContentHeight() {
-      const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
-      this.contentHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight
+      // windowHeight 已扣除原生导航栏与 tabBar，再减会多扣导致底部空白
+      this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadData(skipCache = false) {
       if (!this.userStore.isLoggedIn) return
@@ -195,97 +193,91 @@ export default {
 .index-page { height: 100vh; }
 .content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
+/* 欢迎卡：主蓝渐变 */
 .welcome-card {
-  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
-  border-radius: 24rpx;
-  margin: 24rpx;
-  padding: 40rpx;
+  background: linear-gradient(135deg, var(--wms-primary), var(--wms-primary-deep));
+  border-radius: 20rpx;
+  margin: 20rpx 24rpx;
+  padding: 40rpx 32rpx;
   color: #fff;
+  box-shadow: 0 4rpx 16rpx rgba(9, 88, 217, 0.25);
 }
-.welcome-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32rpx; }
-.greeting { font-size: 36rpx; font-weight: 500; }
+.welcome-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28rpx; }
+.greeting { font-size: 36rpx; font-weight: 600; }
 .role-badge { font-size: 22rpx; padding: 4rpx 16rpx; }
 
 .warehouse-selector {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
+  border: 2rpx solid rgba(255, 255, 255, 0.25);
   border-radius: 16rpx;
   padding: 24rpx 32rpx;
 }
 .warehouse-info { display: flex; flex-direction: column; }
-.warehouse-info .label { font-size: 24rpx; color: rgba(255,255,255,0.8); }
-.warehouse-info .value { font-size: 32rpx; font-weight: 500; }
-.arrow { font-size: 24rpx; color: rgba(255,255,255,0.6); }
+.warehouse-info .label { font-size: 24rpx; color: rgba(255, 255, 255, 0.75); margin-bottom: 8rpx; }
+.warehouse-info .value { font-size: 32rpx; font-weight: 600; color: #fff; }
+.arrow { font-size: 24rpx; color: rgba(255, 255, 255, 0.7); }
 
-.dashboard-card {
-  background: #fff;
-  border-radius: 24rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-}
+/* 白卡内区块标题贴顶 */
+.card .section-title { margin-top: 0; }
+
+/* 今日概览：六宫格数字突出 */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24rpx;
-  margin-top: 16rpx;
+  gap: 20rpx;
 }
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx;
-  background: #fafafa;
+  padding: 24rpx 12rpx;
+  background: var(--wms-bg);
   border-radius: 16rpx;
 }
-.stat-label { font-size: 24rpx; color: #999; }
-.stat-value { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
+.stat-label { font-size: 24rpx; color: var(--wms-ink-3); }
+.stat-value { font-size: 36rpx; font-weight: 600; margin-top: 8rpx; }
 
-.menu-section {
-  background: #fff;
-  border-radius: 24rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-}
+/* 常用功能 */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24rpx;
-  margin-top: 16rpx;
+  gap: 20rpx;
 }
 .menu-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32rpx 24rpx;
-  background: #fafafa;
-  border-radius: 20rpx;
+  padding: 28rpx 12rpx;
+  background: var(--wms-bg);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 16rpx;
   text-decoration: none;
 }
-.menu-item-hover { background: #e6f7ff; }
-.menu-icon { font-size: 56rpx; margin-bottom: 16rpx; }
-.menu-name { font-size: 26rpx; color: #333; text-align: center; }
+.menu-item-hover { background: var(--wms-primary-bg); border-color: var(--wms-primary); }
+.menu-icon { font-size: 56rpx; margin-bottom: 12rpx; }
+.menu-name { font-size: 26rpx; color: var(--wms-ink); font-weight: 500; text-align: center; }
 
-.alert-card {
-  background: #fff;
-  border-radius: 24rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-}
-.alert-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.view-all { font-size: 26rpx; color: #1677ff; }
-.alert-list { display: flex; flex-direction: column; gap: 20rpx; }
+/* 库存预警：顶部橙色警示条 + 预警项左侧橙条 */
+.alert-card { border-top: 6rpx solid var(--wms-accent); }
+.alert-header { display: flex; justify-content: space-between; align-items: center; }
+.alert-header .section-title { margin-bottom: 0; }
+.view-all { font-size: 26rpx; color: var(--wms-primary); }
+.alert-list { display: flex; flex-direction: column; gap: 16rpx; margin-top: 24rpx; }
 .alert-item {
   display: flex;
   justify-content: space-between;
+  gap: 16rpx;
   padding: 24rpx;
-  background: #fffbe6;
-  border: 2rpx solid #ffe58f;
-  border-radius: 16rpx;
+  background: var(--wms-warning-bg);
+  border-left: 6rpx solid var(--wms-accent);
+  border-radius: 12rpx;
 }
-.alert-main { display: flex; align-items: center; gap: 16rpx; flex: 1; }
-.alert-name { font-size: 26rpx; color: #333; }
-.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; }
-.footer { text-align: center; padding: 40rpx; font-size: 24rpx; color: #999; }
+.alert-main { display: flex; align-items: center; gap: 16rpx; flex: 1; flex-wrap: wrap; }
+.alert-name { font-size: 26rpx; color: var(--wms-ink); font-weight: 500; }
+.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; color: var(--wms-ink-2); }
+
+.footer { text-align: center; padding: 40rpx 24rpx; font-size: 24rpx; color: var(--wms-ink-3); }
 </style>

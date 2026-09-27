@@ -10,7 +10,7 @@
       </view>
 
       <view v-else class="list">
-        <view v-for="task in list" :key="task.id" class="task-card">
+        <view v-for="task in list" :key="task.id" class="card task-card">
           <view class="task-header">
             <view class="task-no">{{ task.stocktakeNo }}</view>
             <view class="task-status" :class="['badge', statusClass(task.status)]">{{ statusText(task.status) }}</view>
@@ -34,9 +34,9 @@
             </view>
           </view>
           <view class="task-actions">
-            <button v-if="task.status === 'DRAFT'" class="btn-count" @tap.stop="goCount(task.id)">录入实盘</button>
-            <button v-if="task.status === 'DRAFT'" class="btn-view" @tap.stop="viewDetail(task.id)">查看详情</button>
-            <button v-else class="btn-view" @tap.stop="viewDetail(task.id)">查看详情</button>
+            <button v-if="task.status === 'DRAFT'" class="btn-primary btn-flex" @tap.stop="goCount(task.id)">录入实盘</button>
+            <button v-if="task.status === 'DRAFT'" class="btn-secondary btn-flex" @tap.stop="viewDetail(task.id)">查看详情</button>
+            <button v-else class="btn-secondary btn-flex" @tap.stop="viewDetail(task.id)">查看详情</button>
           </view>
         </view>
       </view>
@@ -77,10 +77,8 @@ export default {
   },
   methods: {
     setContentHeight() {
-      const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
-      this.contentHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），无需再减
+      this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadList(reset = false) {
       if (reset) {
@@ -132,40 +130,46 @@ export default {
 </script>
 
 <style scoped>
-.check-page { background: #f5f5f5; min-height: 100vh; }
+.check-page { min-height: 100vh; }
 .content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
-.task-card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+/* 单据号 chip：蓝浅底 + 主蓝 + 等宽字体 */
+.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
+.task-no {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  font-family: monospace;
+  letter-spacing: 1rpx;
 }
-.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.task-no { font-size: 30rpx; font-weight: 600; color: #333; font-family: monospace; }
-.task-info { display: flex; flex-direction: column; gap: 12rpx; margin-bottom: 24rpx; }
+/* 信息区：分隔线拉开信息层级 */
+.task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  padding-top: 20rpx;
+  border-top: 2rpx solid var(--wms-border);
+  margin-bottom: 24rpx;
+}
 .info-row { display: flex; justify-content: space-between; font-size: 26rpx; }
-.info-row .label { color: #999; }
-.info-row text:last-child { color: #333; }
-.task-actions { display: flex; gap: 16rpx; }
-.btn-count, .btn-view {
-  flex: 1;
-  padding: 20rpx;
-  border-radius: 12rpx;
-  font-size: 28rpx;
-  border: none;
-}
-.btn-count { background: #52c41a; color: #fff; }
-.btn-view { background: #f0f0f0; color: #333; border: 2rpx solid #d9d9d9; }
+.info-row .label { color: var(--wms-ink-3); margin-bottom: 0; }
+.info-row text:last-child { color: var(--wms-ink); }
 
-.loading, .loading-more, .empty-state {
-  text-align: center;
-  padding: 60rpx;
-  color: #999;
+.task-actions { display: flex; gap: 16rpx; }
+.task-actions button {
+  flex: 1;
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
   font-size: 28rpx;
+  line-height: 1.6;
 }
+
+.loading, .loading-more { text-align: center; padding: 60rpx; color: var(--wms-ink-3); font-size: 28rpx; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
-.empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
-.hint { font-size: 24rpx; color: #ccc; }
+.empty-state text:first-child { font-size: 96rpx; }
+.hint { font-size: 24rpx; color: var(--wms-ink-3); }
 </style>

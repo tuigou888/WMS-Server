@@ -31,101 +31,135 @@ export default {
 </script>
 
 <style>
-/* 每个页面公共 css */
+/* ===== 设计令牌 · 工业效率风 v1（全局引用，改动需同步各页面） ===== */
 page {
-  background-color: #f5f5f5;
+  --wms-bg: #f3f5f8;          /* 页面底 · 冷工业灰 */
+  --wms-card: #ffffff;        /* 卡片面 */
+  --wms-border: #e5e8ec;      /* 分隔线/描边 */
+  --wms-ink: #1f2329;         /* 主文字 */
+  --wms-ink-2: #5c626b;       /* 次级文字 */
+  --wms-ink-3: #9aa0a8;       /* 弱化文字 */
+  --wms-primary: #1677ff;     /* 主蓝 */
+  --wms-primary-deep: #0958d9;
+  --wms-primary-bg: #e8f1fd;  /* 蓝浅底 */
+  --wms-success: #52c41a;
+  --wms-success-bg: #f0fae7;
+  --wms-warning: #faad14;
+  --wms-warning-bg: #fff8e6;
+  --wms-danger: #ff4d4f;
+  --wms-danger-bg: #fff1f0;
+  --wms-accent: #fa8c16;      /* 安全橙 · 仅预警/强调 */
+  background-color: var(--wms-bg);
+  color: var(--wms-ink);
+  font-size: 28rpx;
 }
 
-.text-center {
-  text-align: center;
-}
-
-.text-right {
-  text-align: right;
-}
-
+/* ===== 布局工具 ===== */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
 .mt-10 { margin-top: 20rpx; }
 .mt-20 { margin-top: 40rpx; }
 .mb-10 { margin-bottom: 20rpx; }
 .mb-20 { margin-bottom: 40rpx; }
-
 .flex { display: flex; }
 .flex-1 { flex: 1; }
 .items-center { align-items: center; }
 .justify-center { justify-content: center; }
 .justify-between { justify-content: space-between; }
 
+/* ===== 卡片 ===== */
 .card {
-  background: #fff;
-  border-radius: 16rpx;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
   padding: 32rpx;
-  margin: 20rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.08);
+  margin: 20rpx 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
 }
 
+/* ===== 按钮 ===== */
 .btn-primary {
-  background: #1677ff;
+  background: var(--wms-primary);
   color: #fff;
   border: none;
   border-radius: 12rpx;
   padding: 24rpx 48rpx;
   font-size: 32rpx;
+  font-weight: 500;
+  box-shadow: 0 4rpx 12rpx rgba(22, 119, 255, 0.25);
 }
-.btn-primary:disabled { opacity: 0.6; }
+.btn-primary:active { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.5; box-shadow: none; }
 
 .btn-secondary {
-  background: #fff;
-  color: #1677ff;
-  border: 2rpx solid #1677ff;
+  background: var(--wms-card);
+  color: var(--wms-primary);
+  border: 2rpx solid var(--wms-primary);
   border-radius: 12rpx;
-  padding: 24rpx 48rpx;
+  padding: 22rpx 48rpx;
   font-size: 32rpx;
+  font-weight: 500;
 }
+.btn-secondary:active { background: var(--wms-primary-bg); }
 
 .btn-danger {
-  background: #ff4d4f;
+  background: var(--wms-danger);
   color: #fff;
   border: none;
   border-radius: 12rpx;
   padding: 24rpx 48rpx;
   font-size: 32rpx;
+  font-weight: 500;
 }
+.btn-danger:active { opacity: 0.85; }
 
+/* ===== 表单 ===== */
 .input {
   width: 100%;
   padding: 24rpx;
-  border: 2rpx solid #d9d9d9;
+  border: 2rpx solid var(--wms-border);
   border-radius: 12rpx;
-  font-size: 32rpx;
+  font-size: 30rpx;
+  color: var(--wms-ink);
+  background: var(--wms-card);
   box-sizing: border-box;
 }
-
-.label { font-size: 28rpx; color: #666; margin-bottom: 12rpx; display: block; }
-.value { font-size: 32rpx; color: #333; }
+.label { font-size: 26rpx; color: var(--wms-ink-2); margin-bottom: 12rpx; display: block; }
+.value { font-size: 32rpx; color: var(--wms-ink); }
 .value-bold { font-weight: 600; }
-.value-red { color: #ff4d4f; }
-.value-green { color: #52c41a; }
+.value-red { color: var(--wms-danger); }
+.value-green { color: var(--wms-success); }
 
+/* ===== 状态徽标 ===== */
 .badge {
   display: inline-block;
   padding: 4rpx 16rpx;
-  border-radius: 24rpx;
+  border-radius: 8rpx;
   font-size: 24rpx;
+  font-weight: 500;
 }
-.badge-success { background: #f6ffed; color: #52c41a; border: 2rpx solid #b7eb8f; }
-.badge-warning { background: #fffbe6; color: #faad14; border: 2rpx solid #ffe58f; }
-.badge-error { background: #fff1f0; color: #ff4d4f; border: 2rpx solid #ffa39e; }
-.badge-info { background: #e6f7ff; color: #1677ff; border: 2rpx solid #91d5ff; }
-.badge-default { background: #f0f0f0; color: #666; border: 2rpx solid #d9d9d9; }
+.badge-success { background: var(--wms-success-bg); color: var(--wms-success); }
+.badge-warning { background: var(--wms-warning-bg); color: var(--wms-warning); }
+.badge-error { background: var(--wms-danger-bg); color: var(--wms-danger); }
+.badge-info { background: var(--wms-primary-bg); color: var(--wms-primary); }
+.badge-default { background: #f0f2f5; color: var(--wms-ink-3); }
 
-.divider { height: 2rpx; background: #f0f0f0; margin: 24rpx 0; }
+.divider { height: 2rpx; background: var(--wms-border); margin: 24rpx 0; }
 
-.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin: 32rpx 0 16rpx; }
+/* ===== 区块标题：蓝竖条 + 深色标题 ===== */
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--wms-ink);
+  border-left: 6rpx solid var(--wms-primary);
+  padding-left: 16rpx;
+  margin: 32rpx 0 16rpx;
+}
 
 .empty-state {
   padding: 80rpx 40rpx;
   text-align: center;
-  color: #999;
+  color: var(--wms-ink-3);
 }
 .empty-state image { width: 160rpx; height: 160rpx; margin-bottom: 24rpx; opacity: 0.6; }
 </style>

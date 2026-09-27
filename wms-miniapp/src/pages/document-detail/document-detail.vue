@@ -145,7 +145,7 @@
             </view>
             <view class="summary-item">
               <text class="summary-label">{{ doc.type === 'IN' || doc.type === 'RETURN_IN' ? '入库金额' : '出库金额' }}</text>
-              <text class="summary-value value-green">¥{{ formatMoney(doc.totalAmount) }}</text>
+              <text class="summary-value" :class="doc.type === 'IN' || doc.type === 'RETURN_IN' ? 'value-green' : 'value-red'">¥{{ formatMoney(doc.totalAmount) }}</text>
             </view>
           </view>
         </view>
@@ -167,7 +167,7 @@
               <view class="line-qty-row">
                 <text class="qty-label">数量: {{ formatNum(line.quantity) }}</text>
                 <text class="qty-label">单价: ¥{{ formatMoney(line.unitPrice) }}</text>
-                <text class="qty-label value-green">金额: ¥{{ formatMoney(line.lineAmount) }}</text>
+                <text class="qty-label" :class="doc.type === 'IN' || doc.type === 'RETURN_IN' ? 'value-green' : 'value-red'">金额: ¥{{ formatMoney(line.lineAmount) }}</text>
               </view>
             </view>
           </view>
@@ -209,9 +209,8 @@ export default {
   },
   methods: {
     setContentHeight() {
-      const sysInfo = uni.getSystemInfoSync()
-      const navBarHeight = sysInfo.statusBarHeight + 44
-      this.contentHeight = sysInfo.windowHeight - navBarHeight
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），无需再减
+      this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadDetail() {
       this.loading = true
@@ -271,55 +270,70 @@ export default {
 </script>
 
 <style scoped>
-.doc-detail-page { background: #f5f5f5; min-height: 100vh; }
+.doc-detail-page { min-height: 100vh; }
 .content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
-.card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+/* 卡片与区块标题直接复用全局 .card / .section-title，此处不再重复定义 */
+.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
+/* 单据号 chip：蓝浅底 + 主蓝 + 等宽字体 */
+.doc-no {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
+  font-family: monospace;
+  letter-spacing: 1rpx;
 }
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.doc-no { font-size: 32rpx; font-weight: 600; color: #333; font-family: monospace; }
-.header-info { display: flex; flex-direction: column; gap: 16rpx; }
+.header-info { display: flex; flex-direction: column; gap: 16rpx; padding-top: 20rpx; border-top: 2rpx solid var(--wms-border); }
 .info-row { display: flex; justify-content: space-between; font-size: 26rpx; }
-.info-row .label { color: #999; }
-.info-row text:last-child { color: #333; text-align: right; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.info-row .label { color: var(--wms-ink-3); margin-bottom: 0; }
+.info-row text:last-child { color: var(--wms-ink); text-align: right; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin-bottom: 24rpx; }
-
+/* 金额汇总：数字大号加粗 */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 24rpx;
+  gap: 20rpx;
 }
 .summary-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 32rpx 24rpx;
-  background: #fafafa;
+  padding: 28rpx 24rpx;
+  background: var(--wms-bg);
   border-radius: 16rpx;
 }
-.summary-label { font-size: 24rpx; color: #999; }
-.summary-value { font-size: 36rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
+.summary-label { font-size: 24rpx; color: var(--wms-ink-3); }
+.summary-value { font-size: 36rpx; font-weight: 700; color: var(--wms-ink); margin-top: 8rpx; font-family: monospace; }
+.summary-value.value-green { color: var(--wms-success); }
+.summary-value.value-red { color: var(--wms-danger); }
 
-.lines-list { display: flex; flex-direction: column; gap: 20rpx; }
-.line-item {
-  background: #fafafa;
-  border-radius: 16rpx;
-  padding: 24rpx;
+.lines-list { display: flex; flex-direction: column; gap: 16rpx; }
+.line-item { background: var(--wms-bg); border-radius: 16rpx; padding: 24rpx; }
+.line-header { display: flex; align-items: center; gap: 16rpx; margin-bottom: 12rpx; flex-wrap: wrap; }
+/* 物品编码 chip：蓝浅底 + 主蓝 + 等宽字体 */
+.line-code {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  font-family: monospace;
+  letter-spacing: 1rpx;
 }
-.line-header { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 8rpx; }
-.line-code { font-size: 24rpx; color: #1677ff; background: #e6f7ff; padding: 2rpx 12rpx; border-radius: 6rpx; }
-.line-name { font-size: 28rpx; font-weight: 500; color: #333; }
-.line-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; margin-bottom: 16rpx; flex-wrap: wrap; }
-.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
+.line-name { font-size: 28rpx; font-weight: 500; color: var(--wms-ink); flex: 1; min-width: 0; }
+.line-meta { display: flex; gap: 12rpx; font-size: 22rpx; color: var(--wms-ink-2); margin-bottom: 12rpx; flex-wrap: wrap; }
+.meta { background: var(--wms-card); border: 2rpx solid var(--wms-border); padding: 2rpx 12rpx; border-radius: 6rpx; }
 .line-qty-row { display: flex; gap: 32rpx; font-size: 24rpx; flex-wrap: wrap; }
-.qty-label { color: #666; }
+.qty-label { color: var(--wms-ink-3); }
+.qty-label.value-green { color: var(--wms-success); }
+.qty-label.value-red { color: var(--wms-danger); }
+/* 行尾关键数字突出 */
+.line-qty-row text:last-child { font-weight: 600; font-size: 26rpx; }
 .qty-diff { font-weight: 600; }
 
-.loading { text-align: center; padding: 80rpx; color: #999; }
+.loading { text-align: center; padding: 80rpx; color: var(--wms-ink-3); }
 </style>

@@ -83,7 +83,7 @@
       </view>
 
       <!-- 退出登录 -->
-      <button class="btn-logout" @tap="logout" :disabled="loggingOut">
+      <button class="btn-logout btn-danger" @tap="logout" :disabled="loggingOut">
         <text v-if="loggingOut" class="loading"></text>
         <text v-else>退出登录</text>
       </button>
@@ -132,10 +132,8 @@ export default {
   },
   methods: {
     setContentHeight() {
-      const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
-      this.contentHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight
+      // windowHeight 已扣除原生导航栏与 tabBar，再减会多扣导致底部空白
+      this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadMyLogs() {
       try {
@@ -184,112 +182,121 @@ export default {
 </script>
 
 <style scoped>
-.mine-page { background: #f5f5f5; min-height: 100vh; }
+.mine-page { min-height: 100vh; }
 .content { width: 100%; box-sizing: border-box; padding-bottom: 60rpx; }
 
+/* 用户信息：主蓝渐变头部卡 */
 .user-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 60rpx 40rpx;
-  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  margin: 20rpx 24rpx;
+  padding: 48rpx 32rpx;
+  background: linear-gradient(135deg, var(--wms-primary), var(--wms-primary-deep));
+  border-radius: 20rpx;
   color: #fff;
+  box-shadow: 0 4rpx 16rpx rgba(9, 88, 217, 0.25);
 }
 .user-avatar {
-  width: 160rpx;
-  height: 160rpx;
+  width: 144rpx;
+  height: 144rpx;
   border-radius: 50%;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
+  border: 2rpx solid rgba(255, 255, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 64rpx;
+  font-size: 60rpx;
   font-weight: 600;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
 }
-.user-name { font-size: 40rpx; font-weight: 600; margin-bottom: 12rpx; }
-.user-role { font-size: 26rpx; padding: 4rpx 20rpx; border-radius: 24rpx; background: rgba(255,255,255,0.2); }
-.role-admin { background: rgba(255,255,255,0.3); }
+.user-name { font-size: 38rpx; font-weight: 600; margin-bottom: 12rpx; }
+.user-role { font-size: 24rpx; padding: 6rpx 24rpx; border-radius: 999rpx; background: rgba(255, 255, 255, 0.2); }
+.role-admin { background: rgba(255, 255, 255, 0.32); }
 .user-perms {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 12rpx;
-  margin-top: 32rpx;
+  margin-top: 28rpx;
 }
-.perm-tag { font-size: 20rpx; background: rgba(255,255,255,0.15); padding: 4rpx 16rpx; border-radius: 20rpx; }
+.perm-tag { font-size: 20rpx; background: rgba(255, 255, 255, 0.15); padding: 4rpx 16rpx; border-radius: 999rpx; }
 
-.card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
-}
-.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin-bottom: 24rpx; }
+/* 卡片内区块标题贴顶（样式复用全局 .card / .section-title） */
+.card .section-title { margin-top: 0; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.view-all { font-size: 26rpx; color: #1677ff; }
+.section-header .section-title { margin-bottom: 0; }
+.view-all { font-size: 26rpx; color: var(--wms-primary); }
 
 .warehouse-selector {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 24rpx;
-  background: #fafafa;
+  background: var(--wms-bg);
+  border: 2rpx solid var(--wms-border);
   border-radius: 16rpx;
 }
 .ws-main { display: flex; align-items: center; gap: 24rpx; }
 .ws-icon { font-size: 48rpx; }
 .ws-info { display: flex; flex-direction: column; }
-.ws-name { font-size: 30rpx; font-weight: 500; color: #333; }
-.ws-code { font-size: 22rpx; color: #999; }
-.arrow { font-size: 24rpx; color: #999; }
+.ws-name { font-size: 30rpx; font-weight: 600; color: var(--wms-ink); }
+.ws-code { font-size: 22rpx; color: var(--wms-ink-3); margin-top: 4rpx; }
+.arrow { font-size: 24rpx; color: var(--wms-ink-3); }
 
-.menu-list { display: flex; flex-direction: column; gap: 16rpx; }
+/* 功能菜单：分隔线列表 */
+.menu-list { display: flex; flex-direction: column; }
 .menu-item {
   display: flex;
   align-items: center;
-  padding: 24rpx;
-  background: #fafafa;
-  border-radius: 16rpx;
+  padding: 28rpx 8rpx;
+  border-bottom: 2rpx solid var(--wms-border);
   text-decoration: none;
 }
-.menu-item-hover { background: #e6f7ff; }
+.menu-item:last-child { border-bottom: none; }
+.menu-item-hover { background: var(--wms-primary-bg); }
 .menu-icon { font-size: 40rpx; margin-right: 24rpx; }
-.menu-name { flex: 1; font-size: 30rpx; color: #333; }
-.menu-arrow { font-size: 24rpx; color: #999; }
+.menu-name { flex: 1; font-size: 30rpx; color: var(--wms-ink); }
+.menu-arrow { font-size: 24rpx; color: var(--wms-ink-3); }
 
+/* 我的操作记录 */
 .log-list { display: flex; flex-direction: column; gap: 16rpx; }
 .log-item {
   display: flex;
   justify-content: space-between;
-  padding: 20rpx;
-  background: #fafafa;
+  gap: 16rpx;
+  padding: 20rpx 24rpx;
+  background: var(--wms-bg);
   border-radius: 12rpx;
 }
 .log-main { display: flex; flex-direction: column; gap: 4rpx; min-width: 0; }
-.log-action { font-size: 26rpx; font-weight: 500; color: #333; }
-.log-target { font-size: 22rpx; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-action { font-size: 26rpx; font-weight: 500; color: var(--wms-ink); }
+.log-target { font-size: 22rpx; color: var(--wms-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 22rpx; }
-.log-time { color: #999; }
+.log-time { font-size: 22rpx; color: var(--wms-ink-3); }
 
 .about-list { display: flex; flex-direction: column; gap: 20rpx; }
-.about-row { display: flex; justify-content: space-between; font-size: 26rpx; color: #666; }
-.about-row text:last-child { color: #333; }
+.about-row { display: flex; justify-content: space-between; font-size: 26rpx; color: var(--wms-ink); }
+.about-row text:first-child { color: var(--wms-ink-2); }
+.about-row text:last-child { font-weight: 500; }
 
 .btn-logout {
-  width: calc(100% - 64rpx);
-  margin: 40rpx 32rpx;
-  background: #ff4d4f;
-  color: #fff;
-  border: none;
-  border-radius: 16rpx;
-  padding: 28rpx;
-  font-size: 32rpx;
+  width: calc(100% - 48rpx);
+  margin: 40rpx 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16rpx;
 }
 .btn-logout:disabled { opacity: 0.5; }
+
+.loading {
+  width: 36rpx;
+  height: 36rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

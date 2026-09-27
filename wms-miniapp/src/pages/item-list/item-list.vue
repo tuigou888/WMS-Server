@@ -3,7 +3,7 @@
     <!-- 搜索栏 -->
     <view class="search-bar">
       <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称/规格" @confirm="search" />
-      <button class="search-btn" @tap="search">搜索</button>
+      <button class="search-btn btn-primary" @tap="search">搜索</button>
     </view>
 
     <!-- 列表 -->
@@ -19,8 +19,8 @@
         <navigator v-for="item in list" :key="item.id" :url="`/pages/item-detail/item-detail?id=${item.id}`" class="list-item" hover-class="list-item-hover">
           <view class="item-main">
             <view class="item-header">
-              <text class="item-code">{{ item.code }}</text>
               <text class="item-name">{{ item.name }}</text>
+              <text class="item-code">{{ item.code }}</text>
             </view>
             <view class="item-meta">
               <text class="meta" v-if="item.categoryName">{{ item.categoryName }}</text>
@@ -94,11 +94,10 @@ export default {
   },
   methods: {
     setListHeight() {
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），只需再减页内搜索栏高度
       const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
       const searchHeight = 60
-      this.listHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight - searchHeight
+      this.listHeight = sysInfo.windowHeight - searchHeight
     },
     async search(reset = false) {
       if (reset) {
@@ -191,77 +190,113 @@ export default {
 </script>
 
 <style scoped>
-.item-list-page { background: #f5f5f5; min-height: 100vh; }
+.item-list-page { min-height: 100vh; }
 
+/* 搜索栏 */
 .search-bar {
   display: flex;
+  align-items: center;
   gap: 16rpx;
-  padding: 24rpx 32rpx;
-  background: #fff;
-  border-bottom: 2rpx solid #f0f0f0;
+  padding: 20rpx 24rpx;
+  background: var(--wms-card);
+  border-bottom: 2rpx solid var(--wms-border);
 }
 .search-input {
   flex: 1;
-  padding: 20rpx 28rpx;
-  border: 2rpx solid #d9d9d9;
+  height: 72rpx;
+  padding: 0 24rpx;
   border-radius: 12rpx;
-  font-size: 30rpx;
-  background: #fafafa;
+  font-size: 28rpx;
+  color: var(--wms-ink);
+  background: var(--wms-bg);
 }
 .search-btn {
-  background: #1677ff;
-  color: #fff;
-  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  height: 72rpx;
+  padding: 0 36rpx;
+  font-size: 28rpx;
   border-radius: 12rpx;
-  padding: 0 40rpx;
-  font-size: 30rpx;
+  box-shadow: 0 2rpx 8rpx rgba(22, 119, 255, 0.25);
 }
 
+/* 列表 */
 .list-container { width: 100%; box-sizing: border-box; }
-.list { padding: 16rpx 32rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.list { padding: 20rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 20rpx; }
 .list-item {
   display: flex;
   justify-content: space-between;
-  background: #fff;
-  border-radius: 16rpx;
+  align-items: center;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
   padding: 24rpx 28rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
   text-decoration: none;
 }
-.list-item-hover { background: #fafafa; }
+.list-item-hover { background: var(--wms-bg); }
 .item-main { flex: 1; min-width: 0; }
-.item-header { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 8rpx; }
-.item-code { font-size: 24rpx; color: #1677ff; background: #e6f7ff; padding: 2rpx 12rpx; border-radius: 6rpx; white-space: nowrap; }
-.item-name { font-size: 30rpx; font-weight: 500; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; flex-wrap: wrap; margin-bottom: 8rpx; }
-.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
-.item-stock { display: flex; align-items: center; gap: 12rpx; font-size: 24rpx; }
-.stock-label { color: #999; }
-.stock-value { font-weight: 600; color: #333; }
-.stock-cost { color: #1677ff; }
+.item-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; }
+.item-name { flex: 1; min-width: 0; font-size: 30rpx; font-weight: 600; color: var(--wms-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-code {
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  white-space: nowrap;
+}
+.item-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: var(--wms-ink-3); flex-wrap: wrap; margin-bottom: 12rpx; }
+.meta { line-height: 1.5; }
+.item-stock {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  padding-top: 12rpx;
+  border-top: 2rpx solid var(--wms-border);
+}
+.stock-label { font-size: 22rpx; color: var(--wms-ink-3); }
+.stock-value { font-size: 30rpx; font-weight: 600; color: var(--wms-ink); }
+.stock-cost { font-size: 24rpx; font-weight: 500; color: var(--wms-primary); }
 
-.item-qr { display: flex; align-items: center; justify-content: center; width: 88rpx; font-size: 40rpx; }
+.item-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72rpx;
+  height: 72rpx;
+  margin-left: 20rpx;
+  font-size: 36rpx;
+  background: var(--wms-primary-bg);
+  border-radius: 16rpx;
+}
 
 .loading, .loading-more, .empty-state {
   text-align: center;
   padding: 60rpx;
-  color: #999;
-  font-size: 28rpx;
+  color: var(--wms-ink-3);
+  font-size: 26rpx;
 }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
 .empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
 
+/* 二维码弹窗 */
 .qr-modal {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.6);
+  background: rgba(31, 35, 41, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
 .qr-content {
-  background: #fff;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
   border-radius: 24rpx;
   padding: 40rpx;
   width: 80%;
@@ -269,9 +304,9 @@ export default {
   text-align: center;
 }
 .qr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.qr-header text:first-child { font-size: 32rpx; font-weight: 600; }
-.qr-close { font-size: 40rpx; color: #999; }
+.qr-header text:first-child { font-size: 32rpx; font-weight: 600; color: var(--wms-ink); }
+.qr-close { font-size: 40rpx; color: var(--wms-ink-3); }
 .qr-image { width: 400rpx; height: 400rpx; }
-.qr-code { display: block; margin-top: 24rpx; font-size: 26rpx; color: #666; font-family: monospace; }
-.btn-save-qr { margin-top: 32rpx; background: #52c41a; color: #fff; border: none; border-radius: 12rpx; padding: 20rpx; }
+.qr-code { display: block; margin-top: 24rpx; font-size: 26rpx; font-weight: 600; letter-spacing: 1rpx; color: var(--wms-ink-2); font-family: monospace; }
+.btn-save-qr { margin-top: 32rpx; background: var(--wms-success); color: #fff; border: none; border-radius: 12rpx; padding: 20rpx; font-weight: 500; }
 </style>

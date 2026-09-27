@@ -7,7 +7,7 @@
       <view class="header-card">
         <view class="header-row">
           <text class="order-no">{{ order.stocktakeNo }}</text>
-          <text class="status-badge" :class="['badge', statusClass(order.status)]">{{ statusText(order.status) }}</text>
+          <text :class="['badge', statusClass(order.status)]">{{ statusText(order.status) }}</text>
         </view>
         <view class="header-info">
           <text>仓库: {{ order.warehouseName }}</text>
@@ -17,8 +17,8 @@
 
       <!-- 扫码录入 -->
       <view class="scan-section">
-        <button class="btn-scan" @tap="scanCode" :disabled="scanning || order.status !== 'DRAFT'">
-          <text v-if="scanning" class="loading"></text>
+        <button class="btn-primary btn-scan" @tap="scanCode" :disabled="scanning || order.status !== 'DRAFT'">
+          <text v-if="scanning" class="loading-sm"></text>
           <text v-else>📷  扫码录入实盘</text>
         </button>
         <text class="scan-hint" v-if="order.status !== 'DRAFT'">仅草稿状态可录入实盘数量</text>
@@ -56,7 +56,7 @@
               </view>
             </view>
             <view class="line-actions">
-              <button class="btn-save-line" @tap="saveLine(line)" :disabled="savingLineId === line.id">
+              <button class="btn-secondary btn-save-line" @tap="saveLine(line)" :disabled="savingLineId === line.id">
                 <text v-if="savingLineId === line.id" class="loading-sm"></text>
                 <text v-else>保存</text>
               </button>
@@ -67,8 +67,8 @@
 
       <!-- 底部操作 -->
       <view v-if="order.status === 'DRAFT'" class="bottom-actions">
-        <button class="btn-submit-count" @tap="submitAll" :disabled="submittingAll">
-          <text v-if="submittingAll" class="loading"></text>
+        <button class="btn-primary btn-submit-count" @tap="submitAll" :disabled="submittingAll">
+          <text v-if="submittingAll" class="loading-sm"></text>
           <text v-else>全部提交实盘数量</text>
         </button>
       </view>
@@ -226,105 +226,95 @@ export default {
 </script>
 
 <style scoped>
-.check-count-page { background: #f5f5f5; min-height: 100vh; padding-bottom: 160rpx; }
+.check-count-page { padding-bottom: 180rpx; }
 
-.loading { text-align: center; padding: 80rpx; color: #999; }
+.loading { text-align: center; padding: 80rpx; color: var(--wms-ink-3); font-size: 28rpx; }
 
 .header-card {
-  background: #fff;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
   border-radius: 20rpx;
   margin: 24rpx;
   padding: 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
 }
-.header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
-.order-no { font-size: 32rpx; font-weight: 600; color: #333; font-family: monospace; }
-.header-info { display: flex; gap: 32rpx; font-size: 26rpx; color: #666; }
+.header-row { display: flex; justify-content: space-between; align-items: center; gap: 16rpx; margin-bottom: 16rpx; }
+.order-no { font-size: 32rpx; font-weight: 600; color: var(--wms-ink); font-family: monospace; letter-spacing: 1rpx; }
+.header-info { display: flex; gap: 32rpx; font-size: 26rpx; color: var(--wms-ink-2); }
 
-.scan-section {
-  padding: 0 24rpx 24rpx;
-}
-.btn-scan {
-  width: 100%;
-  background: #1677ff;
-  color: #fff;
-  border: none;
-  border-radius: 16rpx;
-  padding: 32rpx;
-  font-size: 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-}
-.btn-scan:disabled { opacity: 0.5; background: #91d5ff; }
-.scan-hint { display: block; text-align: center; margin-top: 16rpx; font-size: 24rpx; color: #999; }
+.scan-section { padding: 0 24rpx; }
+.btn-scan { width: 100%; padding: 28rpx; display: flex; align-items: center; justify-content: center; gap: 16rpx; }
+.scan-hint { display: block; text-align: center; margin-top: 16rpx; font-size: 24rpx; color: var(--wms-ink-3); }
 
 .list-section { padding: 0 24rpx; }
-.list { display: flex; flex-direction: column; gap: 16rpx; }
+.list { display: flex; flex-direction: column; gap: 20rpx; }
 .line-item {
-  background: #fff;
-  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
   padding: 24rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
 }
-.line-main { flex: 1; }
-.line-header { display: flex; align-items: baseline; gap: 16rpx; margin-bottom: 8rpx; }
-.line-code { font-size: 24rpx; color: #1677ff; background: #e6f7ff; padding: 2rpx 12rpx; border-radius: 6rpx; }
-.line-name { font-size: 28rpx; font-weight: 500; color: #333; }
-.line-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; margin-bottom: 16rpx; }
-.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
+.line-main { flex: 1; min-width: 0; }
+.line-header { display: flex; align-items: center; gap: 12rpx; margin-bottom: 12rpx; flex-wrap: wrap; }
+.line-code {
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+}
+.line-name { font-size: 28rpx; font-weight: 600; color: var(--wms-ink); }
+.line-meta { display: flex; gap: 12rpx; font-size: 22rpx; color: var(--wms-ink-3); margin-bottom: 16rpx; flex-wrap: wrap; }
+.meta { background: var(--wms-bg); padding: 4rpx 14rpx; border-radius: 6rpx; }
 
 .line-qty { display: flex; flex-direction: column; gap: 12rpx; }
 .qty-row { display: flex; align-items: center; gap: 16rpx; font-size: 26rpx; }
-.qty-label { color: #999; width: 90rpx; }
-.qty-value { font-weight: 600; color: #333; }
-.qty-input { flex: 1; padding: 12rpx 20rpx; border: 2rpx solid #d9d9d9; border-radius: 8rpx; font-size: 26rpx; text-align: right; }
-.qty-unit { color: #999; font-size: 24rpx; }
-.qty-row.diff { padding-top: 8rpx; border-top: 2rpx dashed #f0f0f0; margin-top: 8rpx; }
-.qty-amt { font-size: 22rpx; color: #faad14; }
-
-.line-actions { display: flex; align-items: center; margin-left: 24rpx; }
-.btn-save-line {
-  background: #52c41a;
-  color: #fff;
-  border: none;
+.qty-label { color: var(--wms-ink-3); width: 90rpx; flex-shrink: 0; }
+.qty-value { font-weight: 600; font-size: 30rpx; color: var(--wms-ink); }
+.qty-input {
+  flex: 1;
+  padding: 14rpx 20rpx;
+  border: 2rpx solid var(--wms-border);
   border-radius: 8rpx;
-  padding: 12rpx 24rpx;
+  background: var(--wms-card);
+  font-size: 28rpx;
+  font-weight: 600;
+  text-align: right;
+  color: var(--wms-ink);
+  box-sizing: border-box;
+}
+.qty-row.diff { padding-top: 12rpx; border-top: 2rpx dashed var(--wms-border); margin-top: 4rpx; }
+
+.line-actions { display: flex; align-items: center; margin-left: 20rpx; flex-shrink: 0; }
+.btn-save-line {
+  padding: 12rpx 28rpx;
   font-size: 24rpx;
+  border-radius: 8rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8rpx;
 }
 .btn-save-line:disabled { opacity: 0.5; }
+.btn-save-line .loading-sm { border-color: var(--wms-primary-bg); border-top-color: var(--wms-primary); }
 
-.loading-sm { width: 24rpx; height: 24rpx; border: 4rpx solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+.loading-sm { width: 24rpx; height: 24rpx; border: 4rpx solid rgba(255, 255, 255, 0.35); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .bottom-actions {
   position: fixed;
   bottom: 0; left: 0; right: 0;
-  padding: 24rpx 32rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
-  background: #fff;
-  border-top: 2rpx solid #f0f0f0;
-  box-shadow: 0 -4rpx 20rpx rgba(0,0,0,0.05);
+  padding: 20rpx 24rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+  background: var(--wms-card);
+  border-top: 2rpx solid var(--wms-border);
+  box-shadow: 0 -4rpx 16rpx rgba(31, 35, 41, 0.06);
   z-index: 100;
 }
-.btn-submit-count {
-  width: 100%;
-  background: #1677ff;
-  color: #fff;
-  border: none;
-  border-radius: 16rpx;
-  padding: 28rpx;
-  font-size: 32rpx;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-}
-.btn-submit-count:disabled { opacity: 0.5; }
+.btn-submit-count { width: 100%; padding: 26rpx; display: flex; align-items: center; justify-content: center; gap: 16rpx; }
 </style>

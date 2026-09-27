@@ -32,8 +32,8 @@
               <text class="meta">{{ formatDate(doc.businessDate) }}</text>
             </view>
             <view class="item-stats">
-              <text class="stat">数量: {{ formatNum(doc.totalQuantity) }}</text>
-              <text class="stat value-green" v-if="doc.totalAmount !== null">金额: ¥{{ formatMoney(doc.totalAmount) }}</text>
+              <text class="stat">数量: <text class="stat-num">{{ formatNum(doc.totalQuantity) }}</text></text>
+              <text class="stat" v-if="doc.totalAmount !== null">金额: <text class="stat-num" :class="doc.type === 'IN' || doc.type === 'RETURN_IN' ? 'value-green' : 'value-red'">¥{{ formatMoney(doc.totalAmount) }}</text></text>
             </view>
           </view>
           <text class="arrow">▶</text>
@@ -84,11 +84,10 @@ export default {
   },
   methods: {
     setListHeight() {
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），只需再减页内筛选栏高度
       const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
       const filterHeight = 60
-      this.listHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight - filterHeight
+      this.listHeight = sysInfo.windowHeight - filterHeight
     },
     onTypeChange(e) {
       this.typeIndex = e.detail.value
@@ -190,53 +189,66 @@ export default {
 </script>
 
 <style scoped>
-.doc-list-page { background: #f5f5f5; min-height: 100vh; }
+.doc-list-page { min-height: 100vh; }
 
+/* 筛选栏：白底横条，选中值主蓝高亮 */
 .filter-bar {
   display: flex;
   gap: 16rpx;
-  padding: 16rpx 32rpx;
-  background: #fff;
-  border-bottom: 2rpx solid #f0f0f0;
+  padding: 16rpx 24rpx;
+  background: var(--wms-card);
+  border-bottom: 2rpx solid var(--wms-border);
 }
 .filter-picker { flex: 1; }
 .filter-item {
-  padding: 16rpx 24rpx;
-  background: #fafafa;
-  border: 2rpx solid #d9d9d9;
+  padding: 14rpx 24rpx;
+  background: var(--wms-bg);
+  border: 2rpx solid var(--wms-border);
   border-radius: 12rpx;
   font-size: 26rpx;
-  color: #666;
+  color: var(--wms-primary);
+  font-weight: 500;
   text-align: center;
 }
 
 .list-container { width: 100%; box-sizing: border-box; }
-.list { padding: 16rpx 32rpx 40rpx; display: flex; flex-direction: column; gap: 16rpx; }
+.list { padding: 20rpx 24rpx 40rpx; display: flex; flex-direction: column; gap: 20rpx; }
 .list-item {
   display: flex;
   justify-content: space-between;
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx 28rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
+  align-items: center;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
   text-decoration: none;
 }
-.list-item-hover { background: #fafafa; }
+.list-item-hover { background: var(--wms-bg); }
 .item-main { flex: 1; min-width: 0; }
-.item-header { display: flex; align-items: center; gap: 16rpx; margin-bottom: 8rpx; flex-wrap: wrap; }
-.doc-no { font-size: 28rpx; font-weight: 600; color: #333; font-family: monospace; }
-.item-meta { display: flex; gap: 20rpx; font-size: 22rpx; color: #999; flex-wrap: wrap; margin-bottom: 8rpx; }
-.meta { background: #f0f0f0; padding: 2rpx 12rpx; border-radius: 6rpx; }
-.item-stats { display: flex; gap: 24rpx; font-size: 24rpx; }
-.stat { color: #666; }
-.arrow { font-size: 24rpx; color: #999; margin-left: 24rpx; }
-
-.loading, .loading-more, .empty-state {
-  text-align: center;
-  padding: 60rpx;
-  color: #999;
-  font-size: 28rpx;
+.item-header { display: flex; align-items: center; gap: 16rpx; margin-bottom: 12rpx; flex-wrap: wrap; }
+/* 单据号 chip：蓝浅底 + 主蓝 + 等宽字体 */
+.doc-no {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  font-family: monospace;
+  letter-spacing: 1rpx;
 }
+.item-meta { display: flex; gap: 12rpx; font-size: 22rpx; color: var(--wms-ink-2); flex-wrap: wrap; margin-bottom: 12rpx; }
+.meta { background: var(--wms-bg); padding: 2rpx 12rpx; border-radius: 6rpx; }
+.item-stats { display: flex; gap: 24rpx; font-size: 24rpx; }
+.stat { color: var(--wms-ink-3); }
+/* 关键数字突出：加粗放大，入库绿/出库红 */
+.stat-num { color: var(--wms-ink); font-weight: 600; font-size: 26rpx; }
+.stat-num.value-green { color: var(--wms-success); }
+.stat-num.value-red { color: var(--wms-danger); }
+.arrow { font-size: 22rpx; color: var(--wms-ink-3); margin-left: 20rpx; }
+
+.loading, .loading-more { text-align: center; padding: 60rpx; color: var(--wms-ink-3); font-size: 28rpx; }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
-.empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
+.empty-state text:first-child { font-size: 96rpx; }
 </style>

@@ -36,7 +36,7 @@
         </view>
 
         <!-- 库存预警 -->
-        <view class="card" v-if="alerts && alerts.length > 0">
+        <view class="card alert-card" v-if="alerts && alerts.length > 0">
           <view class="section-header">
             <text class="section-title">库存预警 ({{ alerts.length }})</text>
             <navigator url="/pages/inventory/inventory" class="view-all">查看库存</navigator>
@@ -167,10 +167,8 @@ export default {
   },
   methods: {
     setContentHeight() {
-      const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
-      this.contentHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），无需再减
+      this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadAll() {
       this.loading = true
@@ -235,89 +233,94 @@ export default {
 </script>
 
 <style scoped>
-.reports-page { background: #f5f5f5; min-height: 100vh; }
+.reports-page { min-height: 100vh; }
 .content { width: 100%; box-sizing: border-box; padding-bottom: 40rpx; }
 
-.card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
-}
-.section-title { font-size: 30rpx; font-weight: 600; color: #333; margin-bottom: 24rpx; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24rpx; }
-.view-all { font-size: 26rpx; color: #1677ff; }
+/* 卡片与区块标题直接复用全局 .card / .section-title，此处不再重复定义 */
+/* 预警卡顶部安全橙条 */
+.alert-card { border-top: 6rpx solid var(--wms-accent); }
 
+.section-header { display: flex; justify-content: space-between; align-items: center; }
+.view-all { font-size: 26rpx; color: var(--wms-primary); }
+
+/* 看板：数字大号加粗 */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24rpx;
+  gap: 16rpx;
 }
 .stat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24rpx;
-  background: #fafafa;
+  padding: 24rpx 12rpx;
+  background: var(--wms-bg);
   border-radius: 16rpx;
 }
-.stat-label { font-size: 22rpx; color: #999; }
-.stat-value { font-size: 32rpx; font-weight: 600; color: #333; margin-top: 8rpx; }
+.stat-label { font-size: 22rpx; color: var(--wms-ink-3); }
+.stat-value { font-size: 32rpx; font-weight: 700; color: var(--wms-ink); margin-top: 8rpx; font-family: monospace; }
+.stat-value.value-green { color: var(--wms-success); }
+.stat-value.value-red { color: var(--wms-danger); }
 
+/* 预警条目：安全橙浅底强调 */
 .alert-list { display: flex; flex-direction: column; gap: 20rpx; }
 .alert-item {
   display: flex;
   justify-content: space-between;
+  gap: 16rpx;
   padding: 24rpx;
-  background: #fffbe6;
-  border: 2rpx solid #ffe58f;
+  background: var(--wms-warning-bg);
+  border: 2rpx solid var(--wms-warning);
   border-radius: 16rpx;
 }
-.alert-main { display: flex; align-items: center; gap: 16rpx; flex: 1; }
-.alert-name { font-size: 26rpx; color: #333; }
-.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; }
-.hint { font-size: 20rpx; color: #999; }
+.alert-main { display: flex; align-items: center; gap: 16rpx; flex: 1; flex-wrap: wrap; }
+.alert-name { font-size: 26rpx; color: var(--wms-ink); font-weight: 500; }
+.alert-detail { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; color: var(--wms-ink-2); }
+.hint { font-size: 20rpx; color: var(--wms-ink-3); }
 
-.tx-list, .profit-list, .top-items { display: flex; flex-direction: column; gap: 16rpx; }
+/* 表格类列表：去底色，行分隔线 */
+.tx-list, .profit-list, .top-items { display: flex; flex-direction: column; }
 .tx-row, .profit-row, .top-item {
   display: flex;
   align-items: center;
   gap: 20rpx;
-  padding: 20rpx;
-  background: #fafafa;
-  border-radius: 12rpx;
+  padding: 20rpx 0;
   font-size: 24rpx;
+  border-bottom: 2rpx solid var(--wms-border);
 }
-.tx-type { font-size: 20rpx; padding: 2rpx 12rpx; border-radius: 16rpx; font-weight: 500; min-width: 88rpx; text-align: center; }
-.type-in { background: #f6ffed; color: #52c41a; }
-.type-out { background: #fff1f0; color: #ff4d4f; }
-.type-transfer { background: #e6f7ff; color: #1677ff; }
-.type-adjust { background: #fffbe6; color: #faad14; }
-.type-check { background: #f9f0ff; color: #722ed1; }
-.tx-item { flex: 1; font-size: 24rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-row:last-child, .profit-row:last-child, .top-item:last-child { border-bottom: none; }
+.tx-type { font-size: 20rpx; padding: 4rpx 12rpx; border-radius: 8rpx; font-weight: 600; min-width: 88rpx; text-align: center; }
+.type-in { background: var(--wms-success-bg); color: var(--wms-success); }
+.type-out { background: var(--wms-danger-bg); color: var(--wms-danger); }
+.type-transfer { background: var(--wms-primary-bg); color: var(--wms-primary); }
+.type-adjust { background: var(--wms-warning-bg); color: var(--wms-warning); }
+.type-check { background: var(--wms-bg); color: var(--wms-ink-2); }
+.tx-item { flex: 1; font-size: 24rpx; color: var(--wms-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tx-qty { font-weight: 600; }
-.tx-time { color: #999; font-size: 22rpx; }
-.profit-month { min-width: 120rpx; font-weight: 500; }
-.profit-cost, .profit-sale { color: #666; font-size: 24rpx; }
+.tx-time { color: var(--wms-ink-3); font-size: 22rpx; }
+.profit-month { min-width: 120rpx; font-weight: 600; color: var(--wms-ink); }
+.profit-cost, .profit-sale { color: var(--wms-ink-2); font-size: 24rpx; }
 .profit-profit { font-weight: 600; }
-.top-rank { width: 56rpx; text-align: center; font-weight: 600; color: #1677ff; background: #e6f7ff; border-radius: 8rpx; }
+.top-rank { width: 56rpx; padding: 4rpx 0; text-align: center; font-weight: 700; color: var(--wms-primary); background: var(--wms-primary-bg); border-radius: 8rpx; }
 .top-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.top-name { font-size: 26rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.top-unit { font-size: 20rpx; color: #999; }
+.top-name { font-size: 26rpx; color: var(--wms-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-unit { font-size: 20rpx; color: var(--wms-ink-3); }
 .top-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; font-size: 24rpx; }
+.top-stats text:first-child { color: var(--wms-ink-2); }
+.top-stats text:last-child { font-weight: 600; }
 
-.category-list { display: flex; flex-direction: column; gap: 16rpx; }
+/* 分布条形图：主蓝进度条 */
+.category-list { display: flex; flex-direction: column; gap: 20rpx; }
 .category-row {
   display: flex;
   align-items: center;
   gap: 20rpx;
   font-size: 24rpx;
 }
-.cat-name { width: 160rpx; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cat-bar { flex: 1; height: 16rpx; background: #f0f0f0; border-radius: 8rpx; overflow: hidden; }
-.cat-fill { height: 100%; background: #1677ff; border-radius: 8rpx; transition: width 0.3s; }
-.cat-value { width: 140rpx; text-align: right; color: #666; font-family: monospace; }
+.cat-name { width: 160rpx; color: var(--wms-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-bar { flex: 1; height: 14rpx; background: var(--wms-bg); border-radius: 7rpx; overflow: hidden; }
+.cat-fill { height: 100%; background: var(--wms-primary); border-radius: 7rpx; transition: width 0.3s; }
+.cat-value { width: 150rpx; text-align: right; color: var(--wms-ink); font-weight: 600; font-family: monospace; }
 
-.loading { text-align: center; padding: 80rpx; color: #999; }
+.loading { text-align: center; padding: 80rpx; color: var(--wms-ink-3); }
 </style>

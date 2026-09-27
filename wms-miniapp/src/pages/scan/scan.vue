@@ -5,13 +5,14 @@
       <text class="scan-desc">扫描物品二维码/条形码，快速进入入库/出库/查询</text>
     </view>
 
-    <button class="btn-scan" @tap="scanCode" :disabled="scanning">
+    <button class="btn-primary btn-scan" @tap="scanCode" :disabled="scanning">
       <text v-if="scanning" class="loading"></text>
       <text v-else>📷  打开扫码</text>
     </button>
 
     <view v-if="lastScan" class="last-scan">
-      <text class="label">上次扫码: {{ lastScan }}</text>
+      <text class="label">上次扫码</text>
+      <text class="last-scan-code">{{ lastScan }}</text>
     </view>
 
     <view class="quick-actions">
@@ -96,67 +97,75 @@ export default {
 </script>
 
 <style scoped>
-.scan-page { padding: 40rpx; background: #f5f5f5; min-height: 100vh; box-sizing: border-box; }
-.scan-header { text-align: center; margin-bottom: 48rpx; }
-.scan-title { font-size: 44rpx; font-weight: 600; color: #333; display: block; margin-bottom: 16rpx; }
-.scan-desc { font-size: 28rpx; color: #999; }
+.scan-page { padding: 24rpx; box-sizing: border-box; }
 
-.btn-scan {
-  width: 100%;
-  background: #1677ff;
-  color: #fff;
-  border: none;
-  border-radius: 20rpx;
-  padding: 36rpx;
-  font-size: 36rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16rpx;
-  margin-bottom: 40rpx;
-}
-.btn-scan:disabled { opacity: 0.7; }
+.scan-header { text-align: center; margin: 16rpx 0 40rpx; }
+.scan-title { font-size: 44rpx; font-weight: 600; color: var(--wms-ink); display: block; margin-bottom: 12rpx; }
+.scan-desc { font-size: 26rpx; color: var(--wms-ink-3); }
+
+.btn-scan { width: 100%; padding: 30rpx; display: flex; align-items: center; justify-content: center; gap: 16rpx; margin-bottom: 24rpx; }
+
+.loading { width: 32rpx; height: 32rpx; border: 4rpx solid rgba(255, 255, 255, 0.35); border-top-color: #ffffff; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .last-scan {
-  text-align: center;
-  padding: 24rpx;
-  background: #e6f7ff;
-  border-radius: 16rpx;
-  margin-bottom: 48rpx;
-  font-size: 28rpx;
-}
-.last-scan .label { color: #1677ff; }
-
-.quick-actions { margin-bottom: 48rpx; }
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 24rpx;
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
+  padding: 28rpx 32rpx;
+  margin-bottom: 20rpx;
 }
+.last-scan .label { margin-bottom: 0; flex-shrink: 0; }
+.last-scan-code {
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: var(--wms-primary);
+  background: var(--wms-primary-bg);
+  padding: 8rpx 20rpx;
+  border-radius: 8rpx;
+  word-break: break-all;
+  text-align: right;
+}
+
+.quick-actions { margin-bottom: 20rpx; }
+.action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20rpx; }
 .action-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 40rpx 24rpx;
-  background: #fff;
+  background: var(--wms-card);
   border-radius: 20rpx;
   text-decoration: none;
-  border: 2rpx solid #f0f0f0;
+  border: 2rpx solid var(--wms-border);
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
 }
-.action-item-hover { background: #e6f7ff; border-color: #91d5ff; }
-.action-icon { font-size: 56rpx; margin-bottom: 16rpx; }
-.action-item text:last-child { font-size: 28rpx; color: #333; }
+.action-item-hover { background: var(--wms-primary-bg); border-color: var(--wms-primary); }
+.action-icon { font-size: 52rpx; margin-bottom: 12rpx; }
+.action-item text:last-child { font-size: 26rpx; color: var(--wms-ink); font-weight: 500; }
 
-.history-section { background: #fff; border-radius: 20rpx; padding: 32rpx; }
-.history-list { margin-top: 24rpx; }
+.history-section {
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
+  padding: 0 32rpx 8rpx;
+}
+.history-list { margin-top: 0; }
 .history-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24rpx;
-  border-bottom: 2rpx solid #f0f0f0;
+  padding: 26rpx 0;
+  border-bottom: 2rpx solid var(--wms-border);
 }
 .history-item:last-child { border-bottom: none; }
-.history-item text:first-child { font-size: 28rpx; color: #333; }
-.arrow { font-size: 24rpx; color: #999; }
+.history-item text:first-child { font-size: 28rpx; font-weight: 600; letter-spacing: 1rpx; color: var(--wms-ink); word-break: break-all; }
+.arrow { font-size: 22rpx; color: var(--wms-ink-3); flex-shrink: 0; margin-left: 16rpx; }
 </style>

@@ -3,7 +3,10 @@
     <!-- 筛选栏 -->
     <view class="filter-bar">
       <picker class="filter-picker" mode="selector" :range="typeOptions" :value="typeIndex" @change="onTypeChange">
-        <view class="filter-item">{{ typeOptions[typeIndex] }}</view>
+        <view class="filter-item">
+          <text class="filter-value">{{ typeOptions[typeIndex] }}</text>
+          <text class="filter-arrow">▾</text>
+        </view>
       </picker>
       <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称" @confirm="search" />
     </view>
@@ -18,20 +21,22 @@
       </view>
 
       <view v-else class="list">
-        <view v-for="tx in list" :key="tx.id" class="tx-item">
+        <view v-for="tx in list" :key="tx.id" class="tx-card">
           <view class="tx-header">
-            <text class="tx-type" :class="typeClass(tx.transactionType)">{{ typeText(tx.transactionType) }}</text>
+            <text class="tx-type badge" :class="typeClass(tx.transactionType)">{{ typeText(tx.transactionType) }}</text>
             <text class="tx-time">{{ formatDateTime(tx.transactionAt) }}</text>
           </view>
-          <view class="tx-main">
-            <text class="tx-item">{{ tx.itemName }} ({{ tx.itemCode }})</text>
-            <text class="tx-ref" v-if="tx.referenceNo">单据: {{ tx.referenceNo }}</text>
-          </view>
-          <view class="tx-qty">
-            <text class="qty" :class="tx.quantity > 0 ? 'value-green' : 'value-red'">
-              {{ tx.quantity > 0 ? '+' : '' }}{{ formatNum(tx.quantity) }}
-            </text>
-            <text class="balance">结存: {{ formatNum(tx.balanceQuantity) }}</text>
+          <view class="tx-body">
+            <view class="tx-main">
+              <text class="tx-name">{{ tx.itemName }} ({{ tx.itemCode }})</text>
+              <text class="tx-ref" v-if="tx.referenceNo">单据: {{ tx.referenceNo }}</text>
+            </view>
+            <view class="tx-qty">
+              <text class="qty" :class="tx.quantity > 0 ? 'value-green' : 'value-red'">
+                {{ tx.quantity > 0 ? '+' : '' }}{{ formatNum(tx.quantity) }}
+              </text>
+              <text class="balance">结存: {{ formatNum(tx.balanceQuantity) }}</text>
+            </view>
           </view>
           <view class="tx-amount" v-if="tx.transactionType === 'out'">
             <text class="amt">成本: ¥{{ formatMoney(tx.totalCostAmount) }}</text>
@@ -83,11 +88,10 @@ export default {
   },
   methods: {
     setListHeight() {
+      // windowHeight 已扣除原生导航栏（本页无 tabBar），只需再减页内筛选栏高度
       const sysInfo = uni.getSystemInfoSync()
-      const tabBarHeight = 50
-      const navBarHeight = sysInfo.statusBarHeight + 44
       const filterHeight = 60
-      this.listHeight = sysInfo.windowHeight - navBarHeight - tabBarHeight - filterHeight
+      this.listHeight = sysInfo.windowHeight - filterHeight
     },
     onTypeChange(e) {
       this.typeIndex = e.detail.value
@@ -138,69 +142,77 @@ export default {
 </script>
 
 <style scoped>
-.transactions-page { background: #f5f5f5; min-height: 100vh; }
+.transactions-page { min-height: 100vh; }
 
+/* 筛选栏 */
 .filter-bar {
   display: flex;
+  align-items: center;
   gap: 16rpx;
-  padding: 16rpx 32rpx;
-  background: #fff;
-  border-bottom: 2rpx solid #f0f0f0;
+  padding: 20rpx 24rpx;
+  background: var(--wms-card);
+  border-bottom: 2rpx solid var(--wms-border);
 }
 .filter-picker { width: 200rpx; }
 .filter-item {
-  padding: 16rpx 24rpx;
-  background: #fafafa;
-  border: 2rpx solid #d9d9d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 72rpx;
+  background: var(--wms-bg);
   border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #666;
-  text-align: center;
 }
+.filter-value { font-size: 26rpx; font-weight: 500; color: var(--wms-primary); }
+.filter-arrow { font-size: 20rpx; color: var(--wms-ink-3); }
 .search-input {
   flex: 1;
-  padding: 16rpx 24rpx;
-  border: 2rpx solid #d9d9d9;
+  height: 72rpx;
+  padding: 0 24rpx;
   border-radius: 12rpx;
   font-size: 26rpx;
-  background: #fafafa;
+  color: var(--wms-ink);
+  background: var(--wms-bg);
 }
 
-.list-container { width: 100%; box-sizing: border-box; padding: 16rpx 32rpx 40rpx; }
-.list { display: flex; flex-direction: column; gap: 16rpx; }
-.tx-item {
-  background: #fff;
-  border-radius: 16rpx;
-  padding: 24rpx;
-  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.04);
-}
-.tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12rpx; }
-.tx-type {
-  font-size: 22rpx;
-  padding: 4rpx 16rpx;
+/* 列表 */
+.list-container { width: 100%; box-sizing: border-box; padding: 20rpx 24rpx 40rpx; }
+.list { display: flex; flex-direction: column; gap: 20rpx; }
+.tx-card {
+  background: var(--wms-card);
+  border: 2rpx solid var(--wms-border);
   border-radius: 20rpx;
-  font-weight: 500;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 2rpx 8rpx rgba(31, 35, 41, 0.04);
 }
-.type-in { background: #f6ffed; color: #52c41a; border: 2rpx solid #b7eb8f; }
-.type-out { background: #fff1f0; color: #ff4d4f; border: 2rpx solid #ffa39e; }
-.type-transfer { background: #e6f7ff; color: #1677ff; border: 2rpx solid #91d5ff; }
-.type-adjust { background: #fffbe6; color: #faad14; border: 2rpx solid #ffe58f; }
-.type-check { background: #f9f0ff; color: #722ed1; border: 2rpx solid #d3adf7; }
-.tx-time { font-size: 22rpx; color: #999; }
-.tx-main { margin-bottom: 16rpx; }
-.tx-item { font-size: 28rpx; font-weight: 500; color: #333; display: block; margin-bottom: 4rpx; }
-.tx-ref { font-size: 22rpx; color: #999; display: block; }
-.tx-qty { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8rpx; font-size: 26rpx; }
-.qty { font-weight: 600; }
-.balance { font-size: 24rpx; color: #999; }
-.tx-amount, .tx-cost { display: flex; gap: 24rpx; font-size: 24rpx; }
-.amt { color: #666; }
+.tx-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16rpx; }
+.tx-time { font-size: 22rpx; color: var(--wms-ink-3); }
+.type-in { background: var(--wms-success-bg); color: var(--wms-success); }
+.type-out { background: var(--wms-danger-bg); color: var(--wms-danger); }
+.type-transfer { background: var(--wms-primary-bg); color: var(--wms-primary); }
+.type-adjust { background: var(--wms-warning-bg); color: var(--wms-warning); }
+.type-check { background: var(--wms-bg); color: var(--wms-ink-2); }
+.tx-body { display: flex; justify-content: space-between; align-items: flex-start; gap: 24rpx; margin-bottom: 16rpx; }
+.tx-main { flex: 1; min-width: 0; }
+.tx-name { display: block; font-size: 28rpx; font-weight: 600; color: var(--wms-ink); margin-bottom: 6rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-ref { font-size: 22rpx; color: var(--wms-ink-3); display: block; }
+.tx-qty { display: flex; flex-direction: column; align-items: flex-end; gap: 4rpx; flex-shrink: 0; }
+.qty { font-size: 32rpx; font-weight: 600; }
+.balance { font-size: 22rpx; color: var(--wms-ink-3); }
+.tx-amount, .tx-cost {
+  display: flex;
+  gap: 24rpx;
+  font-size: 24rpx;
+  color: var(--wms-ink-2);
+  padding-top: 16rpx;
+  border-top: 2rpx solid var(--wms-border);
+}
 
 .loading, .loading-more, .empty-state {
   text-align: center;
   padding: 60rpx;
-  color: #999;
-  font-size: 28rpx;
+  color: var(--wms-ink-3);
+  font-size: 26rpx;
 }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; }
 .empty-state text:first-child { font-size: 96rpx; opacity: 0.5; }
