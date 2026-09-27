@@ -2,7 +2,8 @@
   <view class="page">
     <view v-if="!product" class="empty"><text>商品不存在</text></view>
     <view v-else class="product-detail">
-      <image class="detail-img" :src="product.mainImage || defaultImg" mode="aspectFill" />
+      <image v-if="product.mainImage" class="detail-img" :src="product.mainImage" mode="aspectFill" />
+      <view v-else class="detail-img img-holder"><text class="img-holder-icon">📦</text></view>
       <view class="detail-body">
         <text class="product-sku-title">{{ product.title }}</text>
         <view class="flex mb-10">
@@ -68,7 +69,7 @@ import { formatPrice } from '@/utils/format.js'
 
 export default {
     data() {
-      return { product: null, defaultImg: '', isAdding: false, favorited: false }
+      return { product: null, isAdding: false, favorited: false }
     },
   onLoad(opt) {
     const id = opt && opt.id
@@ -151,10 +152,10 @@ export default {
 .label { width: 140rpx; color: #999; font-size: 26rpx; }
 .value { flex: 1; color: #333; font-size: 26rpx; }
 .price-section {
-  display: flex; align-items: baseline; gap: 8rpx; padding: 30rpx 0;
+  display: flex; align-items: baseline; padding: 30rpx 0;
   border-top: 1rpx solid #f0f0f0; margin-top: 20rpx;
 }
-.price-symbol { font-size: 40rpx; color: #ff4d4f; font-weight: 700; }
+.price-symbol { font-size: 40rpx; color: #ff4d4f; font-weight: 700; margin-right: 8rpx; }
 .price { font-size: 56rpx; color: #333; font-weight: 700; }
 .price-tag { margin-left: auto; }
 .price-mid { color: #999; text-decoration: line-through; font-size: 28rpx; }

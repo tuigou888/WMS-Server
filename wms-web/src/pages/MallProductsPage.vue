@@ -20,6 +20,10 @@ const formState = ref({ ...emptyForm })
 const items = ref([])
 const itemMap = ref({})
 const categories = ref([])
+const catModalOpen = ref(false)
+const catFormOpen = ref(false)
+const catEditing = ref(null)
+const catForm = ref({ name: '', sortOrder: 0, status: true })
 
 const load = async () => {
   loading.value = true
@@ -34,6 +38,12 @@ const load = async () => {
   }
 }
 
+const loadCategories = async () => {
+  try {
+    categories.value = await api.marketCategories()
+  } catch (e) { /* 分类加载失败不阻塞 */ }
+}
+
 onMounted(async () => {
   load()
   try {
@@ -43,10 +53,7 @@ onMounted(async () => {
   } catch (e) {
     message.error(e.message)
   }
-  try {
-    categories.value = await api.categories()
-  } catch (e) { /* 分类加载失败不阻塞 */
-  }
+  loadCategories()
 })
 
 const open = (record) => {
@@ -62,6 +69,51 @@ const onItemChange = (itemId) => {
     formState.value.categoryId = it.category.id
   }
 }
+
+const openCatManager = () => {
+  catModalOpen.value = true
+  catFormOpen.value = false
+  loadCategories()
+}
+
+const openCatForm = (c) => {
+  catEditing.value = c || null
+  catForm.value = c ? { name: c.name, sortOrder: c.sortOrder, status: c.status !== false } : { name: '', sortOrder: 0, status: true }
+  catFormOpen.value = true
+}
+
+const saveCategory = async () => {
+  if (!catForm.value.name.trim()) { message.error('分类名称不能为空'); return }
+  try {
+    if (catEditing.value) await api.updateMarketCategory(catEditing.value.id, catForm.value)
+    else await api.createMarketCategory(catForm.value)
+    message.success(catEditing.value ? '分类已更新' : '分类已新增')
+    catFormOpen.value = false
+    loadCategories()
+  } catch (e) {
+    message.error(e.message)
+  }
+}
+
+const removeCategory = (c) => {
+  api.deleteMarketCategory(c.id)
+    .then(() => { message.success('已删除'); loadCategories() })
+    .catch((e) => message.error(e.message))
+}
+
+const catColumns = [
+  { title: '名称', dataIndex: 'name' },
+  { title: '排序', dataIndex: 'sortOrder', width: 80 },
+  { title: '状态', dataIndex: 'status', width: 90, render: (v) => h(Tag, { color: v ? 'green' : 'default' }, v ? '启用' : '停用') },
+  {
+    title: '操作', width: 140,
+    render: (_, r) => h(Space, [
+      h(Button, { type: 'link', size: 'small', icon: h(EditOutlined), onClick: () => openCatForm(r) }, '编辑'),
+      h(Popconfirm, { title: '确认删除该分类？', onConfirm: () => removeCategory(r) },
+        { default: () => h(Button, { type: 'link', size: 'small', danger: true, icon: h(DeleteOutlined) }, '删除') }),
+    ]),
+  },
+]
 
 const save = async () => {
   const values = { ...formState.value, salePrice: Number(formState.value.salePrice), marketPrice: Number(formState.value.marketPrice), sortNo: Number(formState.value.sortNo || 0) }
@@ -117,7 +169,10 @@ const columns = [
       <Typography.Title :level="3" class="page-title">商城商品</Typography.Title>
       <Typography.Text class="page-subtitle" type="secondary">管理小程序商城商品、售价与上下架</Typography.Text>
     </div>
-    <Button type="primary" :icon="h(PlusOutlined)" @click="open()">新增商品</Button>
+    <Space>
+      <Button @click="openCatManager">管理分类</Button>
+      <Button type="primary" :icon="h(PlusOutlined)" @click="open()">新增商品</Button>
+    </Space>
   </div>
 
   <Card class="table-card">
@@ -148,10 +203,24 @@ const columns = [
       <div class="grid-2">
         <a-form-item label="排序（越小越靠前）"><a-input-number v-model:value="formState.sortNo" style="width: 100%;" /></a-form-item>
         <a-form-item label="分类">
-          <a-select v-model:value="formState.categoryId" allow-clear placeholder="选择分类" :options="categories.map((c) => ({ value: c.id, label: c.name }))" />
+          <a-select v-model:value="formState.categoryId" allow-clear placeholder="选择分类" :options="categories.filter((c) => c.status !== false).map((c) => ({ value: c.id, label: c.name }))" />
         </a-form-item>
       </div>
     </a-form>
+  </a-modal>
+
+  <a-modal v-model:open="catModalOpen" title="商品分类管理" :footer="null" width="560">
+    <div style="margin-bottom: 12px;">
+      <Button v-if="!catFormOpen" type="primary" size="small" :icon="h(PlusOutlined)" @click="openCatForm()">新增分类</Button>
+    </div>
+    <Space v-if="catFormOpen" style="margin-bottom: 12px;" wrap>
+      <a-input v-model:value="catForm.name" placeholder="分类名称" style="width: 160px;" @press-enter="saveCategory" />
+      <a-input-number v-model:value="catForm.sortOrder" :min="0" style="width: 100px;" placeholder="排序" />
+      <span><a-switch v-model:checked="catForm.status" checked-children="启用" un-checked-children="停用" /></span>
+      <Button type="primary" size="small" @click="saveCategory">保存</Button>
+      <Button size="small" @click="catFormOpen = false">取消</Button>
+    </Space>
+    <a-table row-key="id" size="small" :data-source="categories" :columns="normalizeColumns(catColumns)" :pagination="false" />
   </a-modal>
 </template>
 

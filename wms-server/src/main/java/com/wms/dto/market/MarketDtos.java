@@ -31,6 +31,13 @@ public final class MarketDtos {
     /** 上/下架操作。 */
     public record MarketShelfRequest(@NotBlank(message = "状态不能为空") String status) {}
 
+    /** 创建/更新商品分类（复用 WMS categories 表）。 */
+    public record MarketCategoryRequest(
+            @NotBlank(message = "分类名称不能为空") @Size(max = 50) String name,
+            Integer sortOrder,
+            Boolean status
+    ) {}
+
     /** 加入购物车。 */
     public record MarketCartAddRequest(@NotNull(message = "商品不能为空") Long productId, Integer quantity) {}
 

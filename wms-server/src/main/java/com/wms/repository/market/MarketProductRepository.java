@@ -15,6 +15,7 @@ public interface MarketProductRepository extends JpaRepository<MarketProduct, Lo
     Optional<MarketProduct> findByItemId(Long itemId);
     boolean existsByItemId(Long itemId);
     boolean existsByTitle(String title);
+    boolean existsByCategoryId(Long categoryId);
 
     @Query("select p from MarketProduct p join fetch p.item item left join fetch item.category left join fetch p.category where p.status = 'SHELF_ON'")
     List<MarketProduct> findAllShelfOn();

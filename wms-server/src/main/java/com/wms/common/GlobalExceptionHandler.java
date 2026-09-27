@@ -60,6 +60,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiResponse.error(400, "参数格式错误"));
     }
 
+    /** 请求路径无对应 handler（落到静态资源处理器）：按 404 返回，避免误导成服务端 500。 */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> notFound(org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        return ResponseEntity.status(404).body(ApiResponse.error(404, "接口不存在"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> unknown(Exception e) {
         log.error("未处理异常", e);

@@ -83,12 +83,16 @@ page {
 
 .input {
   width: 100%;
-  padding: 20rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 24rpx;
   border: 1rpx solid #d9d9d9;
   border-radius: 8rpx;
   font-size: 28rpx;
   box-sizing: border-box;
 }
+/* textarea 为多行输入，恢复垂直内边距与正常行高（高度由页面样式覆盖） */
+textarea.input { line-height: 1.5; padding: 20rpx 24rpx; }
 
 .label { font-size: 24rpx; color: #999; margin-bottom: 12rpx; display: block; }
 .value { font-size: 28rpx; color: #333; }
@@ -99,8 +103,9 @@ page {
 .text-muted { color: #999; font-size: 24rpx; }
 
 .row { display: flex; margin-bottom: 24rpx; }
-.row > * { flex: 1; }
-.row > * + * { margin-left: 16rpx; }
+/* WXSS 不支持通配符选择器 *，改用实际会用到的子元素选择器 */
+.row > view, .row > text { flex: 1; }
+.row > view + view, .row > view + text, .row > text + view, .row > text + text { margin-left: 16rpx; }
 
 .divider { height: 1rpx; background: #f0f0f0; margin: 24rpx 0; }
 
@@ -130,4 +135,8 @@ page {
 .price-symbol { font-size: 22rpx; }
 .price-integer { font-size: 36rpx; }
 .price-decimal { font-size: 22rpx; }
+
+/* 无图占位：浅灰底 + 图标居中，尺寸随调用处的同名 class（.p-img/.item-img 等） */
+.img-holder { display: flex; align-items: center; justify-content: center; background: #eef1f5; }
+.img-holder-icon { font-size: 60rpx; opacity: 0.35; }
 </style>

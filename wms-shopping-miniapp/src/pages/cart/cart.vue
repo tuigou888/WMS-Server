@@ -3,7 +3,8 @@
     <view v-if="items.length" class="cart-list">
       <view class="cart-item" v-for="c in items" :key="c.id">
         <view class="item-left" @tap="goProduct(c.product.id)">
-          <image class="item-img" :src="c.product.mainImage || defaultImg" mode="aspectFill" />
+          <image v-if="c.product.mainImage" class="item-img" :src="c.product.mainImage" mode="aspectFill" />
+          <view v-else class="item-img img-holder"><text class="img-holder-icon">📦</text></view>
           <view class="item-info">
             <text class="item-title">{{ c.product.title }}</text>
             <text class="item-meta">¥{{ money(c.snapshotPrice) }}</text>
@@ -39,7 +40,7 @@ import { useCartStore } from '@/store/cart.js'
 import { formatPrice as money } from '@/utils/format.js'
 
 export default {
-  data() { return { defaultImg: '', items: [], total: 0 } },
+  data() { return { items: [], total: 0 } },
   onShow() { this.$store = useCartStore(); this.load() },
   methods: {
     money,

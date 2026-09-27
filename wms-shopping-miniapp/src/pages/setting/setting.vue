@@ -2,8 +2,8 @@
   <view class="page">
     <view class="card">
       <view class="menu-item"><text>服务器地址</text><text class="muted">{{ baseUrl }}</text></view>
-      <view class="menu-item" @tap="editBase"><text>修改服务器地址</text><text class="arrow">></text></view>
-      <view class="menu-item" @tap="clearRedis"><text>清除本地缓存</text><text class="arrow">></text></view>
+      <view class="menu-item" @tap="editBase"><text>修改服务器地址</text><view class="arrow"></view></view>
+      <view class="menu-item" @tap="clearRedis"><text>清除本地缓存</text><view class="arrow"></view></view>
     </view>
   </view>
 </template>
@@ -27,5 +27,5 @@ export default {
 <style scoped>
 .menu-item { display: flex; justify-content: space-between; padding: 28rpx 0; border-bottom: 1rpx solid #f0f0f0; font-size: 28rpx; }
 .muted { color: #999; font-size: 24rpx; }
-.arrow { color: #ccc; }
+.arrow { width: 18rpx; height: 18rpx; border-top: 4rpx solid #ccc; border-right: 4rpx solid #ccc; transform: rotate(45deg); margin-left: 8rpx; }
 </style>

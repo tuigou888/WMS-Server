@@ -4,12 +4,14 @@ import com.wms.common.ApiResponse;
 import com.wms.common.BusinessException;
 import com.wms.dto.market.MarketDtos.MarketProductRequest;
 import com.wms.dto.market.MarketDtos.MarketShelfRequest;
+import com.wms.dto.market.MarketDtos.MarketCategoryRequest;
 import com.wms.dto.market.MarketDtos.MarketOrderAuditRequest;
 import com.wms.dto.market.MarketDtos.MarketOrderShipRequest;
 import com.wms.dto.market.MarketDtos.MarketCustomerRequest;
 import com.wms.model.entity.UserAccount;
 import com.wms.model.entity.market.*;
 import com.wms.repository.market.*;
+import com.wms.repository.CategoryRepository;
 import com.wms.security.Permissions;
 import com.wms.security.SecurityUtils;
 import com.wms.service.market.MarketService;
@@ -32,6 +34,7 @@ public class MarketAdminController {
     private final MarketCustomerRepository customers;
     private final MarketOrderLogRepository orderLogs;
     private final com.wms.repository.UserAccountRepository users;
+    private final CategoryRepository categories;
     private final WarehouseAccessService warehouseAccess;
 
     public MarketAdminController(MarketService service,
@@ -40,10 +43,12 @@ public class MarketAdminController {
                                  MarketCustomerRepository customers,
                                  MarketOrderLogRepository orderLogs,
                                  com.wms.repository.UserAccountRepository users,
+                                 CategoryRepository categories,
                                  WarehouseAccessService warehouseAccess) {
         this.service = service; this.products = products;
         this.orders = orders; this.customers = customers;
         this.orderLogs = orderLogs; this.users = users;
+        this.categories = categories;
         this.warehouseAccess = warehouseAccess;
     }
 
@@ -94,6 +99,41 @@ public class MarketAdminController {
         SecurityUtils.require(Permissions.PRODUCT_WRITE);
         service.deleteProduct(id);
         return ApiResponse.ok("已删除", null);
+    }
+
+    // ==================== 分类管理（含停用分类，供后台维护） ====================
+    @GetMapping("/categories")
+    public ApiResponse<List<Map<String, Object>>> categoryList() {
+        SecurityUtils.require(Permissions.PRODUCT_READ);
+        return ApiResponse.ok(categories.findAllByOrderBySortOrderAscIdAsc().stream()
+                .map(MarketAdminController::categoryView).toList());
+    }
+
+    @com.wms.security.Idempotent @PostMapping("/categories")
+    public ApiResponse<Map<String, Object>> createCategory(@Valid @RequestBody MarketCategoryRequest req) {
+        SecurityUtils.require(Permissions.PRODUCT_WRITE);
+        return ApiResponse.ok("创建成功", categoryView(service.saveCategory(req)));
+    }
+
+    @PutMapping("/categories/{id}")
+    public ApiResponse<Map<String, Object>> updateCategory(@PathVariable Long id,
+                                                            @Valid @RequestBody MarketCategoryRequest req) {
+        SecurityUtils.require(Permissions.PRODUCT_WRITE);
+        return ApiResponse.ok("更新成功", categoryView(service.updateCategory(id, req)));
+    }
+
+    @DeleteMapping("/categories/{id}")
+    public ApiResponse<Void> deleteCategory(@PathVariable Long id) {
+        SecurityUtils.require(Permissions.PRODUCT_WRITE);
+        service.deleteCategory(id);
+        return ApiResponse.ok("已删除", null);
+    }
+
+    private static Map<String, Object> categoryView(com.wms.model.entity.Category c) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", c.getId()); m.put("name", c.getName());
+        m.put("sortOrder", c.getSortOrder()); m.put("status", c.getStatus());
+        return m;
     }
 
     // ==================== 订单管理 ====================

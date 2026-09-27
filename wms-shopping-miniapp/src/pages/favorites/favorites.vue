@@ -2,7 +2,8 @@
   <view class="page">
     <view v-if="list.length" class="fav-grid">
       <view class="fav-card" v-for="p in list" :key="p.id">
-        <image class="f-img" :src="p.mainImage || ''" mode="aspectFill" @tap="goProduct(p.id)" />
+        <image v-if="p.mainImage" class="f-img" :src="p.mainImage" mode="aspectFill" @tap="goProduct(p.id)" />
+        <view v-else class="f-img img-holder" @tap="goProduct(p.id)"><text class="img-holder-icon">📦</text></view>
         <text class="f-title">{{ p.title }}</text>
         <view class="f-foot">
           <text class="f-price">¥{{ money(p.salePrice) }}</text>
@@ -54,14 +55,14 @@ export default {
 </script>
 
 <style scoped>
-.fav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20rpx; padding: 20rpx; }
-.fav-card { background: #fff; border-radius: 12rpx; padding: 20rpx; }
+.fav-grid { display: flex; flex-wrap: wrap; justify-content: space-between; padding: 20rpx; }
+.fav-card { width: 49%; margin-bottom: 20rpx; background: #fff; border-radius: 12rpx; padding: 20rpx; box-sizing: border-box; }
 .f-img { width: 100%; height: 260rpx; border-radius: 8rpx; background: #f0f0f0; }
 .f-title { font-size: 26rpx; color: #333; margin: 12rpx 0; display: block; }
 .f-foot { display: flex; justify-content: space-between; align-items: center; }
 .f-price { font-size: 30rpx; color: #ff4d4f; font-weight: 700; }
-.f-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8rpx; }
+.f-actions { display: flex; flex-direction: column; align-items: flex-end; }
 .f-add { font-size: 22rpx; color: #1677ff; }
-.f-del { font-size: 22rpx; color: #999; }
+.f-del { font-size: 22rpx; color: #999; margin-top: 8rpx; }
 .empty { padding: 100rpx; text-align: center; color: #999; }
 </style>

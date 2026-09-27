@@ -19,7 +19,8 @@
     <view class="section-title">热卖推荐</view>
     <view v-if="products.length" class="grid">
       <view v-for="p in products" :key="p.id" class="p-card" @tap="goProduct(p.id)">
-        <image class="p-img" :src="p.mainImage || defaultImg" mode="aspectFill" />
+        <image v-if="p.mainImage" class="p-img" :src="p.mainImage" mode="aspectFill" />
+        <view v-else class="p-img img-holder"><text class="img-holder-icon">📦</text></view>
         <view class="p-info">
           <text class="p-name">{{ p.title }}</text>
           <view class="p-bottom">
@@ -53,7 +54,6 @@ export default {
       pageSize: 12,
       total: 0,
       hasMore: true,
-      defaultImg: '',
     }
   },
   onLoad() { this.loadCategories(); this.load(); },
@@ -106,8 +106,8 @@ export default {
 .cat-strip { display: flex; flex-wrap: wrap; gap: 16rpx; margin-bottom: 20rpx; }
 .cat-chip { background: #fff; padding: 16rpx 28rpx; border-radius: 40rpx; font-size: 26rpx; color: #333; box-shadow: 0 1rpx 3rpx rgba(0,0,0,0.06); }
 .section-title { font-size: 32rpx; font-weight: 700; margin: 20rpx 0 16rpx; color: #333; }
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20rpx; }
-.p-card { background: #fff; border-radius: 16rpx; overflow: hidden; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06); }
+.grid { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.p-card { width: 49%; margin-bottom: 20rpx; background: #fff; border-radius: 16rpx; overflow: hidden; box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.06); }
 .p-img { width: 100%; height: 320rpx; background: #f0f0f0; }
 .p-info { padding: 20rpx; }
 .p-name { font-size: 28rpx; color: #333; display: block; min-height: 80rpx; line-height: 40rpx; }

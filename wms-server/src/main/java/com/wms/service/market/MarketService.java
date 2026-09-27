@@ -2,6 +2,7 @@ package com.wms.service.market;
 
 import com.wms.common.BusinessException;
 import com.wms.dto.market.MarketDtos.MarketProductRequest;
+import com.wms.dto.market.MarketDtos.MarketCategoryRequest;
 import com.wms.dto.market.MarketDtos.MarketCustomerRequest;
 import com.wms.dto.market.MarketDtos.MarketOrderCreateRequest;
 import com.wms.model.entity.*;
@@ -140,6 +141,41 @@ public class MarketService {
     public void deleteProduct(Long id) {
         if (!products.existsById(id)) throw new BusinessException("商品不存在");
         products.deleteById(id);
+    }
+
+    // ======================== 分类管理（后台，复用 WMS categories） ========================
+
+    @Transactional
+    public Category saveCategory(MarketCategoryRequest req) {
+        String name = req.name().trim();
+        if (categories.existsByName(name)) throw new BusinessException("分类名称已存在");
+        Category c = new Category(name);
+        applyCategory(c, req);
+        return categories.save(c);
+    }
+
+    @Transactional
+    public Category updateCategory(Long id, MarketCategoryRequest req) {
+        Category c = categories.findById(id).orElseThrow(() -> new BusinessException("分类不存在"));
+        String name = req.name().trim();
+        if (categories.findByName(name).filter(o -> !o.getId().equals(id)).isPresent())
+            throw new BusinessException("分类名称已存在");
+        c.setName(name);
+        applyCategory(c, req);
+        return categories.save(c);
+    }
+
+    @Transactional
+    public void deleteCategory(Long id) {
+        if (!categories.existsById(id)) throw new BusinessException("分类不存在");
+        if (items.existsByCategoryId(id)) throw new BusinessException("该分类已被物品引用，不可删除");
+        if (products.existsByCategoryId(id)) throw new BusinessException("该分类已被商城商品引用，不可删除");
+        categories.deleteById(id);
+    }
+
+    private void applyCategory(Category c, MarketCategoryRequest req) {
+        c.setSortOrder(req.sortOrder() == null ? 0 : req.sortOrder());
+        c.setStatus(req.status() == null || req.status());
     }
 
     @Transactional

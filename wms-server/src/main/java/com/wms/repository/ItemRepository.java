@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 public interface ItemRepository extends JpaRepository<Item,Long> {
- Optional<Item> findByCode(String code); boolean existsByCode(String code); Page<Item> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(String name,String code, Pageable page);
+ Optional<Item> findByCode(String code); boolean existsByCode(String code); boolean existsByCategoryId(Long categoryId); Page<Item> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(String name,String code, Pageable page);
  @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select i from Item i where i.id=:id") Optional<Item> findForInventoryCreation(@Param("id") Long id);
 }

@@ -58,6 +58,8 @@ export default {
 .label { font-size: 26rpx; color: #666; margin-bottom: 12rpx; display: block; }
 .textarea { height: 160rpx; }
 .switch { width: 96rpx; height: 52rpx; border-radius: 26rpx; background: #d9d9d9; position: relative; transition: .2s; }
+/* 全局 .row > view 有 flex:1，需按更高优先级固定开关宽度 */
+.row .switch { flex: 0 0 auto; }
 .switch.on { background: #1677ff; }
 .dot { width: 44rpx; height: 44rpx; border-radius: 50%; background: #fff; position: absolute; top: 4rpx; left: 4rpx; transition: .2s; }
 .switch.on .dot { left: 48rpx; }

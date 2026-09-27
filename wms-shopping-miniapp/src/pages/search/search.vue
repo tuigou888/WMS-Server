@@ -6,7 +6,8 @@
     </view>
     <view class="search-result">
       <view v-for="p in results" :key="p.id" class="result-item" @tap="goProduct(p.id)">
-        <image class="r-img" :src="p.mainImage || ''" mode="aspectFill" />
+        <image v-if="p.mainImage" class="r-img" :src="p.mainImage" mode="aspectFill" />
+        <view v-else class="r-img img-holder"><text class="img-holder-icon">📦</text></view>
         <view class="r-info">
           <text class="r-title">{{ p.title }}</text>
           <text class="r-spec">{{ p.specs || p.brand || '' }}</text>

@@ -27,7 +27,8 @@
     <view class="card">
       <view class="section-label">订单商品</view>
       <view class="order-item" v-for="c in items" :key="c.id">
-        <image class="oi-img" :src="c.product.mainImage || ''" mode="aspectFill" />
+        <image v-if="c.product.mainImage" class="oi-img" :src="c.product.mainImage" mode="aspectFill" />
+        <view v-else class="oi-img img-holder"><text class="img-holder-icon">📦</text></view>
         <view class="oi-info">
           <text class="oi-title">{{ c.product.title }}</text>
           <text class="oi-meta">¥{{ money(c.snapshotPrice) }} × {{ c.quantity }}</text>

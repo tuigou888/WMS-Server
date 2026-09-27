@@ -2,7 +2,7 @@
   <view class="mine">
     <!-- 未登录 -->
     <view v-if="!isLoggedIn" class="guest">
-      <image class="avatar" :src="avatar" mode="aspectFill" />
+      <view class="avatar avatar-holder"><text class="avatar-holder-icon">👤</text></view>
       <text class="guest-text">登录后可查看订单与购物车</text>
       <button class="btn-primary" @tap="goLogin">立即登录</button>
     </view>
@@ -10,7 +10,7 @@
     <!-- 已登录 -->
     <view v-else>
       <view class="profile">
-        <image class="avatar" :src="avatar" mode="aspectFill" />
+        <view class="avatar avatar-holder avatar-primary"><text class="avatar-char">{{ avatarChar }}</text></view>
         <view class="profile-info">
           <text class="display-name">{{ displayName }}</text>
           <text class="username">@{{ username }}</text>
@@ -45,10 +45,10 @@
 
       <!-- 功能菜单 -->
       <view class="card section">
-        <view class="menu-item" @tap="go('/pages/address/address')"><text>收货地址</text><text class="arrow">></text></view>
-        <view class="menu-item" @tap="go('/pages/favorites/favorites')"><text>我的收藏</text><text class="arrow">></text></view>
-        <view class="menu-item" @tap="go('/pages/setting/setting')"><text>设置</text><text class="arrow">></text></view>
-        <view class="menu-item" @tap="go('/pages/about/about')"><text>关于</text><text class="arrow">></text></view>
+        <view class="menu-item" @tap="go('/pages/address/address')"><text>收货地址</text><view class="arrow"></view></view>
+        <view class="menu-item" @tap="go('/pages/favorites/favorites')"><text>我的收藏</text><view class="arrow"></view></view>
+        <view class="menu-item" @tap="go('/pages/setting/setting')"><text>设置</text><view class="arrow"></view></view>
+        <view class="menu-item" @tap="go('/pages/about/about')"><text>关于</text><view class="arrow"></view></view>
       </view>
 
       <button class="logout-btn" @tap="logout">退出登录</button>
@@ -59,7 +59,6 @@
 <script>
 import { useUserStore } from '@/store/user.js'
 import { orders as orderApi, auth } from '@/api/market.js'
-import { getBaseUrl } from '@/api/request.js'
 
 export default {
   data() { return { pendingCount: 0, auditedCount: 0, shippedCount: 0, completedCount: 0 } },
@@ -68,7 +67,7 @@ export default {
     isLoggedIn() { return this.userStore.isLoggedIn },
     username() { return this.userStore.user?.username || '' },
     displayName() { return this.userStore.user?.displayName || this.username },
-    avatar() { return `${getBaseUrl().replace(/\/api\/v1$/, '')}/avatar.png` },
+    avatarChar() { return (this.displayName || this.username || '客').charAt(0).toUpperCase() },
   },
   onShow() { if (this.isLoggedIn) this.loadCounts() },
   methods: {
@@ -98,6 +97,10 @@ export default {
 .mine { padding: 20rpx; min-height: 100vh; }
 .guest { text-align: center; padding: 120rpx 40rpx; }
 .avatar { width: 140rpx; height: 140rpx; border-radius: 50%; background: #e6f7ff; margin-bottom: 20rpx; }
+.avatar-holder { display: flex; align-items: center; justify-content: center; }
+.avatar-holder-icon { font-size: 64rpx; opacity: 0.5; }
+.avatar-primary { background: #1677ff; }
+.avatar-char { color: #fff; font-size: 56rpx; font-weight: 600; }
 .profile { display: flex; align-items: center; padding: 40rpx 20rpx; }
 .profile .avatar { margin-bottom: 0; margin-right: 24rpx; }
 .profile-info { display: flex; flex-direction: column; }
@@ -112,6 +115,7 @@ export default {
 .badge-dot { width: 12rpx; height: 12rpx; background: #ff4d4f; border-radius: 50%; margin-left: 6rpx; }
 .menu-item { display: flex; justify-content: space-between; align-items: center; padding: 28rpx 0; border-bottom: 1rpx solid #f0f0f0; font-size: 28rpx; color: #333; }
 .menu-item:last-child { border-bottom: none; }
-.arrow { color: #ccc; }
+/* CSS 画右箭头，避免 WXML 转义字符问题 */
+.arrow { width: 18rpx; height: 18rpx; border-top: 4rpx solid #ccc; border-right: 4rpx solid #ccc; transform: rotate(45deg); margin-left: 8rpx; }
 .logout-btn { margin-top: 40rpx; background: #fff; color: #ff4d4f; border: 1rpx solid #ff4d4f; border-radius: 12rpx; padding: 24rpx 0; font-size: 30rpx; }
 </style>

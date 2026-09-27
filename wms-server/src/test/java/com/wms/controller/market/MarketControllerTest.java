@@ -5,6 +5,7 @@ import com.wms.harness.Harness;
 import com.wms.model.entity.UserAccount;
 import com.wms.model.entity.market.*;
 import com.wms.repository.UserAccountRepository;
+import com.wms.repository.CategoryRepository;
 import com.wms.repository.market.*;
 import com.wms.security.Permissions;
 import com.wms.security.SecurityUtils;
@@ -41,6 +42,7 @@ class MarketControllerTest {
     @Autowired private MarketOrderRepository orders;
     @Autowired private MarketFavoriteRepository favorites;
     @Autowired private UserAccountRepository users;
+    @Autowired private CategoryRepository categories;
     @Autowired private jakarta.persistence.EntityManager entityManager;
 
     private UserAccount admin() { return users.findByUsername("admin").orElseThrow(); }
@@ -602,6 +604,54 @@ class MarketControllerTest {
             // 删除
             adminController.deleteCustomer(id);
             assertTrue(customers.findById(id).isEmpty());
+        });
+    }
+
+    // ==================== 分类管理 API ====================
+
+    @Test
+    void adminCategories_listAll() {
+        Harness.asAdmin(() -> {
+            var resp = adminController.categoryList();
+            assertEquals(200, resp.code());
+            assertFalse(resp.data().isEmpty());
+            // 管理端视图应含 status/sortOrder 字段
+            assertTrue(resp.data().get(0).containsKey("status"));
+            assertTrue(resp.data().get(0).containsKey("sortOrder"));
+        });
+    }
+
+    @Test
+    void adminCategories_crudLifecycle() {
+        Harness.asAdmin(() -> {
+            // 创建
+            var created = adminController.createCategory(new MarketCategoryRequest("API测试分类", 5, true));
+            assertEquals(200, created.code());
+            Long id = ((Number) created.data().get("id")).longValue();
+            assertEquals("API测试分类", created.data().get("name"));
+            assertEquals(5, ((Number) created.data().get("sortOrder")).intValue());
+            // 重名创建应被拒绝
+            assertThrows(com.wms.common.BusinessException.class, () ->
+                    adminController.createCategory(new MarketCategoryRequest("API测试分类", 0, true)));
+            // 更新（含停用）
+            var updated = adminController.updateCategory(id, new MarketCategoryRequest("API测试分类改", 9, false));
+            assertEquals("API测试分类改", updated.data().get("name"));
+            assertEquals(Boolean.FALSE, updated.data().get("status"));
+            // 停用后买家端分类列表不可见
+            var buyerView = marketController.categories();
+            assertTrue(buyerView.data().stream().noneMatch(c -> "API测试分类改".equals(c.get("name"))));
+            // 删除
+            adminController.deleteCategory(id);
+            assertTrue(categories.findById(id).isEmpty());
+        });
+    }
+
+    @Test
+    void adminCategories_deleteRejectsReferencedCategory() {
+        Harness.asAdmin(() -> {
+            // 演示分类"电子设备"已被物品/商品引用，删除应被拒绝
+            Long id = categories.findByName("电子设备").orElseThrow().getId();
+            assertThrows(com.wms.common.BusinessException.class, () -> adminController.deleteCategory(id));
         });
     }
 
