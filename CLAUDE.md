@@ -12,7 +12,7 @@ A full-stack warehouse management system (WMS) for purchase-sales-inventory, mod
 - **Default DB**: H2 in-memory (auto-seeds demo data on every restart). MySQL supported via env vars.
 - **Demo users**: `admin / admin123` (ADMIN), `operator / operator123` (WAREHOUSE) — dev/test seeding only; prod never creates them.
 
-Ports: API `8088` (context path `/api/v1`), actuator on a separate management port `9089` (no context path; `health`/`info`/`prometheus` only — a separate port does **not** bypass Spring Security: requests there hit 401 until `SecurityConfig.managementPortChain` matches them by `localPort`), Web dev `5173`, Docker stack maps Web→`3000`.
+Ports: API `8088` (context path `/api/v1`), actuator on a separate management port `9089` (no context path; `health`/`info`/`prometheus` only — a separate port does **not** bypass Spring Security: requests there hit 401 until `SecurityConfig.managementPortChain` matches them by `localPort`), Web dev `5173`, Docker stack maps Web→`3100` (host port from `.env` `WMS_WEB_BIND`).
 
 ## Build / Run Commands
 
@@ -38,7 +38,7 @@ npm run preview
 ### Full stack via Docker
 ```bash
 cp .env.example .env      # required: MYSQL_*/WECHAT_* creds are ${VAR:?} — compose refuses to start without them
-docker compose up --build # web:3000, api:8088, management:9089, mysql:3306 — all bound to 127.0.0.1 by default
+docker compose up --build # web:3100, api:8088, management:9089, mysql:3306 — all bound to 127.0.0.1 by default
 ```
 
 ### Release check (runs everything the launch gate expects)

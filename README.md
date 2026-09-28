@@ -117,7 +117,7 @@ mkdir -p secrets                 # 放入 secrets/apiclient_key.pem、secrets/we
 docker compose --env-file .env up --build -d
 ```
 
-- 服务与端口：Web `3000`、API `8088`、Actuator `9089`（仅 health/info/prometheus）、MySQL `3306`；**默认全部只绑 127.0.0.1**，公网访问必须经 HTTPS 反向代理。
+- 服务与端口：Web `3100`、API `8088`、Actuator `9089`（仅 health/info/prometheus）、MySQL `3306`；**默认全部只绑 127.0.0.1**（主机端口由 `.env` 的 `WMS_WEB_BIND`/`WMS_API_BIND`/`WMS_MGMT_BIND` 覆盖），公网访问必须经 HTTPS 反向代理。
 - `prod` profile 禁用 H2 Console、演示数据、微信登录/支付 mock；空库首次启动需临时设置 `WMS_BOOTSTRAP_ADMIN_USERNAME` 与至少 12 位的 `WMS_BOOTSTRAP_ADMIN_PASSWORD`，启动成功后立即从 `.env` 删除。
 - 上线前建议执行 `ops/` 下的 `backup-mysql.sh`、`restore-mysql.sh`、`reconcile-mysql.sh` 完成备份演练与只读对账。
 

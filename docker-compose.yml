@@ -1,6 +1,9 @@
 services:
   wms-server:
-    build: ./wms-server
+    build:
+      context: ./wms-server
+      args:
+        MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-https://maven.aliyun.com/repository/public}
     restart: unless-stopped
     ports: ["${WMS_API_BIND:-127.0.0.1:8088}:8088", "${WMS_MGMT_BIND:-127.0.0.1:9089}:9089"]
     volumes: ["wms-logs:/app/logs"]
@@ -40,9 +43,12 @@ services:
       - source: wechat_pay_public_key
         target: wechat_pay_public_key
   wms-web:
-    build: ./wms-web
+    build:
+      context: ./wms-web
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
-    ports: ["${WMS_WEB_BIND:-127.0.0.1:3000}:80"]
+    ports: ["${WMS_WEB_BIND:-127.0.0.1:3100}:80"]
     depends_on: [wms-server]
 volumes:
   wms-logs:

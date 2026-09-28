@@ -25,6 +25,10 @@ server:
   port: ${SERVER_PORT:8088}
   servlet:
     context-path: /api/v1
+  # 生产在 TLS 终止的反向代理后面（宝塔 nginx -> wms-web -> 这里），不认 X-Forwarded-* 的话
+  # 后端会把 https 请求当成 http，同源判定随之失败，浏览器同源 POST 也会被 CORS 拦成 403。
+  # 应用只绑 127.0.0.1，能改这些头的只有本机代理，所以这里无条件信任。
+  forward-headers-strategy: framework
 
 # 独立管理端口：避开 /api/v1 上下文路径。注意它同样会经过 Spring Security 链（实测无 token 是 401），
 # 放行由 SecurityConfig.managementPortChain 按 localPort 精确处理，业务端口不受影响。

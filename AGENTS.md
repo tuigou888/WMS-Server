@@ -146,10 +146,11 @@ python3 test-artifacts/run_ui_regression.py http://localhost:5173/
 
 ## 部署
 
-- `docker-compose.yml` 仅 MySQL + `wms-server` + `wms-web` 三个服务：Web `3000`、API `8088`、management `9089`、MySQL `3306`，**默认全部只绑 `127.0.0.1`**（`WMS_WEB_BIND`/`WMS_API_BIND`/`WMS_MGMT_BIND`/`WMS_MYSQL_BIND` 覆盖），公网访问须由 HTTPS 反向代理转发。服务端日志落命名卷 `wms-logs`（容器内 `/app/logs`），审计归档 CSV 也写在其中的 `archive/`（compose 显式设 `AUDIT_ARCHIVE_DIR=/app/logs/archive`），备份策略要一并覆盖，否则"打开删除"等于永久丢数据。**README.md 描述的 Redis/MinIO/Nginx 在仓库里没有对应服务或 pom 依赖**，要按需自行补；两个小程序端是仓库内的源码工程（`wms-miniapp/`、`wms-shopping-miniapp/`），不在 compose 里跑，需自行用微信开发者工具构建上传。
+- `docker-compose.yml` 仅 MySQL + `wms-server` + `wms-web` 三个服务：Web `3100`、API `8088`、management `9089`、MySQL `3306`，**默认全部只绑 `127.0.0.1`**（`WMS_WEB_BIND`/`WMS_API_BIND`/`WMS_MGMT_BIND`/`WMS_MYSQL_BIND` 覆盖；Web 主机端口取 `3100` 是因为宿主机 `3000` 已被 new-api 容器占着 `0.0.0.0:3000`，改端口时记得同步 `deploy/nginx-wms.conf` 的 `proxy_pass`），公网访问须由 HTTPS 反向代理转发。服务端日志落命名卷 `wms-logs`（容器内 `/app/logs`），审计归档 CSV 也写在其中的 `archive/`（compose 显式设 `AUDIT_ARCHIVE_DIR=/app/logs/archive`），备份策略要一并覆盖，否则"打开删除"等于永久丢数据。**README.md 描述的 Redis/MinIO/Nginx 在仓库里没有对应服务或 pom 依赖**，要按需自行补；两个小程序端是仓库内的源码工程（`wms-miniapp/`、`wms-shopping-miniapp/`），不在 compose 里跑，需自行用微信开发者工具构建上传。
 - 商户私钥/平台公钥走 docker secrets（`WECHAT_PAY_PRIVATE_KEY_FILE`/`WECHAT_PAY_PUBLIC_KEY_FILE` 指向 `./secrets/*.pem`），**不要提交 `.env` 与 `secrets/` 下的 PEM**。
 - `wms-server/Dockerfile` 多阶段：maven 3.9 + temurin-21 构建 → `eclipse-temurin:21-jre` 运行。
 - `wms-web/Dockerfile` 多阶段：node 20-alpine 构建 → nginx:alpine，使用 `wms-web/nginx.conf`。
+- **容器构建不继承宿主机 `~/.npmrc`/镜像源**，直连 `registry.npmjs.org` 或 Maven Central 在境内机器上会 `ETIMEDOUT`（表现为 `npm ci` 或 `dependency:go-offline` 挂几分钟后失败）。两个 Dockerfile 都用 build arg 配了默认镜像：`wms-web` 的 `NPM_REGISTRY`（默认 `https://registry.npmmirror.com`，同时调大 `fetch-retries/timeout`）、`wms-server` 的 `MAVEN_MIRROR_URL`（默认 `https://maven.aliyun.com/repository/public`，由生成的 `/app/settings-mirror.xml` 走 `mvn-mirror` 包装脚本；置空则直连 Central）。compose 里透传为 `args`，可由 `.env` 覆盖，改动说明见 `.env.example`。实测参考值：`go-offline` 走阿里云镜像 159s（直连 Central 538s 未完成），`npm ci` + vite build 共约 60s。
 - MySQL 凭据**没有默认值**：`MYSQL_ROOT_PASSWORD`/`MYSQL_USER`/`MYSQL_PASSWORD` 均为 `${VAR:?...}`，必须写在仓库根 `.env`（模板 `.env.example`），缺失时 `docker compose` 直接报错拒绝启动。不存在"root 密码默认 `wms_password`"这回事。
 
 ## 改动后建议跑

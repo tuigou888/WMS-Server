@@ -130,7 +130,7 @@ cp .env.example .env
 docker compose --env-file .env up --build
 ```
 
-容器默认将 Web `3000`、API `8088`、MySQL `3306` 绑定到宿主机 `127.0.0.1`；正式公网访问必须通过 HTTPS 反向代理。
+容器默认将 Web `3100`、API `8088`、MySQL `3306` 绑定到宿主机 `127.0.0.1`；正式公网访问必须通过 HTTPS 反向代理。
 
 Compose 的 `prod` Profile 使用 Flyway 和 `ddl-auto=validate`。全新库会依次执行 `V1` 基线至 `V9`（库存预占/冲销追溯、历史 `reverse` 流水规范化、认证状态持久化、查询路径索引、仓库用户范围、盘点库存版本、冲销唯一约束、幂等请求记录）；已有 Hibernate 管理的库会先基线为 V1，再执行后续迁移。上线前必须完成数据库备份、恢复抽检，并运行只读对账脚本留存结果：
 
