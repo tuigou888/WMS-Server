@@ -23,10 +23,10 @@ const createForm = ref({ warehouseId: undefined, supplierId: undefined, required
 const load = (target = page.value) => { loading.value = true; return api.purchaseRequests({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message || '加载失败')).finally(() => { loading.value = false }) }
 const loadReferences = async () => {
   try {
-    const [warehouseRows, supplierRows, itemPage] = await Promise.all([api.warehouses(), api.partners('SUPPLIER'), api.items({ page: 1, pageSize: 100 })])
+    const [warehouseRows, supplierRows, itemRows] = await Promise.all([api.warehouses(), api.partners('SUPPLIER'), api.allItems()])
     warehouses.value = warehouseRows.map((x) => ({ value: x.id, label: x.name }))
     suppliers.value = supplierRows.map((x) => ({ value: x.id, label: `${x.code} · ${x.name}` }))
-    items.value = (itemPage.records || []).map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))
+    items.value = itemRows.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))
   } catch (e) { message.error(e.message || '基础资料加载失败') }
 }
 

@@ -7,6 +7,7 @@ import { dateTime, number } from '../utils/format'
 import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
+import { useFormDraft } from '../utils/formDraft'
 
 const statuses = { DRAFT: ['草稿', 'default'], APPROVED: ['已审核', 'blue'], REJECTED: ['已驳回', 'red'], COMPLETED: ['已执行', 'green'] }
 
@@ -24,13 +25,14 @@ watch(drawerOpen, (v) => { if (!v) detail.value = null })
 watch(detail, (v) => { drawerOpen.value = !!v })
 const formState = ref({ action: 'LOSS', lines: [{ quantity: 1 }] })
 const formRef = ref()
+useFormDraft('adjustment', open, formState)
 
 const load = (target = page.value) => { loading.value = true; return api.adjustments({ page: target, pageSize: 20 }).then((x) => { data.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 
 onMounted(() => {
   load()
-  Promise.all([api.items({ pageSize: 1000 }), api.warehouses()])
-    .then(([i, w]) => { items.value = i.records; warehouses.value = w })
+  Promise.all([api.allItems(), api.warehouses()])
+    .then(([i, w]) => { items.value = i; warehouses.value = w })
     .catch((e) => message.error(e.message))
 })
 

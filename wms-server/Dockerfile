@@ -15,6 +15,8 @@ RUN mvn-mirror -q -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
+# curl 仅供容器 healthcheck 探活使用（/api/v1/health/ready）
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/target/wms-server-*.jar app.jar
 EXPOSE 8088
 ENTRYPOINT ["java","-jar","/app/app.jar"]

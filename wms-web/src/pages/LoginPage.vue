@@ -16,7 +16,10 @@ const submit = async () => {
   loading.value = true
   try {
     await auth.login(formState.value)
-    router.push('/dashboard')
+    // 优先回到 401 被踢出前正在处理的页面，避免过期后丢工作现场
+    const redirect = sessionStorage.getItem('wms_redirect_after_login')
+    sessionStorage.removeItem('wms_redirect_after_login')
+    router.push(redirect || '/dashboard')
   } catch (e) {
     message.error(e.message)
   } finally {

@@ -22,6 +22,8 @@ public class OcrController {
 
     private final ItemRepository items;
     @Value("${ocr.mock:false}") private boolean mock;
+    /** 单文件上限 8MB：留余量低于全局 multipart 的 10MB；type/size 双校验防误传与超大原图。 */
+    private static final long MAX_FILE_BYTES = 8L * 1024 * 1024;
 
     public OcrController(ItemRepository items) {
         this.items = items;
@@ -34,6 +36,9 @@ public class OcrController {
         if (file.isEmpty()) {
             throw new BusinessException("请选择图片文件");
         }
+        if (file.getSize() > MAX_FILE_BYTES) throw new BusinessException("图片过大（" + (file.getSize() / 1024 / 1024) + "MB），请压缩到 8MB 以内再上传");
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) throw new BusinessException("仅支持图片文件（jpg/png/webp/bmp），收到: " + contentType);
 
         // 模拟 OCR 识别结果
         // 实际项目中应调用第三方OCR API，返回识别到的结构化数据

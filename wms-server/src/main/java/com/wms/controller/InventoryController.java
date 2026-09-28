@@ -55,10 +55,11 @@ public class InventoryController {
             @RequestParam(defaultValue = "100") int limit) {
         int size = Math.min(Math.max(limit, 0), 500);
         if (size == 0) return ApiResponse.ok(List.of());
-        return ApiResponse.ok(transactions.findRecentDetailedLimited(PageRequest.of(0, size)).stream()
-                .filter(t -> warehouseAccess.canAccess(t.getWarehouse().getId()))
-                .map(this::transactionView)
-                .toList());
+        // M5：仓库过滤下推进 SQL（同 list 端点模式），避免"全局取 N 条再内存过滤"导致 scope 用户被截断漏单
+        List<InventoryTransaction> rows = warehouseAccess.isWarehouseScoped()
+                ? transactions.findRecentDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds(), PageRequest.of(0, size))
+                : transactions.findRecentDetailedLimited(PageRequest.of(0, size));
+        return ApiResponse.ok(rows.stream().map(this::transactionView).toList());
     }
 
     @GetMapping("/warehouses")

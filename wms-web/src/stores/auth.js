@@ -14,9 +14,8 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = await api.me()
       setJson('wms_user', user.value)
     } catch {
-      removeStorage('wms_token')
-      removeStorage('wms_user')
-      user.value = null
+      // client.js 仅在 401 时清除 token/user 并跳转登录页；网络抖动或服务端 5xx 不应强制登出
+      if (!getStorage('wms_token')) user.value = null
     } finally {
       checking.value = false
     }

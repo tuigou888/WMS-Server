@@ -105,6 +105,34 @@ class MarketServiceIntegrationTest {
                 customer.getId(), 1L, payType, "测试备注"));
     }
 
+    /** M2：快照价超 TTL 后回退当前售价——管理员调价后老购物车不能无限期按旧价成交。 */
+    @Test
+    void staleCartSnapshotFallsBackToCurrentPrice() {
+        UserAccount user = admin();
+        MarketProduct p = shelfOnProduct(1L, "测试商品-001", new BigDecimal("20.00"));
+        service.clearCart(user);
+        MarketCustomer customer = service.saveCustomer(user, new MarketCustomerRequest(
+                "王五", "13700000000", "广州市测试路3号", true, null));
+        service.addCart(user, p.getId(), 1);
+        // 管理员涨价：加购快照 20.00 → 现价 30.00
+        p.setSalePrice(new BigDecimal("30.00"));
+        products.saveAndFlush(p);
+        // 把购物车行拨回 8 天前（超过 7 天 TTL）；先 flush+clear 清一级缓存，
+        // 否则 bulk JPQL 绕过持久化上下文，createOrder 会命中缓存里未回拨的旧实体
+        entityManager.flush();
+        entityManager.clear();
+        entityManager.createQuery("update MarketCart c set c.updatedAt = :t where c.user.username = :u")
+                .setParameter("t", java.time.LocalDateTime.now().minusDays(8))
+                .setParameter("u", user.getUsername())
+                .executeUpdate();
+
+        MarketOrder order = service.createOrder(user, new MarketOrderCreateRequest(
+                customer.getId(), 1L, "PAY_ONLINE", "快照过期"));
+
+        assertEquals(0, new BigDecimal("30.00").compareTo(
+                order.getItems().get(0).getSalePrice()), "过期快照应回退当前售价");
+    }
+
     /** 查某 item 在 WH-001(warehouseId=1) 下的库存总量。 */
     private BigDecimal inventoryQty(Long itemId) {
         return inventories.findAllDetailed().stream()

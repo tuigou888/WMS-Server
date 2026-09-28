@@ -7,6 +7,7 @@ import { dateTime, number } from '../utils/format'
 import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
+import { useFormDraft } from '../utils/formDraft'
 
 const statusLabels = { DRAFT: ['草稿', 'default'], APPROVED: ['已审核', 'blue'], REJECTED: ['已驳回', 'red'], COMPLETED: ['已执行', 'green'] }
 
@@ -21,6 +22,7 @@ const transferOpen = ref(false)
 const warehouseOpen = ref(false)
 const formState = ref({ lines: [{ quantity: 1, sourceLocationCode: 'A-01-01', targetLocationCode: 'A-01-01' }] })
 const warehouseFormState = ref({})
+useFormDraft('transfer', transferOpen, formState)
 
 const loadTransfers = (target = page.value) => { loading.value = true; return api.transfers({ page: target, pageSize: 20 }).then((x) => { rows.value = x.records; page.value = x.page; total.value = x.total }).catch((e) => message.error(e.message)).finally(() => { loading.value = false }) }
 const loadWarehouses = () => api.warehouses().then((x) => { warehouses.value = x }).catch((e) => message.error(e.message))
@@ -28,7 +30,7 @@ const loadWarehouses = () => api.warehouses().then((x) => { warehouses.value = x
 onMounted(() => {
   loadTransfers()
   loadWarehouses()
-  api.items({ pageSize: 1000 }).then((p) => { items.value = p.records }).catch((e) => message.error(e.message))
+  api.allItems().then((rows) => { items.value = rows }).catch((e) => message.error(e.message))
 })
 
 const openTransfer = () => {

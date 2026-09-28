@@ -2,6 +2,7 @@ package com.wms.service;
 
 import com.wms.model.entity.OperationLog;
 import com.wms.repository.OperationLogRepository;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +33,8 @@ import java.util.List;
  * <p>水位（已归档最大 id）写在归档目录的 {@code .operation_logs.watermark}。进程若被杀在
  * "CSV 已落盘、水位未推进"之间，下一轮会重复导出同一批：冗余但不丢数据。
  *
- * <p>多实例部署时本任务只应在一个实例上开启，直到 A7（ShedLock）落地。
+ * <p>多实例部署由 ShedLock 保证同一时刻只有一个实例执行（A7，锁存 shedlock 表，见
+ * {@link com.wms.config.SchedulerLockConfig}）；实例在锁内崩溃时锁由 lockAtMostFor 兜底过期。
  */
 @Service
 public class AuditArchiveService {
@@ -62,6 +64,7 @@ public class AuditArchiveService {
 
     /** 定时入口。手动执行（含测试）请直接调 {@link #runOnce()}，enabled 只控制是否自动跑。 */
     @Scheduled(cron = "${audit.archive.cron:0 30 3 * * *}")
+    @SchedulerLock(name = "audit-archive", lockAtMostFor = "PT2H")
     public void scheduledRun() {
         if (!enabled) return;
         try {

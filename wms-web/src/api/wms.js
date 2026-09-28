@@ -1,8 +1,18 @@
 import client from './client'
+
+// 后端 /items 将 pageSize 钳制到 ≤100（ItemController#list），物品下拉等需要全量数据的场景按页取完；上限 20 页（2000 条）防御性兜底
+async function allItems() {
+  const first = await api.items({ page: 1, pageSize: 100 })
+  const records = [...first.records]
+  const pages = Math.min(Math.ceil(Number(first.total || 0) / (first.pageSize || 100)), 20)
+  for (let page = 2; page <= pages; page++) records.push(...(await api.items({ page, pageSize: 100 })).records)
+  return records
+}
+
 export const api = {
   login: (data) => client.post('/auth/login', data), me: () => client.get('/auth/me'), logout: () => client.post('/auth/logout'), users: () => client.get('/auth/users'), createUser: (data) => client.post('/auth/users', data), updateUser: (id, data) => client.put(`/auth/users/${id}`, data), permissions: () => client.get('/auth/permissions'),
   dashboard: () => client.get('/reports/dashboard'), alerts: () => client.get('/reports/stock-alert'), profit: (params) => client.get('/reports/profit', { params }),
-  items: (params) => client.get('/items', { params }), item: (id) => client.get(`/items/${id}`), createItem: (data) => client.post('/items', data), updateItem: (id, data) => client.put(`/items/${id}`, data), deleteItem: (id) => client.delete(`/items/${id}`), categories: () => client.get('/items/categories'),
+  items: (params) => client.get('/items', { params }), allItems, item: (id) => client.get(`/items/${id}`), createItem: (data) => client.post('/items', data), updateItem: (id, data) => client.put(`/items/${id}`, data), deleteItem: (id) => client.delete(`/items/${id}`), categories: () => client.get('/items/categories'),
   inventory: (params) => client.get('/inventory', { params }), inventoryByItem: (itemId) => client.get(`/inventory/${itemId}`), transactions: () => client.get('/inventory/transactions'), warehouses: (includeDisabled = false) => client.get('/warehouses', { params: includeDisabled ? { includeDisabled: true } : {} }), createWarehouse: (data) => client.post('/warehouses', data), updateWarehouse: (id, data) => client.put(`/warehouses/${id}`, data),
   stockIn: (data) => client.post('/stock/in/scan', data), stockOut: (data) => client.post('/stock/out/scan', data),
   partners: (type) => client.get('/partners', { params: type ? { type } : {} }), createPartner: (data) => client.post('/partners', data), updatePartner: (id, data) => client.put(`/partners/${id}`, data), deletePartner: (id) => client.delete(`/partners/${id}`),

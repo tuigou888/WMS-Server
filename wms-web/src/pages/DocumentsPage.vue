@@ -8,6 +8,7 @@ import { dateTime, money, number } from '../utils/format'
 import { normalizeColumns } from '../utils/table'
 import { useAuthStore } from '../stores/auth'
 import { hasPerm } from '../utils/permission'
+import { useFormDraft } from '../utils/formDraft'
 
 const statuses = { DRAFT: ['草稿', 'default'], APPROVED: ['已审核', 'blue'], REJECTED: ['已驳回', 'red'], COMPLETED: ['已执行', 'green'], CANCELLED: ['已取消', 'default'] }
 const typeLabels = { IN: ['采购入库', 'green'], OUT: ['销售出库', 'volcano'], RETURN_IN: ['退货入库', 'cyan'], RETURN_OUT: ['退货出库', 'orange'] }
@@ -28,6 +29,7 @@ watch(drawerOpen, (v) => { if (!v) detail.value = null })
 watch(detail, (v) => { drawerOpen.value = !!v })
 const formState = ref({ type: 'IN', businessDate: dayjs(), lines: [{ quantity: 1, unitPrice: 0, locationCode: 'A-01-01' }] })
 const formRef = ref()
+useFormDraft('document', open, formState, { revive: (f) => ({ ...f, businessDate: f.businessDate ? dayjs(f.businessDate) : f.businessDate }) })
 
 const documentType = computed(() => formState.value.type)
 const isOut = computed(() => ['OUT', 'RETURN_OUT'].includes(documentType.value))
@@ -39,8 +41,8 @@ const load = (target = page.value) => { loading.value = true; return api.documen
 
 onMounted(() => {
   load()
-  Promise.all([api.items({ pageSize: 1000 }), api.warehouses(), api.partners()])
-    .then(([i, w, p]) => { items.value = i.records; warehouses.value = w; partners.value = p })
+  Promise.all([api.allItems(), api.warehouses(), api.partners()])
+    .then(([i, w, p]) => { items.value = i; warehouses.value = w; partners.value = p })
     .catch((e) => message.error(e.message))
 })
 

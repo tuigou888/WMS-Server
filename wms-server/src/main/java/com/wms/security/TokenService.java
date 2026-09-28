@@ -29,7 +29,8 @@ public class TokenService {
 
     @Transactional
     public String issue(UserAccount user) {
-        cleanup();
+        // 过期会话的清理已归并到 AuthCleanupService 每日定时执行：原先每次登录都顺带全表 DELETE，
+        // 高频登录场景下会造成不必要的写放大（undo/binlog）；resolve 碰到过期会话时仍会即时删除。
         String token = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
         AuthSession session = new AuthSession();
         session.setTokenHash(hash(token));
@@ -61,8 +62,6 @@ public class TokenService {
 
     @Transactional
     public void revokeByUsername(String username) { if (username != null) sessions.deleteByUsername(username); }
-
-    private void cleanup() { sessions.deleteByExpiresAtBefore(LocalDateTime.now()); }
 
     private String hash(String token) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }

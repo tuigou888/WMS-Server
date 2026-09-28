@@ -1,8 +1,11 @@
 package com.wms.model.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.BatchSize;
 
+/** 类级 @BatchSize：同 Category——Item.defaultWarehouse 等 EAGER 引用的 follow-on SELECT 按 50 行一批合并成 IN 查询。 */
 @Entity
+@BatchSize(size = 50)
 @Table(name = "warehouses")
 public class Warehouse extends AuditableEntity {
     @Id

@@ -221,10 +221,12 @@ export default {
         if (this.isStocktake) {
           data = await api.get(`/stocktakes/${this.id}`)
         } else if (this.isTransfer) {
-          data = uni.getStorageSync('wms_transfer_detail')
-          if (!data || String(data.id) !== String(this.id)) {
-            throw new Error('未找到调拨单详情')
-          }
+          // L3：优先走详情接口（此前仅靠列表页 storage 缓存，刷新/直达详情会失败）；缓存仅作接口异常时兜底
+          data = await api.get(`/transfers/${this.id}`).catch(() => {
+            const cached = uni.getStorageSync('wms_transfer_detail')
+            if (!cached || String(cached.id) !== String(this.id)) throw new Error('未找到调拨单详情')
+            return cached
+          })
         } else {
           data = await api.get(`/documents/${this.id}`)
         }

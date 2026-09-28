@@ -11,7 +11,7 @@ const exportLoading = ref(false)
 const formState = ref({})
 
 onMounted(() => {
-  api.items({ pageSize: 1000 }).then((x) => { items.value = x.records }).catch((e) => message.error(e.message))
+  api.allItems().then((rows) => { items.value = rows }).catch((e) => message.error(e.message))
 })
 
 const generateQr = async () => {

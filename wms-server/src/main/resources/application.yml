@@ -21,6 +21,12 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  servlet:
+    multipart:
+      # Spring Boot 默认 max-file-size=1MB：手机拍照上传 OCR（通常 3-10MB）必然被拒，Excel 导入大表也会超。
+      # 放宽到 10MB；应用层各自再收紧（OCR 8MB、Excel 5000 行），超限由 GlobalExceptionHandler 返回 400。
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:12MB}
 server:
   port: ${SERVER_PORT:8088}
   servlet:
@@ -88,6 +94,34 @@ audit:
     dir: ${AUDIT_ARCHIVE_DIR:logs/archive}
     batch-size: ${AUDIT_ARCHIVE_BATCH_SIZE:500}
     delete-enabled: ${AUDIT_ARCHIVE_DELETE_ENABLED:false}
+
+# 幂等请求记录清理：IdempotencyAspect 只插入不删除，idempotent_requests 会随请求无限增长。
+# retention-hours 必须大于客户端最长重试窗口（响应重放依赖记录存在）；删除幂等，多实例同跑无副作用。
+idempotency:
+  cleanup:
+    enabled: ${IDEMPOTENCY_CLEANUP_ENABLED:true}
+    retention-hours: ${IDEMPOTENCY_RETENTION_HOURS:48}
+    cron: ${IDEMPOTENCY_CLEANUP_CRON:0 15 4 * * *}
+
+# 登录相关临时表清理：auth_login_attempts / wechat_bind_tickets 都只有惰性删除路径，
+# 未再被访问的过期行会一直积累；login-attempt-retention-hours 是限速计数的排查保留期（窗口本身 10 分钟）。
+auth:
+  cleanup:
+    enabled: ${AUTH_CLEANUP_ENABLED:true}
+    login-attempt-retention-hours: ${AUTH_LOGIN_ATTEMPT_RETENTION_HOURS:24}
+    cron: ${AUTH_CLEANUP_CRON:0 30 4 * * *}
+
+# 库龄报表（inventory-age）需整表重放库存流水，是最重的报表；结果按访问范围缓存，TTL 秒（0=关闭）。
+report:
+  inventory-age-cache-seconds: ${REPORT_INVENTORY_AGE_CACHE_SECONDS:300}
+
+# 全局 IP 限流（L2）：固定窗口，注册于 Security 链之前，登录/支付回调等免鉴权路径同样受保护。
+# IP 取 X-Forwarded-For 首段（反代后 remoteAddr 全站同桶会误伤）；测试 profile 关闭。
+security:
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    max-requests: ${RATE_LIMIT_MAX_REQUESTS:300}
+    window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
 
 logging:
   level:

@@ -23,6 +23,11 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
     @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location order by t.transactionAt desc")
     List<InventoryTransaction> findRecentDetailedLimited(Pageable pageable);
 
+    /** M5：仓库过滤下推到 SQL——scope 用户拿"自己仓库的最近 N 条"。此前是全局取 N 条再内存 filter，
+     * 仓库受限用户会被截断漏单（看到的是"全局最近 N 条里属于自己的"而非"自己仓库的最近 N 条"）。空分配由调用方传哨兵 -1。 */
+    @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location where t.warehouse.id in :warehouseIds order by t.transactionAt desc")
+    List<InventoryTransaction> findRecentDetailedByWarehouseIds(List<Long> warehouseIds, Pageable pageable);
+
     @Query("select t from InventoryTransaction t join fetch t.item join fetch t.warehouse left join fetch t.location where t.transactionType = :transactionType order by t.transactionAt desc")
     List<InventoryTransaction> findByTransactionType(String transactionType);
 

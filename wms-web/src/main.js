@@ -18,6 +18,9 @@ app.use(router)
 app.use(Antd, { locale: zhCN })
 
 setUnauthorizedHandler(() => {
+  // 401 被踢出前记住当前页面，重新登录后回跳原处（配合页面级表单草稿恢复，避免过期丢工作现场）
+  const current = router.currentRoute.value
+  if (current.path !== '/login') sessionStorage.setItem('wms_redirect_after_login', current.fullPath)
   router.push('/login')
 })
 

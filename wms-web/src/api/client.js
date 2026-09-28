@@ -32,6 +32,13 @@ function clearRequestIdentity(identity) {
 
 let onUnauthorized = () => {}
 
+// L6：401 并发风暴防重——token 过期时页面往往并发多请求、同时收到一串 401，
+// 若每个都清 token + 触发跳转，回跳地址会被反复覆写、弹窗/跳转执行 N 次。
+// 记录首个 401 请求的 Authorization：同一 token 批次的后续 401 直接跳过；
+// 换了 token（重新登录后）再遇 401 则开启新一轮处理，不会漏踢。
+let handlingUnauthorized = false
+let lastUnauthorizedAuth = ''
+
 export function setUnauthorizedHandler(handler) {
   onUnauthorized = handler
 }
@@ -74,9 +81,14 @@ client.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      removeStorage('wms_token')
-      removeStorage('wms_user')
-      onUnauthorized()
+      const auth = String(error.config?.headers?.Authorization || '')
+      if (!handlingUnauthorized || auth !== lastUnauthorizedAuth) {
+        handlingUnauthorized = true
+        lastUnauthorizedAuth = auth
+        removeStorage('wms_token')
+        removeStorage('wms_user')
+        onUnauthorized()
+      }
     }
     return Promise.reject(new Error(error.response?.data?.message || (error.response?.status === 401 ? '登录已失效，请重新登录' : error.message) || '网络异常'))
   },

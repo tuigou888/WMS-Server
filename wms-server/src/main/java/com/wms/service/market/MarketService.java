@@ -271,6 +271,18 @@ public class MarketService {
 
     // ======================== 下单 ========================
 
+    private static final int SNAPSHOT_PRICE_TTL_DAYS = 7;
+
+    /** 快照价 7 天内有效（以购物车行最后更新时间近似快照时间，活跃购物车顺延）；超期或快照无效回退当前售价。 */
+    private BigDecimal effectivePrice(MarketCart cart, MarketProduct product) {
+        BigDecimal snapshot = cart.getSnapshotPrice();
+        boolean fresh = snapshot != null && snapshot.signum() > 0
+                && cart.getUpdatedAt() != null
+                && cart.getUpdatedAt().isAfter(LocalDateTime.now().minusDays(SNAPSHOT_PRICE_TTL_DAYS));
+        if (fresh) return snapshot;
+        return product.getSalePrice() == null ? BigDecimal.ZERO : product.getSalePrice();
+    }
+
     @Transactional
     public MarketOrder createOrder(UserAccount user, MarketOrderCreateRequest req) {
         MarketCustomer customer = customers.findById(req.customerId())
@@ -301,8 +313,8 @@ public class MarketService {
             MarketProduct product = cart.getProduct();
             if (!"SHELF_ON".equals(product.getStatus())) throw new BusinessException("商品已下架：" + product.getTitle());
             // P2-1：下单使用购物车快照价（加购时价格），而非当前商品售价，使快照机制生效
-            BigDecimal price = cart.getSnapshotPrice() == null ? product.getSalePrice() : cart.getSnapshotPrice();
-            if (price == null) price = BigDecimal.ZERO;
+            // M2：快照 7 天内有效——管理员调价后老购物车无限期按旧价成交是商家损失窗口，超期回退现价
+            BigDecimal price = effectivePrice(cart, product);
             BigDecimal sub = price.multiply(BigDecimal.valueOf(cart.getQuantity())).setScale(2, RoundingMode.HALF_UP);
             total = total.add(sub);
             MarketOrderItem oi = new MarketOrderItem();
@@ -624,9 +636,9 @@ public class MarketService {
 
     // ======================== 库存预占/支付取消（内部） ========================
 
-    /** 下单事务内先锁物理库存行，再读取已提交预占，避免并发下单超卖。 */
+    /** 下单事务内先锁物理库存行，再读取已提交预占，避免并发下单超卖；按 itemId 升序加锁，保证并发下单锁顺序一致（防死锁）。 */
     private void holdInventory(MarketOrder order) {
-        LocalDateTime now=LocalDateTime.now(),expiresAt=now.plusMinutes(30); Map<Long,BigDecimal> quantities=new LinkedHashMap<>();Map<Long,Item> orderItems=new LinkedHashMap<>();
+        LocalDateTime now=LocalDateTime.now(),expiresAt=now.plusMinutes(30); Map<Long,BigDecimal> quantities=new TreeMap<>();/* TreeMap 按 itemId 升序迭代，保证守卫锁获取顺序一致（防死锁） */Map<Long,Item> orderItems=new LinkedHashMap<>();
         for(MarketOrderItem line:order.getItems()){quantities.merge(line.getItem().getId(),line.getQuantity(),BigDecimal::add);orderItems.put(line.getItem().getId(),line.getItem());}
         for(Map.Entry<Long,BigDecimal> entry:quantities.entrySet()){Long itemId=entry.getKey();BigDecimal requested=entry.getValue();InventoryReservationGuard.Snapshot protection=reservationGuard.lock(itemId,order.getWarehouse().getId());reservationGuard.requireAvailable(protection,null,requested,"库存不足："+orderItems.get(itemId).getName()+"（可售 "+protection.availableExcluding(null).stripTrailingZeros().toPlainString()+"）");reservations.save(new InventoryReservation(order,orderItems.get(itemId),order.getWarehouse(),requested,expiresAt));}
     }
@@ -641,10 +653,10 @@ public class MarketService {
 
     // ======================== 库存扣减/回滚（内部） ========================
 
-    /** FIFO 扣减订单库存，写入 OUT 流水。库存不足抛异常整体回滚。 */
+    /** FIFO 扣减订单库存，写入 OUT 流水。库存不足抛异常整体回滚；明细按 itemId 升序扣减，保证并发订单锁顺序一致（防死锁）。 */
     private void deductStock(MarketOrder order, String remark) {
         Warehouse warehouse = order.getWarehouse();
-        for (MarketOrderItem oi : order.getItems()) {
+        for (MarketOrderItem oi : order.getItems().stream().sorted(Comparator.comparing((MarketOrderItem x) -> x.getItem().getId())).toList()) {
             BigDecimal remaining = oi.getQuantity();
             InventoryReservationGuard.Snapshot protection = reservationGuard.lock(oi.getItem().getId(), warehouse.getId());
             reservationGuard.requireAvailable(protection, order.getId(), remaining, "库存不足或其他订单已预占：" + oi.getItemName());

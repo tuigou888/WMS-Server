@@ -8,9 +8,15 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public interface IdempotentRequestRepository extends JpaRepository<IdempotentRequest, Long> {
+    /** 超保留期记录的批量清理：响应重放窗口之外的数据没有保留价值。 */
+    @Modifying
+    @Query("delete from IdempotentRequest r where r.createdAt < :before")
+    int deleteExpiredBefore(@Param("before") LocalDateTime before);
+
     @Modifying
     @Query(value = "insert into idempotent_requests (username, scope, request_key, request_hash, created_at, updated_at) "
             + "values (:username, :scope, :requestKey, :requestHash, now(), now()) "

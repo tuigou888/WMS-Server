@@ -42,6 +42,14 @@ services:
         target: wechat_pay_private_key
       - source: wechat_pay_public_key
         target: wechat_pay_public_key
+    # 就绪探针连真实数据库（DB 挂 → /health/ready 返回 503 → 容器判 unhealthy）；
+    # wms-web 依赖此状态，避免 server 起来但库不可用时反代全 5xx。
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8088/api/v1/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
   wms-web:
     build:
       context: ./wms-web
@@ -49,9 +57,22 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
     ports: ["${WMS_WEB_BIND:-127.0.0.1:3100}:80"]
-    depends_on: [wms-server]
+    depends_on:
+      wms-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+# 备份范围（宿主机职责，compose 不做快照）：
+#  1) MySQL 数据 —— 本部署用宿主机自建 MySQL，走宿主备份方案（mysqldump/xtrabackup）；
+#  2) wms-logs 卷 —— 含审计归档 CSV（AUDIT_ARCHIVE_DIR）；卷显式命名，便于备份脚本按名引用；
+#  3) ./secrets 下的商户密钥 —— 建议纳入加密备份。
+# 注意：打开 AUDIT_ARCHIVE_DELETE_ENABLED 前，必须确认归档文件已进上述备份。
 volumes:
   wms-logs:
+    name: wms-logs
 secrets:
   wechat_pay_private_key:
     file: ${WECHAT_PAY_PRIVATE_KEY_FILE:?Set WECHAT_PAY_PRIVATE_KEY_FILE in .env}

@@ -8,6 +8,7 @@ import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
 import com.wms.repository.ItemRepository;
 import com.wms.service.WarehouseAccessService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.Set;
 
@@ -39,10 +41,41 @@ public class ReportController {
         this.warehouseAccess = warehouseAccess;
     }
 
+    /** 库龄结果缓存 TTL 秒数（0=关闭），见 {@link #inventoryAgeCached()}。 */
+    @Value("${report.inventory-age-cache-seconds:300}") private int inventoryAgeCacheSeconds;
+    private final Map<String, CachedAge> inventoryAgeCache = new ConcurrentHashMap<>();
+    private record CachedAge(long expiresAt, List<Map<String, Object>> result) {}
+
+    /** 仪表盘结果缓存 TTL 秒数（0=关闭），见 {@link #dashboardCached()}。 */
+    @Value("${report.dashboard-cache-seconds:300}") private int dashboardCacheSeconds;
+    private final Map<String, CachedDashboard> dashboardCache = new ConcurrentHashMap<>();
+    private record CachedDashboard(long expiresAt, Map<String, Object> result) {}
+
     @GetMapping("/dashboard")
     @PreAuthorize("hasAuthority('report:view')")
     @Transactional(readOnly = true)
     public ApiResponse<Map<String, Object>> dashboard() {
+        return ApiResponse.ok(dashboardCached());
+    }
+
+    /**
+     * 仪表盘一次要聚合全量物品+库存、当天/近7天/近14天/近6个月流水共 5 轮查询，
+     * 是首页高频接口；按访问范围（非仓库角色=全量 / WAREHOUSE=其授权仓库集）缓存结果，TTL 内直接复用。
+     * 并发未命中各自重算、后写覆盖，无害；{@code report.dashboard-cache-seconds=0} 关闭
+     * （测试 profile 默认关闭，防止用例间改库存后读到脏缓存）。
+     */
+    private Map<String, Object> dashboardCached() {
+        String scope = warehouseAccess.isWarehouseScoped() ? "wh:" + warehouseAccess.currentWarehouseIds().stream().sorted().toList() : "all";
+        if (dashboardCacheSeconds <= 0) return computeDashboard();
+        CachedDashboard hit = dashboardCache.get(scope);
+        long now = System.currentTimeMillis();
+        if (hit != null && hit.expiresAt() > now) return hit.result();
+        Map<String, Object> fresh = computeDashboard();
+        dashboardCache.put(scope, new CachedDashboard(now + dashboardCacheSeconds * 1000L, fresh));
+        return fresh;
+    }
+
+    private Map<String, Object> computeDashboard() {
         List<ItemStock> stock = currentStockByItem();
         List<Map<String, Object>> alerts = smartAlerts(stock);
         BigDecimal qty = stock.stream().map(x -> x.quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -80,7 +113,7 @@ public class ReportController {
         result.put("dailyTrend", dailyTrend);
         result.put("monthlyProfit", monthlyProfit);
         result.put("topItemsByValue", topItemsByValue);
-        return ApiResponse.ok(result);
+        return result;
     }
 
     @GetMapping("/stock-alert")
@@ -370,6 +403,27 @@ public class ReportController {
     @PreAuthorize("hasAuthority('report:view')")
     @Transactional(readOnly = true)
     public ApiResponse<List<Map<String, Object>>> inventoryAge() {
+        return ApiResponse.ok(inventoryAgeCached());
+    }
+
+    /**
+     * 库龄需整表流式重放全部库存流水（FIFO 逐层消耗），代价随流水总量线性增长，是报表里最重的一个；
+     * 按访问范围（非仓库角色=全量 / WAREHOUSE=其授权仓库集）缓存结果，TTL 内直接复用。
+     * 并发未命中各自重算、后写覆盖，无害；{@code report.inventory-age-cache-seconds=0} 关闭
+     * （测试 profile 默认关闭，防止用例间改库存后读到脏缓存）。
+     */
+    private List<Map<String, Object>> inventoryAgeCached() {
+        String scope = warehouseAccess.isWarehouseScoped() ? "wh:" + warehouseAccess.currentWarehouseIds().stream().sorted().toList() : "all";
+        if (inventoryAgeCacheSeconds <= 0) return computeInventoryAge();
+        CachedAge hit = inventoryAgeCache.get(scope);
+        long now = System.currentTimeMillis();
+        if (hit != null && hit.expiresAt() > now) return hit.result();
+        List<Map<String, Object>> fresh = computeInventoryAge();
+        inventoryAgeCache.put(scope, new CachedAge(now + inventoryAgeCacheSeconds * 1000L, fresh));
+        return fresh;
+    }
+
+    private List<Map<String, Object>> computeInventoryAge() {
         LocalDate today = LocalDate.now();
 
         Map<String,List<AgeLayer>> remainingLayers;
@@ -381,7 +435,7 @@ public class ReportController {
         java.util.stream.Stream<Inventory> inventoryStream=warehouseAccess.isWarehouseScoped()?inventories.streamAllDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds()):inventories.streamAllDetailed();
         try(inventoryStream){inventoryStream.forEach(inv->{if(inv.getQuantity()==null||inv.getQuantity().signum()<=0)return;List<AgeLayer> layers=remainingLayers.getOrDefault(stockKey(inv.getItem().getId(),inv.getWarehouse().getId(),inv.getLocation()==null?null:inv.getLocation().getId(),inv.getBatchNo()),List.of());long ageDays=layerAgeDays(inv,layers,today);String bucket=ageDays<30?"0-30":ageDays<60?"30-60":ageDays<90?"60-90":">90";Map<String,Object> m=new LinkedHashMap<>();m.put("itemCode",inv.getItem().getCode());m.put("itemName",inv.getItem().getName());m.put("unit",inv.getItem().getUnit());m.put("warehouseName",inv.getWarehouse().getName());m.put("locationCode",inv.getLocation()==null?null:inv.getLocation().getCode());m.put("batchNo",inv.getBatchNo());m.put("quantity",inv.getQuantity());m.put("amount",inv.getTotalAmount());m.put("earliestInDate",earliestLayerDate(inv,layers,today));m.put("ageDays",ageDays);m.put("bucket",bucket);result.add(m);});}
         result.sort((a, b) -> Long.compare((long) b.get("ageDays"), (long) a.get("ageDays")));
-        return ApiResponse.ok(result);
+        return result;
     }
 
     /** 以带符号流水构建每个库存键真实剩余的 FIFO 入库层，出库会逐层消费而非只看当前库存。 */

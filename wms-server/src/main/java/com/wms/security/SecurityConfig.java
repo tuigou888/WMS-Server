@@ -1,6 +1,7 @@
 package com.wms.security;
 
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -34,6 +35,17 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /** 全局 IP 限流（L2）：注册在 Servlet 链最前（早于 Security 链），登录/支付回调等 permitAll 路径同样受保护；测试 profile 通过 security.rate-limit.enabled=false 关闭。 */
+    @Bean
+    FilterRegistrationBean<GlobalRateLimitFilter> globalRateLimitFilter() {
+        boolean enabled = environment.getProperty("security.rate-limit.enabled", boolean.class, true);
+        int maxRequests = environment.getProperty("security.rate-limit.max-requests", int.class, 300);
+        int windowSeconds = environment.getProperty("security.rate-limit.window-seconds", int.class, 60);
+        FilterRegistrationBean<GlobalRateLimitFilter> registration = new FilterRegistrationBean<>(new GlobalRateLimitFilter(enabled, maxRequests, windowSeconds));
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 10);
+        return registration;
     }
 
     /** 独立管理端口（默认 9089）专用链：actuator 只在该端口提供，而 Prometheus 抓取不带 token，实测会被下面的链拦成 401。

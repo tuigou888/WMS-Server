@@ -4,6 +4,7 @@ import com.wms.common.BusinessException;
 import com.wms.dto.AdjustmentRequest;
 import com.wms.dto.DocumentRequest;
 import com.wms.dto.ReviewRequest;
+import com.wms.dto.StockInRequest;
 import com.wms.harness.Harness;
 import com.wms.repository.InventoryRepository;
 import com.wms.repository.InventoryTransactionRepository;
@@ -28,6 +29,7 @@ class AdjustmentIntegrationTest {
 
     @Autowired private DocumentService documents;
     @Autowired private AdjustmentService adjustments;
+    @Autowired private InventoryService stock;
     @Autowired private InventoryRepository inventories;
     @Autowired private InventoryTransactionRepository transactions;
 
@@ -59,6 +61,24 @@ class AdjustmentIntegrationTest {
             adjustments.complete(id);
 
             assertEquals(before.subtract(new BigDecimal("5")), qty("ITEM-001"));
+        });
+    }
+
+    /** 回归：超量报损不得使库存为负——多批次时预占守卫只看仓库物理总量，具体行可为负而被掩盖，须由目标值下限拦截。 */
+    @Test
+    void overLossRejectedKeepingInventoryNonNegative() {
+        Harness.asAdmin(() -> {
+            // A-01-01 初始 100；再造第二批次 A-01-02 入 50，使物理总量 150 足以掩盖单行透支 150
+            stock.stockIn(new StockInRequest("ITEM-001", new BigDecimal("50"), new BigDecimal("16.00"), 1L, "A-01-02", null, "构造第二批次"));
+            BigDecimal before = qty("ITEM-001");
+            Map<String, Object> created = adjustments.create(new AdjustmentRequest(
+                    "LOSS", 1L, "超量报损", null,
+                    List.of(new AdjustmentRequest.AdjustmentLineRequest("ITEM-001", "A-01-01", null, new BigDecimal("150")))));
+            Long id = ((Number) created.get("id")).longValue();
+            adjustments.review(id, new ReviewRequest("APPROVE", null));
+            BusinessException ex = assertThrows(BusinessException.class, () -> adjustments.complete(id));
+            assertTrue(ex.getMessage().contains("不能为负数"), ex.getMessage());
+            assertEquals(0, before.compareTo(qty("ITEM-001")));
         });
     }
 

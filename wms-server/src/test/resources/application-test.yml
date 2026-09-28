@@ -22,6 +22,27 @@ audit:
     # 关掉自动归档：定时任务会在测试期间往仓库写文件。AuditArchiveServiceTest 直接调 runOnce() 并指定 @TempDir 目录。
     enabled: false
 
+idempotency:
+  cleanup:
+    # 关掉自动清理：IdempotencyCleanupServiceTest 直接调 runOnce() 验证。
+    enabled: false
+
+auth:
+  cleanup:
+    # 关掉自动清理：AuthCleanupServiceTest 直接调 runOnce() 验证。
+    enabled: false
+
+report:
+  # 关掉库龄缓存：ReportControllerIntegrationTest 改库存后会立即重查库龄，防用例间脏读。
+  inventory-age-cache-seconds: 0
+  # 关掉仪表盘缓存：dashboard 用例改库存后立即断言当天金额，防用例间脏读（缓存用例自身用 ReflectionTestUtils 显式拨 TTL）。
+  dashboard-cache-seconds: 0
+
+security:
+  rate-limit:
+    # 集成测试全走 MockMvc 同一 IP，打开会集体 429；GlobalRateLimitFilterTest 直调 filter 单测。
+    enabled: false
+
 logging:
   level:
     com.wms: WARN

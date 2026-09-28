@@ -47,9 +47,9 @@ const loadCategories = async () => {
 onMounted(async () => {
   load()
   try {
-    const itemPage = await api.items({ page: 1, pageSize: 1000 })
-    items.value = itemPage.records
-    itemMap.value = Object.fromEntries(itemPage.records.map((x) => [x.id, x]))
+    const rows = await api.allItems()
+    items.value = rows
+    itemMap.value = Object.fromEntries(rows.map((x) => [x.id, x]))
   } catch (e) {
     message.error(e.message)
   }
