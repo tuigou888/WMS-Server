@@ -74,6 +74,12 @@
       }
     },
     {
+      "path": "pages/document-create/document-create",
+      "style": {
+        "navigationBarTitleText": "新建单据"
+      }
+    },
+    {
       "path": "pages/document-detail/document-detail",
       "style": {
         "navigationBarTitleText": "单据详情"

@@ -289,9 +289,37 @@ class MarketControllerTest {
                     "列表", "13800000000", "地址", true, null));
             service.addCart(user, productId, 1);
             service.createOrder(user, new MarketOrderCreateRequest(c.getId(), 1L, "PAY_ONLINE", null));
-            var resp = marketController.orders(1, 10, null);
+            var resp = marketController.orders(1, 10, null, null);
             assertEquals(200, resp.code());
             assertTrue(((Number) resp.data().get("total")).longValue() > 0);
+        });
+    }
+
+    /** payStatus 过滤（"退款"tab 支撑）：UNPAID 只返回未支付单，PAID 过滤无匹配。 */
+    @Test
+    void orders_payStatusFilterMatches() {
+        Map<String, Object> p = createShelfOnProductViaApi();
+        Long productId = ((Number) p.get("id")).longValue();
+        Harness.asAdmin(() -> {
+            UserAccount user = admin();
+            MarketCustomer c = service.saveCustomer(user, new MarketCustomerRequest(
+                    "支付过滤", "13900000001", "地址", true, null));
+            service.addCart(user, productId, 1);
+            service.createOrder(user, new MarketOrderCreateRequest(c.getId(), 1L, "PAY_ONLINE", null));
+
+            var unpaid = marketController.orders(1, 10, null, "UNPAID");
+            assertEquals(200, unpaid.code());
+            assertTrue(((Number) unpaid.data().get("total")).longValue() > 0);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rows = (List<Map<String, Object>>) unpaid.data().get("records");
+            rows.forEach(r -> assertEquals("UNPAID", String.valueOf(r.get("payStatus"))));
+
+            var paid = marketController.orders(1, 10, null, "PAID");
+            assertEquals(0, ((Number) paid.data().get("total")).longValue());
+
+            // REFUND 简写 = REFUNDING + REFUNDED，无退款单时为空且不报错
+            var refund = marketController.orders(1, 10, null, "REFUND");
+            assertEquals(0, ((Number) refund.data().get("total")).longValue());
         });
     }
 

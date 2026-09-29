@@ -44,6 +44,7 @@ const permissionLabels = {
   'excel:write': '电子表格导入',
   'ocr:use': '文字识别',
   'location:read': '库位查看',
+  'customer:read-all': '客户档案查看（全部）',
   'market:buy': '商城购买',
   'market:read': '商城信息查看',
   'market:credit': '商城挂账下单',

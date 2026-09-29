@@ -28,7 +28,10 @@ export const useCartStore = defineStore('cart', () => {
 
   async function add(productId, quantity = 1) {
     await cartApi.add({ productId, quantity })
-    await load()
+    // 加购本身已成功；随后的刷新失败不外抛，否则页面会把成功误报为失败、用户重试导致重复加购
+    try {
+      await load()
+    } catch (e) { /* 刷新失败静默，下次进购物车页会重拉 */ }
   }
 
   async function update(id, quantity) {

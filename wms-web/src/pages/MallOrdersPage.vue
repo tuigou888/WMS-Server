@@ -257,6 +257,8 @@ const columns = [
   </a-modal>
 
   <a-modal v-model:open="auditModal" :title="auditForm.approve ? '审核通过' : '驳回订单'" width="480" :ok-text="auditForm.approve ? '确认通过' : '确认驳回'" @ok="auditOrder(auditForm.approve)">
+    <a-alert v-if="currentOrder && currentOrder.payType === 'CREDIT'" type="warning" show-icon
+             message="挂账订单：审核通过即视为已收款并扣减库存，请核实线下赊账凭据" style="margin-bottom: 12px" />
     <a-form layout="vertical">
       <a-form-item :label="auditForm.approve ? '审核备注' : '驳回原因'">
         <a-textarea v-model:value="auditForm.remark" :placeholder="auditForm.approve ? '可填审核备注（选填）' : '请填写驳回原因'" :rows="3" />

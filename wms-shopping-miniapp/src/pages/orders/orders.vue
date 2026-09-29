@@ -56,7 +56,7 @@ export default {
   },
   computed: {
     tabs() {
-      return [ { value: '', label: '全部' }, { value: 'PENDING', label: '待付款' }, { value: 'AUDITED', label: '待发货' }, { value: 'SHIPPED', label: '已发货' }, { value: 'COMPLETED', label: '已完成' }, { value: 'CANCELLED', label: '已取消' }, { value: 'REJECTED', label: '已拒绝' } ]
+      return [ { value: '', label: '全部' }, { value: 'PENDING', label: '待付款' }, { value: 'AUDITED', label: '待发货' }, { value: 'SHIPPED', label: '已发货' }, { value: 'COMPLETED', label: '已完成' }, { value: 'CANCELLED', label: '已取消' }, { value: 'REJECTED', label: '已拒绝' }, { value: 'REFUND', label: '退款' } ]
     },
     statusText() { return (s) => ({ PENDING: '待付款', AUDITED: '待发货', SHIPPED: '已发货', COMPLETED: '已完成', CANCELLED: '已取消', REJECTED: '已拒绝' }[s] || s) },
   },
@@ -71,7 +71,13 @@ export default {
       const seq = ++this.loadSeq
       const page = reset ? 1 : this.page + 1
       try {
-        const res = await orderApi.list({ page, pageSize: this.pageSize, status: this.status })
+        const isRefundTab = this.status === 'REFUND'
+        const res = await orderApi.list({
+          page,
+          pageSize: this.pageSize,
+          status: isRefundTab ? null : this.status,
+          payStatus: isRefundTab ? 'REFUND' : null,
+        })
         if (seq !== this.loadSeq) return
         const rows = (res && res.records) || []
         this.list = reset ? rows : this.list.concat(rows)

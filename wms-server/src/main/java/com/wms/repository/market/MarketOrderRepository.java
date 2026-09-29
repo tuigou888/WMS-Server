@@ -2,6 +2,7 @@ package com.wms.repository.market;
 
 import com.wms.model.entity.market.MarketOrder;
 import com.wms.model.entity.market.MarketOrderStatus;
+import com.wms.model.entity.market.MarketPayStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -25,6 +26,14 @@ public interface MarketOrderRepository extends JpaRepository<MarketOrder, Long> 
             + "where (:userId is null or o.user.id = :userId) "
             + "and (:status is null or o.orderStatus = :status) order by o.createdAt desc")
     Page<MarketOrder> search(@Param("userId") Long userId, @Param("status") MarketOrderStatus status, Pageable pageable);
+
+    /** 支付状态过滤（商城"退款"tab 需同时命中 REFUNDING/REFUNDED，故收集合）。 */
+    @Query("select distinct o from MarketOrder o left join fetch o.user left join fetch o.warehouse left join fetch o.customer left join fetch o.items i left join fetch i.item left join fetch i.item.category "
+            + "where o.user.id = :userId "
+            + "and (:status is null or o.orderStatus = :status) "
+            + "and o.payStatus in :payStatuses order by o.createdAt desc")
+    Page<MarketOrder> searchByPayStatus(@Param("userId") Long userId, @Param("status") MarketOrderStatus status,
+                                        @Param("payStatuses") java.util.Collection<MarketPayStatus> payStatuses, Pageable pageable);
 
     @Query("select distinct o from MarketOrder o left join fetch o.user left join fetch o.warehouse left join fetch o.customer left join fetch o.items i left join fetch i.item left join fetch i.item.category "
             + "where (:keyword is null or :keyword = '' "

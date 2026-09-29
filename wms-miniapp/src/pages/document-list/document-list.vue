@@ -8,6 +8,7 @@
       <picker class="filter-picker" mode="selector" :range="activeStatusOptions" :value="statusIndex" @change="onStatusChange">
         <view class="filter-item">{{ activeStatusOptions[statusIndex] }}</view>
       </picker>
+      <view v-if="userStore.hasPerm('document:write')" class="filter-item create-btn" @tap="goCreate">+ 新建</view>
     </view>
 
     <!-- 列表 -->
@@ -47,6 +48,7 @@
 
 <script>
 import { api } from '@/api/request.js'
+import { useUserStore } from '@/store/user.js'
 import { money as formatMoney, num as formatNum, date as formatDate } from '@/utils/format.js'
 
 const TYPE_MAP = { IN: '采购入库', OUT: '销售出库', RETURN_IN: '退货入库', RETURN_OUT: '退回供应商' }
@@ -74,6 +76,7 @@ export default {
     }
   },
   computed: {
+    userStore() { return useUserStore() },
     // 调拨/盘点无 CANCELLED 状态，筛"已取消"永远为空——选项按单据类型裁剪
     activeStatusOptions() {
       return (this.typeIndex === 3 || this.typeIndex === 4)
@@ -98,6 +101,9 @@ export default {
       const sysInfo = uni.getSystemInfoSync()
       const filterHeight = 60
       this.listHeight = sysInfo.windowHeight - filterHeight
+    },
+    goCreate() {
+      uni.navigateTo({ url: '/pages/document-create/document-create' })
     },
     onTypeChange(e) {
       this.typeIndex = e.detail.value
@@ -226,6 +232,7 @@ export default {
   border-bottom: 2rpx solid var(--wms-border);
 }
 .filter-picker { flex: 1; }
+.create-btn { flex: 0 0 140rpx; color: var(--wms-primary); font-weight: 600; }
 .filter-item {
   padding: 14rpx 24rpx;
   background: var(--wms-bg);

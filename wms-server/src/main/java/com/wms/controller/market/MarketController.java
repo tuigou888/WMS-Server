@@ -200,12 +200,29 @@ public class MarketController {
     public ApiResponse<Map<String, Object>> orders(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String payStatus) {
         SecurityUtils.require(Permissions.MARKET_READ);
         UserAccount user = user();
         Pageable pageable = PageRequest.of(Math.max(0, page - 1), Math.min(50, Math.max(1, pageSize)));
-        Page<MarketOrder> p = orders.search(user.getId(),
-                (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status), pageable);
+        MarketOrderStatus statusFilter = (status == null || status.isBlank()) ? null : MarketOrderStatus.from(status);
+        // payStatus 支持逗号分隔多值；"REFUND" 简写展开为退款中+已退款
+        List<MarketPayStatus> payStatuses = new ArrayList<>();
+        if (payStatus != null && !payStatus.isBlank()) {
+            for (String s : payStatus.split(",")) {
+                String v = s.trim();
+                if (v.isEmpty()) continue;
+                if ("REFUND".equalsIgnoreCase(v)) {
+                    payStatuses.add(MarketPayStatus.REFUNDING);
+                    payStatuses.add(MarketPayStatus.REFUNDED);
+                } else {
+                    payStatuses.add(MarketPayStatus.valueOf(v.toUpperCase()));
+                }
+            }
+        }
+        Page<MarketOrder> p = payStatuses.isEmpty()
+                ? orders.search(user.getId(), statusFilter, pageable)
+                : orders.searchByPayStatus(user.getId(), statusFilter, payStatuses, pageable);
         return ApiResponse.ok(orderPageOf(p));
     }
 

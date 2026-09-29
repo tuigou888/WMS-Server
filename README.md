@@ -171,7 +171,7 @@ Authorization: Bearer <token>
 | 工具 | `GET /qrcodes/items/{code}`（Base64）、`GET /qrcodes/items/{code}/png`、`GET /excel/items/export`、`POST /excel/items/import` |
 | 报表 | `/reports/dashboard`、`/stock-alert`、`/profit`、`/anomalies`、`/inventory-age`、`/in-out-summary?period=YYYY-MM` |
 | 审计 | `GET /logs`（需 `log:view`，服务端分页 `{records,total,page,pageSize}`） |
-| 商城 | `GET /market/products`、购物车 `/market/cart`（`GET ?pricing=effective` 与下单同口径；`DELETE ?ids=` 删单条）、订单 `/market/orders`（`/prepay`、`/mock-pay`、`/cancel`、`/receive`）、收藏 `/market/favorites`；管理端 `/admin/market/**`（商品/订单/客户/统计）；支付回调 `/market/pay/notify`、`/market/pay/refund-notify`（免鉴权，APIv3 验签） |
+| 商城 | `GET /market/products`、购物车 `/market/cart`（`GET ?pricing=effective` 与下单同口径；`DELETE ?ids=` 删单条）、订单 `/market/orders`（`?payStatus=` 逗号分隔支付状态过滤，`REFUND` 简写=退款中+已退款；`/prepay`、`/mock-pay`、`/cancel`、`/receive`）、收藏 `/market/favorites`；管理端 `/admin/market/**`（商品/订单/客户/统计）；支付回调 `/market/pay/notify`、`/market/pay/refund-notify`（免鉴权，APIv3 验签） |
 | 其他 | `GET /health`、`POST /ocr/recognize`（`ocr.mock` 开关驱动）、`GET/POST /purchase-requests`（请购） |
 
 **鉴权约定**：除登录/注册/绑定、`/health/**`、两个支付回调外，所有接口（包括 `/market/**` 浏览类）均需 Token。权限为 RBAC `资源:动作` 字符串（如 `document:review`、`inventory:scan`），Controller 侧 `@PreAuthorize` + Service 侧 `SecurityUtils.require` 双重校验；WAREHOUSE 无 `*:review`、`inventory:scan`、`user:manage` 等权限。
