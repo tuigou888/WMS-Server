@@ -45,7 +45,7 @@
                 </view>
                 <view class="qty-row">
                   <text class="qty-label">实盘</text>
-                  <input class="qty-input" type="digit" v-model="line.actualQuantity" placeholder="请输入" @blur="saveLine(line)" />
+                  <input class="qty-input" type="digit" v-model="line.actualQuantity" placeholder="请输入" :disabled="order.status !== 'DRAFT'" @blur="saveLine(line)" />
                 </view>
                 <view class="qty-row diff" v-if="line.differenceQuantity !== undefined && line.differenceQuantity !== null">
                   <text class="qty-label">差异</text>
@@ -56,7 +56,7 @@
               </view>
             </view>
             <view class="line-actions">
-              <button class="btn-secondary btn-save-line" @tap="saveLine(line)" :disabled="savingLineId === line.id">
+              <button class="btn-secondary btn-save-line" @tap="saveLine(line)" :disabled="savingLineId === line.id || order.status !== 'DRAFT'">
                 <text v-if="savingLineId === line.id" class="loading-sm"></text>
                 <text v-else>保存</text>
               </button>
@@ -97,9 +97,6 @@ export default {
   onLoad() {
     this.loadDetail()
   },
-  onShow() {
-    this.loadDetail()
-  },
   methods: {
     async loadDetail() {
       this.loading = true
@@ -123,42 +120,64 @@ export default {
           await this.processScan(res.result)
         }
       } catch (e) {
-        uni.showToast({ title: e.errMsg || '扫码失败', icon: 'none' })
+        const scanErr = (e && e.errMsg) || ''
+        if (scanErr.indexOf('cancel') < 0) uni.showToast({ title: scanErr || '扫码失败', icon: 'none' })
       } finally {
         this.scanning = false
       }
     },
     async processScan(code) {
       try {
-        // 查找明细行
+        // 查找明细行：同一物品可能有多库位/多批次多行，仅按 itemCode 取第一行会漏录
         const item = await api.itemByCode(code)
-        const line = this.lines.find(l => l.itemCode === item.code)
-        if (line) {
-          // 弹窗输入实盘数量
-          const result = await uni.showModal({
-            title: '录入实盘',
-            content: `${item.name} (${line.locationCode || '默认库位'})\n账面数量: ${formatNum(line.bookQuantity)}`,
-            editable: true,
-            placeholderText: '请输入实盘数量',
-          })
-          if (result.confirm && result.content) {
-            const qty = parseFloat(result.content)
-            if (!isNaN(qty) && qty >= 0) {
-              line.actualQuantity = qty.toString()
-              await this.saveLine(line)
-            } else {
-              uni.showToast({ title: '请输入有效数量', icon: 'none' })
-            }
-          }
-        } else {
+        const candidates = this.lines.filter(l => l.itemCode === item.code)
+        if (candidates.length === 0) {
           uni.showToast({ title: '该物品不在盘点范围内', icon: 'none' })
+          return
+        }
+        let line = candidates[0]
+        if (candidates.length > 1) {
+          if (candidates.length > 6) {
+            uni.showToast({ title: '该物品有多行盘点行，请在列表中直接录入', icon: 'none' })
+            return
+          }
+          const tapIndex = await new Promise((resolve) => {
+            uni.showActionSheet({
+              itemList: candidates.map(l => `${l.locationCode || '默认库位'}${l.batchNo ? ' / 批次 ' + l.batchNo : ''}`),
+              success: (r) => resolve(r.tapIndex),
+              fail: () => resolve(-1),
+            })
+          })
+          if (tapIndex < 0) return
+          line = candidates[tapIndex]
+        }
+        // 弹窗输入实盘数量
+        const result = await uni.showModal({
+          title: '录入实盘',
+          content: `${item.name} (${line.locationCode || '默认库位'})\n账面数量: ${formatNum(line.bookQuantity)}`,
+          editable: true,
+          placeholderText: '请输入实盘数量',
+        })
+        if (result.confirm && result.content) {
+          const raw = String(result.content).trim()
+          if (!/^\d+(\.\d+)?$/.test(raw)) {
+            uni.showToast({ title: '请输入非负数字', icon: 'none' })
+            return
+          }
+          line.actualQuantity = raw
+          await this.saveLine(line)
         }
       } catch (e) {
         uni.showToast({ title: e.message || '处理失败', icon: 'none' })
       }
     },
     async saveLine(line) {
-      if (line.actualQuantity === '' || line.actualQuantity === undefined) return
+      if (line.actualQuantity === '' || line.actualQuantity === undefined || line.actualQuantity === null) return
+      if (this.savingLineId === line.id) return
+      if (!/^\d+(\.\d+)?$/.test(String(line.actualQuantity).trim())) {
+        uni.showToast({ title: '请输入非负数字', icon: 'none' })
+        return
+      }
       this.savingLineId = line.id
       try {
         const payload = {
@@ -171,8 +190,10 @@ export default {
           }],
         }
         await api.countStocktake(this.id, payload)
+        // 本地行已带最新实盘值，同步差异数供模板展示（不再整页 reload）
+        line.differenceQuantity = parseFloat(line.actualQuantity) - parseFloat(line.bookQuantity || 0)
         uni.showToast({ title: '保存成功', icon: 'success' })
-        this.loadDetail()
+        // 本地行已带最新实盘值，不再整页 reload（会强制收起键盘、打断连续录入）
       } catch (e) {
         uni.showToast({ title: e.message || '保存失败', icon: 'none' })
       } finally {
@@ -185,6 +206,12 @@ export default {
         uni.showToast({ title: '请先录入至少一行实盘数量', icon: 'none' })
         return
       }
+      const invalid = filledLines.find(l => !/^\d+(\.\d+)?$/.test(String(l.actualQuantity).trim()))
+      if (invalid) {
+        uni.showToast({ title: `${invalid.itemName} 的实盘数量不是有效数字`, icon: 'none' })
+        return
+      }
+      if (this.submittingAll) return
       this.submittingAll = true
       try {
         const payload = {
@@ -206,11 +233,11 @@ export default {
       }
     },
     statusText(status) {
-      const map = { DRAFT: '草稿', IN_PROGRESS: '盘点中', CONFIRMED: '已确认', CANCELLED: '已取消' }
+      const map = { DRAFT: '草稿', APPROVED: '已审核', REJECTED: '已驳回', COMPLETED: '已完成' }
       return map[status] || status
     },
     statusClass(status) {
-      const map = { DRAFT: 'badge-default', IN_PROGRESS: 'badge-info', CONFIRMED: 'badge-success', CANCELLED: 'badge-error' }
+      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', REJECTED: 'badge-error', COMPLETED: 'badge-success' }
       return map[status] || 'badge-default'
     },
     diffClass(diff) {

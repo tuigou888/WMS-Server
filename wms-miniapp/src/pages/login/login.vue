@@ -63,11 +63,10 @@
         <navigator class="btn-primary login-home-link" url="/pages/index/index" open-type="reLaunch">进入首页</navigator>
       </view>
 
-      <view v-if="isLocalDebug" class="demo-accounts">
+      <view v-if="demoAccounts.length" class="demo-accounts">
         <text class="demo-title">演示账号：</text>
         <view class="demo-row">
-          <text class="demo-item" @tap="fillAccount('admin', 'admin123')">管理员 / admin123</text>
-          <text class="demo-item" @tap="fillAccount('operator', 'operator123')">操作员 / operator123</text>
+          <text v-for="d in demoAccounts" :key="d.username" class="demo-item" @tap="fillAccount(d.username, d.password)">{{ d.label }} / {{ d.password }}</text>
         </view>
       </view>
     </view>
@@ -81,6 +80,13 @@ import { useUserStore } from '@/store/user.js'
 import { api, IS_LOCAL_API } from '@/api/request.js'
 
 const isLocalDebug = import.meta.env.DEV || IS_LOCAL_API
+// 演示口令只在 DEV 构建存在；生产构建时 import.meta.env.DEV 为 false，字面量会被死代码消除，不进产物
+const DEMO_ACCOUNTS = import.meta.env.DEV
+  ? [
+      { label: '管理员', username: 'admin', password: 'admin123' },
+      { label: '操作员', username: 'operator', password: 'operator123' },
+    ]
+  : []
 
 export default {
   data() {
@@ -89,6 +95,7 @@ export default {
       wxState: 'login', // login | bind
       loading: false,
       isLocalDebug,
+      demoAccounts: isLocalDebug ? DEMO_ACCOUNTS : [],
       loginSucceeded: false,
       bindForm: { username: '', password: '' },
       pwdForm: { username: '', password: '' },
@@ -145,12 +152,23 @@ export default {
 
     handleLoginSuccess(result) {
       const userStore = useUserStore()
+      // 买家（CUSTOMER）账号属于商城端，登入作业端只会到处 403——这里直接拦截
+      if (!(result.permissions || []).includes('inventory:read')) {
+        uni.showModal({
+          title: '无仓库作业权限',
+          content: '当前账号为商城买家账号，请使用商城小程序购物；仓库作业请使用管理员或仓管账号登录。',
+          showCancel: false,
+        })
+        return
+      }
       userStore.login({
         username: result.username,
         displayName: result.displayName,
         role: result.role,
         permissions: result.permissions,
       }, result.token)
+      // 本地保存到期时间（expiresIn 秒，留 1 分钟余量），冷启动据此判断 token 是否已过期
+      uni.setStorageSync('wms_token_expires_at', Date.now() + Math.max(60, result.expiresIn || 43200) * 1000)
       this.loginSucceeded = true
       uni.showToast({ title: '登录成功', icon: 'success' })
       this.navigateAfterLogin()

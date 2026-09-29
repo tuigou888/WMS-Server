@@ -116,6 +116,7 @@
 <script>
 import { useUserStore } from '@/store/user.js'
 import { api } from '@/api/request.js'
+import { chooseIndex } from '@/utils/choose.js'
 import { money as formatMoney, num as formatNum } from '@/utils/format.js'
 
 export default {
@@ -185,7 +186,9 @@ export default {
         const res = await uni.scanCode({ scanType: ['qrCode', 'barCode'] })
         if (res.result) await this.loadItem(res.result)
       } catch (e) {
-        uni.showToast({ title: e.errMsg || '扫码失败', icon: 'none' })
+        // 用户主动取消（errMsg 含 cancel）不提示失败
+        const scanErr = (e && e.errMsg) || ''
+        if (scanErr.indexOf('cancel') < 0) uni.showToast({ title: scanErr || '扫码失败', icon: 'none' })
       }
     },
     async loadItem(code) {
@@ -236,23 +239,21 @@ export default {
         const list = await api.get(`/locations?warehouseId=${this.userStore.warehouseId}`)
         this.locations = list
       } catch (e) {
-        console.warn('加载库位失败:', e)
+        // 加载失败与"真无库位"区分提示（原来静默吞掉，误导为"该仓库暂无库位"）
+        uni.showToast({ title: '库位加载失败', icon: 'none' })
       }
     },
-    showWarehousePicker() {
+    async showWarehousePicker() {
       const items = this.userStore.warehouses.map(w => w.name)
       if (items.length === 0) return
-      uni.showActionSheet({
-        itemList: items,
-        success: (res) => {
-          const selected = this.userStore.warehouses[res.tapIndex]
-          this.userStore.setWarehouse(selected.id)
-          this.selectedLocation = ''
-          this.loadLocations()
-        },
-      })
+      // 仓库可能超过 6 个（微信 actionSheet 上限），用分页选择器
+      const idx = await chooseIndex(items)
+      if (idx < 0) return
+      this.userStore.setWarehouse(this.userStore.warehouses[idx].id)
+      this.selectedLocation = ''
+      this.loadLocations()
     },
-    showLocationPicker() {
+    async showLocationPicker() {
       if (!this.userStore.warehouseId) {
         uni.showToast({ title: '请先选择仓库', icon: 'none' })
         return
@@ -262,16 +263,26 @@ export default {
         return
       }
       const items = this.locations.map(l => l.code)
-      uni.showActionSheet({
-        itemList: items,
-        success: (res) => {
-          this.selectedLocation = this.locations[res.tapIndex].code
-        },
-      })
+      // 库位常超过 6 个（微信 actionSheet 上限），用分页选择器
+      const idx = await chooseIndex(items)
+      if (idx < 0) return
+      this.selectedLocation = this.locations[idx].code
+    },
+    // 前端硬校验：负数/"12abc" 这类会被 parseFloat 静默截断的输入在提交前拦截
+    numericError() {
+      if (!/^\d+(\.\d+)?$/.test(String(this.form.quantity).trim()) || !(Number(this.form.quantity) > 0)) return '数量必须为正数'
+      if (!/^\d+(\.\d+)?$/.test(String(this.form.salePrice).trim()) || !(Number(this.form.salePrice) >= 0)) return '售出单价必须为非负数'
+      return ''
     },
     async submit() {
+      if (this.submitting) return
       if (!this.formValid) {
         uni.showToast({ title: '请填写完整信息', icon: 'none' })
+        return
+      }
+      const numericError = this.numericError()
+      if (numericError) {
+        uni.showToast({ title: numericError, icon: 'none' })
         return
       }
       this.submitting = true

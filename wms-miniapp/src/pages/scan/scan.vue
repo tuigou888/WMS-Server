@@ -84,7 +84,9 @@ export default {
           this.goToItem(res.result)
         }
       } catch (e) {
-        uni.showToast({ title: e.errMsg || '扫码失败', icon: 'none' })
+        // 用户主动取消（errMsg 含 cancel）不提示失败
+        const msg = (e && e.errMsg) || ''
+        if (msg.indexOf('cancel') < 0) uni.showToast({ title: msg || '扫码失败', icon: 'none' })
       } finally {
         this.scanning = false
       }

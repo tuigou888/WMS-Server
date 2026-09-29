@@ -153,9 +153,6 @@ export default {
     this.setContentHeight()
     this.loadDetail()
   },
-  onShow() {
-    this.loadDetail()
-  },
   onPullDownRefresh() {
     this.refreshing = true
     this.loadDetail()
@@ -171,10 +168,14 @@ export default {
         const identifier = this.id || this.code
         if (!identifier) throw new Error('缺少物品标识')
 
-        const [item, dist] = await Promise.all([
-          this.id ? api.item(this.id) : api.itemByCode(this.code),
-          api.inventoryByItem(this.id || (await api.itemByCode(this.code)).id),
-        ])
+        let item, dist
+        if (this.id) {
+          ;[item, dist] = await Promise.all([api.item(this.id), api.inventoryByItem(this.id)])
+        } else {
+          // 仅带 code 进入：先解析物品拿 id，避免 itemByCode 重复请求两次
+          item = await api.itemByCode(this.code)
+          dist = await api.inventoryByItem(item.id)
+        }
         this.item = item
         this.distribution = dist
         await this.loadQrcode()

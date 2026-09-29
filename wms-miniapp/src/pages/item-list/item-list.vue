@@ -74,6 +74,7 @@ export default {
       loadingMore: false,
       refreshing: false,
       hasMore: true,
+      reqSeq: 0,
       listHeight: 0,
       showQrModal: false,
       qrImage: '',
@@ -83,10 +84,10 @@ export default {
   },
   onLoad() {
     this.setListHeight()
-    this.search()
   },
   onShow() {
-    this.search()
+    // 统一在 onShow 重置加载（原 onLoad 拉第 1 页后 onShow 再拉会自动 append 第 2 页）
+    this.search(true)
   },
   onPullDownRefresh() {
     this.refreshing = true
@@ -100,20 +101,25 @@ export default {
       this.listHeight = sysInfo.windowHeight - searchHeight
     },
     async search(reset = false) {
+      // reset 允许打断在途翻页，过期响应直接丢弃
       if (reset) {
+        this.reqSeq++
         this.page = 1
         this.list = []
         this.hasMore = true
+      } else if (this.loading) {
+        return
       }
+      const seq = this.reqSeq
       this.loading = true
       try {
         const params = { page: this.page, pageSize: this.pageSize }
         if (this.keyword) params.keyword = this.keyword
         const res = await api.items(params)
+        if (seq !== this.reqSeq) return
         const data = res.records || res
-        if (reset) this.list = []
-        // 为每个物品获取库存摘要
-        for (const item of data) {
+        // 为每个物品并行获取库存摘要（原串行 await 一次列表 21 个请求）
+        await Promise.all(data.map(async (item) => {
           try {
             const inv = await api.inventoryByItem(item.id)
             if (inv.length > 0) {
@@ -125,16 +131,20 @@ export default {
           } catch (e) {
             item.stockInfo = null
           }
-        }
+        }))
+        if (seq !== this.reqSeq) return
         this.list.push(...data)
         this.hasMore = data.length >= this.pageSize
         this.page++
       } catch (e) {
+        if (seq !== this.reqSeq) return
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })
       } finally {
-        this.loading = false
-        this.refreshing = false
-        uni.stopPullDownRefresh()
+        if (seq === this.reqSeq) {
+          this.loading = false
+          this.refreshing = false
+          uni.stopPullDownRefresh()
+        }
       }
     },
     loadMore() {
@@ -158,11 +168,20 @@ export default {
       }
     },
     async saveQrcode() {
+      uni.showLoading({ title: '保存中...', mask: true })
+      const finish = () => uni.hideLoading()
       try {
-        uni.showLoading({ title: '保存中...', mask: true })
         const res = await api.qrcodePng(this.qrItemCode)
+        // #ifdef H5
         const blob = new Blob([res], { type: 'image/png' })
-        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(blob)
+        a.download = `qrcode_${this.qrItemCode}.png`
+        a.click()
+        URL.revokeObjectURL(a.href)
+        uni.showToast({ title: '已下载', icon: 'success' })
+        // #endif
+        // #ifndef H5
         const fs = uni.getFileSystemManager()
         const path = `${uni.env.USER_DATA_PATH}/qrcode_${this.qrItemCode}.png`
         fs.writeFile({
@@ -177,10 +196,11 @@ export default {
           },
           fail: () => uni.showToast({ title: '保存失败', icon: 'none' }),
         })
+        // #endif
       } catch (e) {
         uni.showToast({ title: e.message || '保存失败', icon: 'none' })
       } finally {
-        uni.hideLoading()
+        finish()
       }
     },
     formatMoney,

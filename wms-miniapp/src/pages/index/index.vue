@@ -92,6 +92,7 @@
 <script>
 import { useUserStore } from '@/store/user.js'
 import { api } from '@/api/request.js'
+import { chooseIndex } from '@/utils/choose.js'
 import { money as formatMoney, num as formatNum } from '@/utils/format.js'
 
 export default {
@@ -132,7 +133,6 @@ export default {
   },
   onLoad() {
     this.setContentHeight()
-    this.loadData()
   },
   onShow() {
     if (this.userStore.isLoggedIn) {
@@ -169,19 +169,16 @@ export default {
       this.loadData(true)
     },
     loadMore() {},
-    showWarehousePicker() {
+    async showWarehousePicker() {
       const items = this.userStore.warehouses.map(w => w.name)
       if (items.length === 0) {
         uni.showToast({ title: '暂无仓库数据', icon: 'none' })
         return
       }
-      uni.showActionSheet({
-        itemList: items,
-        success: (res) => {
-          const selected = this.userStore.warehouses[res.tapIndex]
-          this.userStore.setWarehouse(selected.id)
-        },
-      })
+      // 仓库可能超过 6 个（微信 actionSheet 上限），用分页选择器
+      const idx = await chooseIndex(items)
+      if (idx < 0) return
+      this.userStore.setWarehouse(this.userStore.warehouses[idx].id)
     },
     formatMoney,
     formatNum,

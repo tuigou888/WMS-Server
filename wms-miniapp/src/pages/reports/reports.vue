@@ -156,7 +156,6 @@ export default {
   },
   onLoad() {
     this.setContentHeight()
-    this.loadAll()
   },
   onShow() {
     this.loadAll()
@@ -173,13 +172,11 @@ export default {
     async loadAll() {
       this.loading = true
       try {
-        const [dashboard, alerts, profit, anomalies, inventoryAge, inOutSummary] = await Promise.all([
+        // anomalies/inventoryAge/inOutSummary 本页从未消费，不再拉取（省 3 个废请求）
+        const [dashboard, alerts, profit] = await Promise.all([
           api.dashboard().catch(() => null),
           api.alerts().catch(() => []),
           api.profit().catch(() => []),
-          api.anomalies().catch(() => []),
-          api.inventoryAge().catch(() => []),
-          api.inOutSummary().catch(() => []),
         ])
 
         this.dashboard = dashboard
@@ -210,12 +207,23 @@ export default {
       this.loadAll()
     },
     typeText(type) {
-      const map = { in: '入库', out: '出库', transfer: '调拨', adjust: '调整', check: '盘点' }
+      const map = {
+        in: '采购入库', out: '销售出库',
+        transfer_in: '调拨入', transfer_out: '调拨出',
+        adjust_in: '盘盈入', adjust_out: '盘亏出',
+        return_in: '退货入', return_out: '退供出',
+        loss_out: '报损出', gain_in: '报溢入',
+        reverse_in: '红冲入', reverse_out: '红冲出',
+      }
       return map[type] || type
     },
     typeClass(type) {
-      const map = { in: 'type-in', out: 'type-out', transfer: 'type-transfer', adjust: 'type-adjust', check: 'type-check' }
-      return map[type] || ''
+      if (['in', 'gain_in', 'return_in'].includes(type)) return 'type-in'
+      if (['out', 'loss_out', 'return_out'].includes(type)) return 'type-out'
+      if ((type || '').startsWith('transfer')) return 'type-transfer'
+      if ((type || '').startsWith('adjust')) return 'type-adjust'
+      if ((type || '').startsWith('reverse')) return 'type-check'
+      return ''
     },
     catPercent(val) {
       const max = Math.max(...(this.categoryDistribution?.map(c => c.value) || [1]))

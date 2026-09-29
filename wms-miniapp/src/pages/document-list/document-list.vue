@@ -5,8 +5,8 @@
       <picker class="filter-picker" mode="selector" :range="typeOptions" :value="typeIndex" @change="onTypeChange">
         <view class="filter-item">{{ typeOptions[typeIndex] }}</view>
       </picker>
-      <picker class="filter-picker" mode="selector" :range="statusOptions" :value="statusIndex" @change="onStatusChange">
-        <view class="filter-item">{{ statusOptions[statusIndex] }}</view>
+      <picker class="filter-picker" mode="selector" :range="activeStatusOptions" :value="statusIndex" @change="onStatusChange">
+        <view class="filter-item">{{ activeStatusOptions[statusIndex] }}</view>
       </picker>
     </view>
 
@@ -61,6 +61,8 @@ export default {
       loadingMore: false,
       refreshing: false,
       hasMore: true,
+      reqSeq: 0,
+      autoLoads: 0,
       page: 1,
       pageSize: 20,
       listHeight: 0,
@@ -71,11 +73,19 @@ export default {
       typeOptionsCache: {},
     }
   },
+  computed: {
+    // 调拨/盘点无 CANCELLED 状态，筛"已取消"永远为空——选项按单据类型裁剪
+    activeStatusOptions() {
+      return (this.typeIndex === 3 || this.typeIndex === 4)
+        ? ['全部状态', '草稿', '已审核', '已执行']
+        : ['全部状态', '草稿', '已审核', '已执行', '已取消']
+    },
+  },
   onLoad() {
     this.setListHeight()
-    this.loadList(true)
   },
   onShow() {
+    // 统一 onShow 加载（原 onLoad+onShow 双请求会竞态重复渲染）；onShow 带 reset 重取第一页
     this.loadList(true)
   },
   onPullDownRefresh() {
@@ -91,6 +101,7 @@ export default {
     },
     onTypeChange(e) {
       this.typeIndex = e.detail.value
+      if (this.statusIndex >= this.activeStatusOptions.length) this.statusIndex = 0
       this.loadList(true)
     },
     onStatusChange(e) {
@@ -98,11 +109,11 @@ export default {
       this.loadList(true)
     },
     statusText(status) {
-      const map = { DRAFT: '草稿', APPROVED: '已审核', COMPLETED: '已执行', CANCELLED: '已取消', CONFIRMED: '已确认' }
+      const map = { DRAFT: '草稿', APPROVED: '已审核', COMPLETED: '已执行', CANCELLED: '已取消', REJECTED: '已驳回', CONFIRMED: '已确认' }
       return map[status] || status
     },
     statusClass(status) {
-      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-error', CONFIRMED: 'badge-success' }
+      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-error', REJECTED: 'badge-error', CONFIRMED: 'badge-success' }
       return map[status] || 'badge-default'
     },
     enrichDoc(doc, kind) {
@@ -135,43 +146,58 @@ export default {
     },
     async loadList(reset = false) {
       if (reset) {
+        // 请求序号：reset 允许打断在途翻页，过期响应直接丢弃
+        this.reqSeq++
         this.page = 1
+        this.autoLoads = 0
         this.list = []
         this.hasMore = true
+      } else if (this.loading || this.loadingMore) {
+        return
       }
-      if (this.loading || this.loadingMore || !this.hasMore) return
-      this.loadingMore = this.list.length > 0
+      const seq = this.reqSeq
+      this.loadingMore = !reset && this.list.length > 0
       this.loading = true
       try {
-        let pageData = { records: [] }
-        let kind = 'document'
-        const params = { page: this.page, pageSize: this.pageSize }
-        if (this.typeIndex === 3) {
-          pageData = await api.transfers(params)
-          kind = 'transfer'
-        } else if (this.typeIndex === 4) {
-          pageData = await api.stocktakes(params)
-          kind = 'stocktake'
-        } else {
-          pageData = await api.documents(params)
+        // 类型/状态为本地过滤，可能把当前页全部滤空——还有后续页时自动续拉（最多 10 页）
+        for (;;) {
+          let pageData = { records: [] }
+          let kind = 'document'
+          const params = { page: this.page, pageSize: this.pageSize }
+          if (this.typeIndex === 3) {
+            pageData = await api.transfers(params)
+            kind = 'transfer'
+          } else if (this.typeIndex === 4) {
+            pageData = await api.stocktakes(params)
+            kind = 'stocktake'
+          } else {
+            pageData = await api.documents(params)
+          }
+          if (seq !== this.reqSeq) return
+          let data = pageData.records || []
+          if (this.typeIndex === 1) data = data.filter(d => IN_TYPES.includes(d.type))
+          else if (this.typeIndex === 2) data = data.filter(d => OUT_TYPES.includes(d.type))
+          const statusMap = { 1: 'DRAFT', 2: 'APPROVED', 3: 'COMPLETED', 4: 'CANCELLED' }
+          if (this.statusIndex > 0 && statusMap[this.statusIndex]) {
+            data = data.filter(d => d.status === statusMap[this.statusIndex])
+          }
+          const rawCount = (pageData.records || []).length
+          this.list.push(...data.map(d => this.enrichDoc(d, kind)))
+          this.hasMore = rawCount === this.pageSize
+          this.page++
+          if (data.length > 0 || !this.hasMore || this.autoLoads >= 10) break
+          this.autoLoads++
         }
-        let data = pageData.records || []
-        if (this.typeIndex === 1) data = data.filter(d => IN_TYPES.includes(d.type))
-        else if (this.typeIndex === 2) data = data.filter(d => OUT_TYPES.includes(d.type))
-        const statusMap = { 1: 'DRAFT', 2: 'APPROVED', 3: 'COMPLETED', 4: 'CANCELLED' }
-        if (this.statusIndex > 0 && statusMap[this.statusIndex]) {
-          data = data.filter(d => d.status === statusMap[this.statusIndex])
-        }
-        this.list.push(...data.map(d => this.enrichDoc(d, kind)))
-        this.hasMore = (pageData.records || []).length === this.pageSize
-        this.page++
       } catch (e) {
+        if (seq !== this.reqSeq) return
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })
       } finally {
-        this.loading = false
-        this.loadingMore = false
-        this.refreshing = false
-        uni.stopPullDownRefresh()
+        if (seq === this.reqSeq) {
+          this.loading = false
+          this.loadingMore = false
+          this.refreshing = false
+          uni.stopPullDownRefresh()
+        }
       }
     },
     loadMore() {

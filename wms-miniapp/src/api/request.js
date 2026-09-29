@@ -9,6 +9,14 @@ const USER_KEY = 'wms_user'
 const WAREHOUSE_KEY = 'wms_warehouse'
 const IDEMPOTENCY_CACHE_KEY = 'wms_idempotency_pending'
 
+// 幂等 pending 表：内存缓存 + 惰性落盘，避免每个写请求同步双 IO
+let idempotencyCache = null
+function loadPending() {
+  if (idempotencyCache === null) idempotencyCache = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  return idempotencyCache
+}
+function savePending() { uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, idempotencyCache || {}) }
+
 function requestIdentity(method, url, data) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) return null
   const body = JSON.stringify(sortForHash(data == null ? null : data)) || 'null'
@@ -20,12 +28,15 @@ function requestIdentity(method, url, data) {
     b = Math.imul(b ^ code, 3266489917)
   }
   const scope = `${method.toUpperCase()}:${url}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`
-  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
+  const pending = loadPending()
+  // 上限保护：只增不减会撑爆 storage——按插入序淘汰最旧条目（而非整表清空，避免抹掉在途请求的幂等键）
+  const keys = Object.keys(pending)
+  while (keys.length >= 50) { delete pending[keys.shift()] }
   let key = pending[scope]
   if (!key) {
     key = `wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`
     pending[scope] = key
-    uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending)
+    savePending()
   }
   return { scope, key }
 }
@@ -38,9 +49,8 @@ function sortForHash(value) {
 
 function clearRequestIdentity(identity) {
   if (!identity) return
-  const pending = uni.getStorageSync(IDEMPOTENCY_CACHE_KEY) || {}
-  delete pending[identity.scope]
-  uni.setStorageSync(IDEMPOTENCY_CACHE_KEY, pending)
+  const pending = loadPending()
+  if (pending[identity.scope] === identity.key) { delete pending[identity.scope]; savePending() }
 }
 
 class RequestError extends Error {
@@ -60,9 +70,14 @@ function setToken(token) {
   uni.setStorageSync(TOKEN_KEY, token)
 }
 
+// 会话态与业务残留一并清理（登出与 401 都走这里）：换账号登录不得沿用上一账号
+// 的仓库（wms_warehouse）、扫码历史（scan_history）、转单缓存（wms_transfer_detail）与幂等键；
+// wms_api_base 属设备级配置，保留
+const SESSION_STORAGE_KEYS = [TOKEN_KEY, USER_KEY, WAREHOUSE_KEY, IDEMPOTENCY_CACHE_KEY, 'scan_history', 'wms_transfer_detail', 'wms_token_expires_at']
+
 function clearToken() {
-  uni.removeStorageSync(TOKEN_KEY)
-  uni.removeStorageSync(USER_KEY)
+  SESSION_STORAGE_KEYS.forEach(key => uni.removeStorageSync(key))
+  idempotencyCache = null
 }
 
 function getUser() {
@@ -81,6 +96,9 @@ function getWarehouseId() {
 function setWarehouseId(id) {
   uni.setStorageSync(WAREHOUSE_KEY, id)
 }
+
+// 同一 token 批次的 401 只清一次登出，防页面并发多请求重复 reLaunch（对齐 wms-web client.js 约定）
+let lastUnauthorizedAuth = null
 
 async function request(options) {
   const { url, method = 'GET', data, header = {}, responseType } = options
@@ -111,11 +129,14 @@ async function request(options) {
       ...requestOptions,
       success: (res) => {
         if (res.statusCode === 401) {
-          clearToken()
-          if (getCurrentPages().length > 0) {
-            const currentRoute = getCurrentPages()[getCurrentPages().length - 1].route
-            if (!currentRoute.includes('login')) {
-              uni.reLaunch({ url: '/pages/login/login' })
+          if (lastUnauthorizedAuth !== token) {
+            lastUnauthorizedAuth = token
+            clearToken()
+            if (getCurrentPages().length > 0) {
+              const currentRoute = getCurrentPages()[getCurrentPages().length - 1].route
+              if (!currentRoute.includes('login')) {
+                uni.reLaunch({ url: '/pages/login/login' })
+              }
             }
           }
           reject(new RequestError('登录已过期，请重新登录', 401, res))
@@ -125,6 +146,8 @@ async function request(options) {
         const apiRes = normalizeResponseData(res.data)
 
         if (res.statusCode >= 400) {
+          // 后端明确拒绝 = 业务终态，释放幂等键（网络中断时保留键以支持安全重试）
+          clearRequestIdentity(identity)
           const msg = apiRes?.message || `请求失败 (${res.statusCode})`
           reject(new RequestError(msg, res.statusCode, res))
           return
@@ -135,6 +158,7 @@ async function request(options) {
             clearRequestIdentity(identity)
             resolve(apiRes.data)
           } else {
+            clearRequestIdentity(identity)
             reject(new RequestError(apiRes.message || '请求失败', apiRes.code, res))
           }
         } else {
@@ -248,19 +272,10 @@ const api = {
   qrcodePng: (code) => api.download(`/qrcodes/items/${encodeURIComponent(code)}/png`),
 
   // Excel
-  exportItems: () => api.download('/excel/items/export'),
-  importItems: (file) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    return request({ url: '/excel/items/import', method: 'POST', data: formData, header: { 'Content-Type': 'multipart/form-data' } })
-  },
+  // （exportItems/importItems 已移除：小程序无 FormData 全局、且无任何页面调用；将来做文件上传需走 uni.uploadFile）
 
   // OCR
-  ocrRecognize: (file) => {
-    const formData = new FormData()
-    formData.append('file', file)
-    return request({ url: '/ocr/recognize', method: 'POST', data: formData, header: { 'Content-Type': 'multipart/form-data' } })
-  },
+  // （ocrRecognize 已移除：同上，wx.request 不支持 multipart FormData）
 
   // 操作日志
   logs: (params) => api.get('/logs', params),

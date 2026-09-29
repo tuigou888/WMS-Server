@@ -2,8 +2,8 @@
   <view class="inventory-page">
     <!-- 搜索栏 -->
     <view class="search-bar">
-      <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称" @confirm="search" />
-      <button class="search-btn btn-primary" @tap="search">搜索</button>
+      <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称" @confirm="onSearch" />
+      <button class="search-btn btn-primary" @tap="onSearch">搜索</button>
     </view>
 
     <!-- 筛选 -->
@@ -14,9 +14,9 @@
           <text class="filter-arrow">▾</text>
         </view>
       </picker>
-      <picker class="filter-picker" mode="selector" :range="['全部', '有库存', '预警', '零库存']" :value="statusIndex" @change="onStatusChange">
+      <picker class="filter-picker" mode="selector" :range="statusNames" :value="statusIndex" @change="onStatusChange">
         <view class="filter-item">
-          <text class="filter-value">{{ ['全部', '有库存', '预警', '零库存'][statusIndex] }}</text>
+          <text class="filter-value">{{ statusNames[statusIndex] }}</text>
           <text class="filter-arrow">▾</text>
         </view>
       </picker>
@@ -84,20 +84,27 @@ export default {
       loadingMore: false,
       refreshing: false,
       hasMore: true,
+      rawCount: 0,
+      autoLoads: 0,
+      reqSeq: 0,
       listHeight: 0,
       warehouseIndex: 0,
       statusIndex: 0,
+      // 后端库存列表无预警阈值字段，"预警"档从未有数据支撑，改为可真实过滤的三档
+      statusNames: ['全部', '有库存', '零库存'],
       warehouseNames: ['全部仓库'],
       warehouses: [],
     }
   },
-  onLoad() {
+  onLoad(opt) {
     this.setListHeight()
+    // 支持从物品详情页带关键词跳入（此前 onLoad 不接收入参，keyword 丢失）
+    if (opt && opt.keyword) this.keyword = decodeURIComponent(opt.keyword)
     this.loadWarehouses()
-    this.search()
   },
   onShow() {
-    this.search()
+    // 统一在 onShow 加载并重置到第一页；onLoad 只做初始化，避免双请求竞态与 onShow 自动翻页
+    this.search(true)
   },
   onPullDownRefresh() {
     this.refreshing = true
@@ -127,33 +134,63 @@ export default {
       this.statusIndex = e.detail.value
       this.search(true)
     },
+    onSearch() { this.search(true) },
+    // 后端 list 端点不接收 keyword，状态筛选也无对应参数——两者都在前端本地过滤
+    applyLocalFilters(rows) {
+      let out = rows
+      const kw = (this.keyword || '').trim().toLowerCase()
+      if (kw) out = out.filter(r => (r.itemCode || '').toLowerCase().includes(kw) || (r.itemName || '').toLowerCase().includes(kw))
+      // 后端 /inventory 不接收 warehouseId（仅 scoped 用户服务端过滤），管理员视角的仓库筛选在本地生效
+      if (this.warehouseIndex > 0 && this.warehouses[this.warehouseIndex - 1]) {
+        const wid = this.warehouses[this.warehouseIndex - 1].id
+        out = out.filter(r => Number(r.warehouseId) === Number(wid))
+      }
+      if (this.statusIndex === 1) out = out.filter(r => Number(r.quantity || 0) > 0)
+      if (this.statusIndex === 2) out = out.filter(r => Number(r.quantity || 0) <= 0)
+      return out
+    },
     async search(reset = false) {
+      if (this.loading && !reset) return
       if (reset) {
+        // 请求序号：reset 允许打断在途翻页，过期响应直接丢弃
+        this.reqSeq++
         this.page = 1
+        this.rawCount = 0
+        this.autoLoads = 0
         this.list = []
         this.hasMore = true
       }
+      const seq = this.reqSeq
       this.loading = true
       try {
-        const params = {
-          page: this.page,
-          pageSize: this.pageSize,
-        }
-        if (this.keyword) params.keyword = this.keyword
-        if (this.warehouseIndex > 0) params.warehouseId = this.warehouses[this.warehouseIndex - 1].id
+        // keyword/状态为本地过滤，可能把当前页全部滤空——还有后续页时自动续拉（最多 10 页），
+        // 避免"明明有数据却显示为空"
+        for (;;) {
+          const params = {
+            page: this.page,
+            pageSize: this.pageSize,
+          }
+          if (this.warehouseIndex > 0) params.warehouseId = this.warehouses[this.warehouseIndex - 1].id
 
-        const pageData = await api.inventory(params)
-        const data = pageData.records || []
-        if (reset) this.list = []
-        this.list.push(...data)
-        this.hasMore = data.length === this.pageSize && this.list.length < pageData.total
-        this.page++
+          const pageData = await api.inventory(params)
+          if (seq !== this.reqSeq) return
+          const data = pageData.records || []
+          this.rawCount += data.length
+          const filtered = this.applyLocalFilters(data)
+          this.list.push(...filtered)
+          this.hasMore = data.length === this.pageSize && this.rawCount < pageData.total
+          this.page++
+          if (filtered.length > 0 || !this.hasMore || this.autoLoads >= 10) break
+          this.autoLoads++
+        }
       } catch (e) {
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })
       } finally {
-        this.loading = false
-        this.refreshing = false
-        uni.stopPullDownRefresh()
+        if (seq === this.reqSeq) {
+          this.loading = false
+          this.refreshing = false
+          uni.stopPullDownRefresh()
+        }
       }
     },
     loadMore() {

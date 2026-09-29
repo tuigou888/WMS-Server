@@ -61,12 +61,12 @@ export default {
       loadingMore: false,
       refreshing: false,
       hasMore: true,
+      reqSeq: 0,
       contentHeight: 0,
     }
   },
   onLoad() {
     this.setContentHeight()
-    this.loadList()
   },
   onShow() {
     this.loadList(true)
@@ -81,27 +81,35 @@ export default {
       this.contentHeight = uni.getSystemInfoSync().windowHeight
     },
     async loadList(reset = false) {
+      // reset 允许打断在途翻页，过期响应直接丢弃
       if (reset) {
+        this.reqSeq++
         this.page = 1
         this.list = []
         this.hasMore = true
+      } else if (this.loading) {
+        return
       }
+      const seq = this.reqSeq
       this.loading = true
       try {
         const params = { page: this.page, pageSize: this.pageSize }
         const pageData = await api.stocktakes(params)
+        if (seq !== this.reqSeq) return
         const data = pageData.records || []
-        if (reset) this.list = []
         this.list.push(...data)
         this.hasMore = data.length >= this.pageSize
         this.page++
       } catch (e) {
+        if (seq !== this.reqSeq) return
         uni.showToast({ title: e.message || '加载失败', icon: 'none' })
       } finally {
-        this.loading = false
-        this.loadingMore = false
-        this.refreshing = false
-        uni.stopPullDownRefresh()
+        if (seq === this.reqSeq) {
+          this.loading = false
+          this.loadingMore = false
+          this.refreshing = false
+          uni.stopPullDownRefresh()
+        }
       }
     },
     loadMore() {
@@ -111,18 +119,18 @@ export default {
       }
     },
     statusText(status) {
-      const map = { DRAFT: '草稿', IN_PROGRESS: '盘点中', CONFIRMED: '已确认', CANCELLED: '已取消' }
+      const map = { DRAFT: '草稿', APPROVED: '已审核', REJECTED: '已驳回', COMPLETED: '已完成' }
       return map[status] || status
     },
     statusClass(status) {
-      const map = { DRAFT: 'badge-default', IN_PROGRESS: 'badge-info', CONFIRMED: 'badge-success', CANCELLED: 'badge-error' }
+      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', REJECTED: 'badge-error', COMPLETED: 'badge-success' }
       return map[status] || 'badge-default'
     },
     goCount(id) {
       uni.navigateTo({ url: `/pages/check-count/check-count?id=${id}` })
     },
     viewDetail(id) {
-      uni.navigateTo({ url: `/pages/document-detail/document-detail?id=${id}&type=check` })
+      uni.navigateTo({ url: `/pages/document-detail/document-detail?id=${id}&type=stocktakes` })
     },
     formatDate,
   },

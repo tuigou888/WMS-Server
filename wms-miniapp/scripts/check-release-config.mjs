@@ -17,6 +17,15 @@ if (fs.existsSync(siblingManifest)) {
     errors.push(`appid 与 ../wms-shopping-miniapp 相同（${appid}）：微信后台一个 appid 只对应一个小程序，后上传会覆盖前者`)
   }
 }
+// 工程内一致性：根目录 project.config.json 是开发者工具打开源码工程时使用的 appid，
+// 与 manifest 构建产物不一致会导致"开发工具与正式上传指向不同小程序主体"
+const projectConfigPath = path.resolve('project.config.json')
+if (fs.existsSync(projectConfigPath)) {
+  const projectAppid = fs.readFileSync(projectConfigPath, 'utf8').match(/"appid"\s*:\s*"([^"]*)"/)?.[1]?.trim()
+  if (appid && projectAppid && projectAppid !== appid) {
+    errors.push(`project.config.json 的 appid（${projectAppid}）与 src/manifest.json 的 mp-weixin.appid（${appid}）不一致`)
+  }
+}
 if (errors.length) {
   console.error(`微信生产发布配置不完整：\n- ${errors.join('\n- ')}`)
   process.exit(1)

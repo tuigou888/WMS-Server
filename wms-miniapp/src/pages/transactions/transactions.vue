@@ -8,7 +8,7 @@
           <text class="filter-arrow">▾</text>
         </view>
       </picker>
-      <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称" @confirm="search" />
+      <input class="search-input" v-model="keyword" placeholder="搜索物品编码/名称" @confirm="onSearch" />
     </view>
 
     <!-- 列表 -->
@@ -64,20 +64,28 @@ export default {
   data() {
     return {
       list: [],
-      limit: 100,
+      // 后端 /inventory/transactions limit 钳制 0..500（默认 100），一次取满 500 条前端过滤
+      limit: 500,
       loading: false,
       loadingMore: false,
       refreshing: false,
-      hasMore: true,
+      hasMore: false,
       listHeight: 0,
       typeIndex: 0,
-      typeOptions: ['全部', '入库', '出库', '调拨', '调整', '盘点'],
+      typeOptions: ['全部', '入库', '出库', '调拨', '盘点/调整', '红冲'],
+      // 与后端 TransactionType 枚举对齐的分组过滤（原 transfer/adjust/check 等值后端不存在，选了永远为空）
+      typeGroups: {
+        1: ['in', 'gain_in', 'return_in'],
+        2: ['out', 'loss_out', 'return_out'],
+        3: ['transfer_in', 'transfer_out'],
+        4: ['adjust_in', 'adjust_out'],
+        5: ['reverse_in', 'reverse_out'],
+      },
       keyword: '',
     }
   },
   onLoad() {
     this.setListHeight()
-    this.loadList()
   },
   onShow() {
     this.loadList(true)
@@ -93,6 +101,7 @@ export default {
       const filterHeight = 60
       this.listHeight = sysInfo.windowHeight - filterHeight
     },
+    onSearch() { this.loadList(true) },
     onTypeChange(e) {
       this.typeIndex = e.detail.value
       this.loadList(true)
@@ -102,15 +111,13 @@ export default {
       try {
         const data = await api.transactions(this.limit)
         let filtered = data
-        if (this.typeIndex > 0) {
-          const typeMap = ['', 'in', 'out', 'transfer', 'adjust', 'check']
-          filtered = data.filter(tx => tx.transactionType === typeMap[this.typeIndex])
-        }
+        const group = this.typeGroups[this.typeIndex]
+        if (group) filtered = filtered.filter(tx => group.includes(tx.transactionType))
         if (this.keyword) {
           const kw = this.keyword.toLowerCase()
           filtered = filtered.filter(tx =>
-            tx.itemCode.toLowerCase().includes(kw) ||
-            tx.itemName.toLowerCase().includes(kw)
+            (tx.itemCode || '').toLowerCase().includes(kw) ||
+            (tx.itemName || '').toLowerCase().includes(kw)
           )
         }
         this.list = filtered
@@ -124,15 +131,26 @@ export default {
       }
     },
     loadMore() {
-      // 后端已返回全部，前端只做筛选
+      // 接口为一次性最新 N 条（limit 上限 500），无游标分页
     },
     typeText(type) {
-      const map = { in: '入库', out: '出库', transfer: '调拨', adjust: '调整', check: '盘点' }
+      const map = {
+        in: '采购入库', out: '销售出库',
+        transfer_in: '调拨入', transfer_out: '调拨出',
+        adjust_in: '盘盈入', adjust_out: '盘亏出',
+        return_in: '退货入', return_out: '退供出',
+        loss_out: '报损出', gain_in: '报溢入',
+        reverse_in: '红冲入', reverse_out: '红冲出',
+      }
       return map[type] || type
     },
     typeClass(type) {
-      const map = { in: 'type-in', out: 'type-out', transfer: 'type-transfer', adjust: 'type-adjust', check: 'type-check' }
-      return map[type] || ''
+      if (['in', 'gain_in', 'return_in'].includes(type)) return 'type-in'
+      if (['out', 'loss_out', 'return_out'].includes(type)) return 'type-out'
+      if (type.startsWith('transfer')) return 'type-transfer'
+      if (type.startsWith('adjust')) return 'type-adjust'
+      if (type.startsWith('reverse')) return 'type-check'
+      return ''
     },
     formatMoney,
     formatNum,

@@ -35,6 +35,10 @@ export const useUserStore = defineStore('user', () => {
 
   function setWarehouses(list) {
     warehouses.value = list
+    // 本地残留的仓库可能已被收回授权（换账号/权限变更），失效即回退第一个可用仓库
+    if (warehouseId.value && !list.some(w => w.id === warehouseId.value)) {
+      warehouseId.value = null
+    }
     if (!warehouseId.value && list.length > 0) {
       setWarehouse(list[0].id)
     }

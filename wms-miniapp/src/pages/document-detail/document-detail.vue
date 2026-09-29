@@ -257,11 +257,11 @@ export default {
       this.loadDetail()
     },
     statusText(status) {
-      const map = { DRAFT: '草稿', APPROVED: '已审核', COMPLETED: '已执行', CANCELLED: '已取消', CONFIRMED: '已确认' }
+      const map = { DRAFT: '草稿', APPROVED: '已审核', COMPLETED: '已执行', CANCELLED: '已取消', REJECTED: '已驳回', CONFIRMED: '已确认' }
       return map[status] || status
     },
     statusClass(status) {
-      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-error', CONFIRMED: 'badge-success' }
+      const map = { DRAFT: 'badge-default', APPROVED: 'badge-info', COMPLETED: 'badge-success', CANCELLED: 'badge-error', REJECTED: 'badge-error', CONFIRMED: 'badge-success' }
       return map[status] || 'badge-default'
     },
     formatMoney,

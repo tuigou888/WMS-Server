@@ -3,9 +3,15 @@ import { useUserStore } from '@/store/user.js'
 
 export default {
   onLaunch() {
-    console.log('App Launch')
     const userStore = useUserStore()
     if (userStore.isLoggedIn) {
+      // 登录页是 pages.json 首项（冷启动入口），已登录且 token 未过期则直达首页
+      const expiresAt = Number(uni.getStorageSync('wms_token_expires_at') || 0)
+      if (expiresAt && expiresAt <= Date.now()) {
+        userStore.logout()
+        return
+      }
+      uni.reLaunch({ url: '/pages/index/index' })
       // 启动时预加载仓库列表
       this.loadWarehouses()
     }

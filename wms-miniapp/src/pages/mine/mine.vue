@@ -45,7 +45,6 @@
       <view class="card" v-if="myLogs.length > 0">
         <view class="section-header">
           <text class="section-title">我的操作记录</text>
-          <navigator url="/pages/mine/mine" class="view-all">查看全部</navigator>
         </view>
         <view class="log-list">
           <view v-for="log in myLogs.slice(0, 5)" :key="log.id" class="log-item">
@@ -94,6 +93,7 @@
 <script>
 import { useUserStore } from '@/store/user.js'
 import { api } from '@/api/request.js'
+import { chooseIndex } from '@/utils/choose.js'
 import { dateTime as formatDateTime } from '@/utils/format.js'
 import { actionLabel, permissionLabel } from '@/utils/labels.js'
 
@@ -125,7 +125,6 @@ export default {
   },
   onLoad() {
     this.setContentHeight()
-    this.loadMyLogs()
   },
   onShow() {
     this.loadMyLogs()
@@ -139,25 +138,24 @@ export default {
       try {
         const username = this.userStore.user?.username
         if (!username) return
+        // /logs 需 log:view 权限（仅 ADMIN/AUDITOR），无权限用户跳过，避免每次进入都 403 静默失败
+        if (!this.userStore.hasPerm('log:view')) { this.myLogs = []; return }
         const data = await api.logs({ username, pageSize: 20 })
         this.myLogs = data.records
       } catch (e) {
         console.warn('加载操作日志失败:', e)
       }
     },
-    showWarehousePicker() {
+    async showWarehousePicker() {
       const items = this.userStore.warehouses.map(w => w.name)
       if (items.length === 0) {
         uni.showToast({ title: '暂无仓库数据', icon: 'none' })
         return
       }
-      uni.showActionSheet({
-        itemList: items,
-        success: (res) => {
-          const selected = this.userStore.warehouses[res.tapIndex]
-          this.userStore.setWarehouse(selected.id)
-        },
-      })
+      // 仓库可能超过 6 个（微信 actionSheet 上限），用分页选择器
+      const idx = await chooseIndex(items)
+      if (idx < 0) return
+      this.userStore.setWarehouse(this.userStore.warehouses[idx].id)
     },
     async logout() {
       this.loggingOut = true
