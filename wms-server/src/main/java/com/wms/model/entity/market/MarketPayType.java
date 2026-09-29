@@ -19,6 +19,11 @@ public enum MarketPayType {
     @JsonCreator
     public static MarketPayType from(String value) {
         if (value == null) return null;
-        return MarketPayType.valueOf(value.toUpperCase());
+        try {
+            return MarketPayType.valueOf(value.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            // 非法支付方式走 400 业务异常，而不是落进兜底 handler 变 500
+            throw new com.wms.common.BusinessException("支付方式不合法：" + value);
+        }
     }
 }

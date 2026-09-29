@@ -30,7 +30,7 @@
           <text class="action-icon">🏷️</text>
           <text>物品查询</text>
         </navigator>
-        <navigator url="/pages/inventory/inventory" class="action-item" hover-class="action-item-hover">
+        <navigator url="/pages/inventory/inventory" open-type="switchTab" class="action-item" hover-class="action-item-hover">
           <text class="action-icon">📦</text>
           <text>库存查询</text>
         </navigator>

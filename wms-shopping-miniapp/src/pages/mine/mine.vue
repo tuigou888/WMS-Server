@@ -87,7 +87,7 @@ export default {
     async logout() {
       try { await auth.logout() } catch (e) {}
       this.userStore.logout()
-      uni.reLaunch({ url: '/pages/index/index' })
+      uni.reLaunch({ url: '/pages/login/login' })
     },
   },
 }

@@ -219,7 +219,8 @@ DRAFT -> REJECTED
 ```
 
 - `GET/POST /stocktakes`：创建时按目标仓库生成账面库存快照。
-- `POST /stocktakes/{id}/count`：提交所有盘点行的 `itemCode`、`locationCode`、`actualQuantity`。
+- `GET /stocktakes/{id}`：盘点单详情（小程序盘点录入/详情页依赖）。
+- `POST /stocktakes/{id}/count`：提交所有盘点行的 `itemCode`、`locationCode`、`actualQuantity`（`locationCode` 允许空串/缺省，对应无库位库存行）。
 - `POST /stocktakes/{id}/review`、`POST /stocktakes/{id}/complete`。
 
 完成时系统将库存调整为实盘数量，生成 `adjust_in` 或 `adjust_out` 流水。

@@ -7,7 +7,7 @@
           <view v-else class="item-img img-holder"><text class="img-holder-icon">📦</text></view>
           <view class="item-info">
             <text class="item-title">{{ c.product.title }}</text>
-            <text class="item-meta">¥{{ money(c.price ?? c.snapshotPrice) }}</text>
+            <text class="item-meta">¥{{ money(c.price ?? c.snapshotPrice) }}<text v-if="c.product && c.product.status !== 'SHELF_ON'" class="off-shelf">已下架</text></text>
           </view>
         </view>
         <view class="item-right">
@@ -53,6 +53,7 @@ export default {
     // in-flight 防抖：同一行更新进行中忽略再点击，避免连点基于旧值发重复 PUT
     async minus(c) {
       if (c.quantity <= 1 || this.updatingId === c.id) return
+      if (c.product && c.product.status !== 'SHELF_ON') { uni.showToast({ title: '该商品已下架，请移除', icon: 'none' }); return }
       this.updatingId = c.id
       try { await this.$store.update(c.id, c.quantity - 1) }
       catch (e) { uni.showToast({ title: (e && e.message) || '更新失败', icon: 'none' }) }
@@ -61,6 +62,7 @@ export default {
     },
     async plus(c) {
       if (this.updatingId === c.id) return
+      if (c.product && c.product.status !== 'SHELF_ON') { uni.showToast({ title: '该商品已下架，请移除', icon: 'none' }); return }
       this.updatingId = c.id
       try { await this.$store.update(c.id, c.quantity + 1) }
       catch (e) { uni.showToast({ title: (e && e.message) || '更新失败', icon: 'none' }) }
@@ -96,4 +98,8 @@ export default {
 .total-price { font-size: 36rpx; color: #ff4d4f; font-weight: 700; }
 .btn-primary { background: #1677ff; color: #fff; border-radius: 40rpx; padding: 20rpx 40rpx; font-size: 30rpx; }
 .empty { padding: 80rpx 40rpx; text-align: center; color: #999; }
+</style>
+
+<style>
+.off-shelf { margin-left: 12rpx; font-size: 20rpx; color: #ff4d4f; border: 1rpx solid #ff4d4f; border-radius: 6rpx; padding: 0 8rpx; }
 </style>

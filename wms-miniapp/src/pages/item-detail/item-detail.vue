@@ -82,7 +82,7 @@
         <view class="card" v-if="distribution.length > 0">
           <view class="section-header">
             <text class="section-title">库位分布</text>
-            <navigator :url="`/pages/inventory/inventory?keyword=${encodeURIComponent(item.code)}`" class="view-all">查看全部库存</navigator>
+            <view class="view-all" @tap="goInventory">查看全部库存</view>
           </view>
           <view class="distribution-list">
             <view v-for="d in distribution" :key="d.id" class="dist-item">
@@ -161,6 +161,11 @@ export default {
     setContentHeight() {
       // windowHeight 已扣除原生导航栏（本页无 tabBar），无需再减
       this.contentHeight = uni.getSystemInfoSync().windowHeight
+    },
+    goInventory() {
+      // tabBar 页无法带 query，经 storage 中转关键词（inventory onShow 读取并清除）
+      uni.setStorageSync('inventory_keyword', this.item ? this.item.code : '')
+      uni.switchTab({ url: '/pages/inventory/inventory' })
     },
     async loadDetail() {
       this.loading = true

@@ -47,13 +47,22 @@ export default {
     return { mode: 'password', username: '', password: '', bindTicket: '', registerForm: { username: '', displayName: '', password: '' }, submitting: false, isDev: import.meta.env.DEV }
   },
   methods: {
+    // 登录/注册成功后的去向：有来源页（401 被踢）则返回原页，否则进首页
+    afterAuth() {
+      const pages = getCurrentPages()
+      if (pages.length > 1) {
+        uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/index/index' }) })
+      } else {
+        uni.switchTab({ url: '/pages/index/index' })
+      }
+    },
     async doLogin() {
       if (!this.username || !this.password) { uni.showToast({ title: '请输入用户名和密码', icon: 'none' }); return }
       this.submitting = true
       try {
         const data = await auth.login({ username: this.username, password: this.password })
         useUserStore().login(data, data.token)
-        uni.switchTab({ url: '/pages/index/index' })
+        this.afterAuth()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '登录失败', icon: 'none' })
       } finally { this.submitting = false }
@@ -70,7 +79,7 @@ export default {
           this.registerForm = { username: '', displayName: '', password: '' }
         } else {
           useUserStore().login(data, data.token)
-          uni.switchTab({ url: '/pages/index/index' })
+          this.afterAuth()
         }
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '微信登录失败', icon: 'none' })
@@ -82,7 +91,7 @@ export default {
       try {
         const data = await auth.wxRegister({ bindTicket: this.bindTicket, ...this.registerForm })
         useUserStore().login(data, data.token)
-        uni.switchTab({ url: '/pages/index/index' })
+        this.afterAuth()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '开户失败', icon: 'none' })
       } finally { this.submitting = false }

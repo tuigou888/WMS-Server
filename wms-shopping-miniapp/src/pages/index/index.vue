@@ -47,6 +47,7 @@ import { formatPrice as money } from '@/utils/format.js'
 export default {
   data() {
     return {
+      loadingMore: false,
       loading: false,
       products: [],
       categories: [],

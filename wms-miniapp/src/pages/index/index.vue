@@ -6,7 +6,7 @@
         <view class="welcome-header">
           <text class="greeting">{{ greeting }}{{ userStore.user?.displayName || userStore.user?.username }}</text>
           <text class="role-badge" :class="['badge', userStore.isAdmin ? 'badge-info' : 'badge-success']">
-            {{ userStore.isAdmin ? '管理员' : '仓库操作员' }}
+            {{ roleText }}
           </text>
         </view>
         <view class="warehouse-selector" @tap="showWarehousePicker">
@@ -53,7 +53,7 @@
       <view class="card menu-section">
         <text class="section-title">常用功能</text>
         <view class="menu-grid">
-          <navigator v-for="item in menus" :key="item.key" :url="item.url" class="menu-item" hover-class="menu-item-hover">
+          <navigator v-for="item in menus" :key="item.key" :url="item.url" :open-type="item.tab ? 'switchTab' : 'navigate'" class="menu-item" hover-class="menu-item-hover">
             <view class="menu-icon">{{ item.icon }}</view>
             <text class="menu-name">{{ item.name }}</text>
           </navigator>
@@ -124,8 +124,8 @@ export default {
           { key: 'stock-in', name: '扫码入库', icon: '📥', url: '/pages/stock-in/stock-in' },
           { key: 'stock-out', name: '扫码出库', icon: '📤', url: '/pages/stock-out/stock-out' },
         ] : []),
-        { key: 'scan', name: '扫码查询', icon: '🔍', url: '/pages/scan/scan' },
-        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory' },
+        { key: 'scan', name: '扫码查询', icon: '🔍', url: '/pages/scan/scan', tab: true },
+        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory', tab: true },
         { key: 'check', name: '盘点任务', icon: '📋', url: '/pages/check/check' },
         { key: 'item-list', name: '物品查询', icon: '🏷️', url: '/pages/item-list/item-list' },
       ]

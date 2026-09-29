@@ -133,6 +133,7 @@ export default {
       scanHistory: [],
       locations: [],
       stockRows: [],
+      loadSeq: 0,
       selectedLocation: '',
       calcData: {
         unitCost: 0,
@@ -197,9 +198,12 @@ export default {
       }
     },
     async loadItem(code) {
+      // 连续扫码防竞态：过期响应直接丢弃（旧响应会污染新物品的 stockRows/口径估算）
+      const seq = ++this.loadSeq
       try {
         uni.showLoading({ title: '加载中...', mask: true })
         const item = await api.itemByCode(code)
+        if (seq !== this.loadSeq) return
         this.item = item
         this.form = { quantity: '', salePrice: '', batchNo: '', remark: '' }
         this.selectedLocation = ''
@@ -209,6 +213,8 @@ export default {
         await this.loadStockInfo(item)
         await this.loadLocations()
       } catch (e) {
+        uni.hideLoading()
+        if (seq !== this.loadSeq) return
         uni.showToast({ title: e.message || '物品不存在', icon: 'none' })
       } finally {
         uni.hideLoading()
@@ -313,7 +319,7 @@ export default {
           salePrice: parseFloat(this.form.salePrice),
           warehouseId: this.userStore.warehouseId,
           locationCode: this.selectedLocation,
-          batchNo: this.form.batchNo || null,
+          batchNo: (this.form.batchNo || '').trim() || null,
           remark: this.form.remark,
         }
         const result = await api.stockOut(data)

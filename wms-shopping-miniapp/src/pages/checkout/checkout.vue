@@ -31,7 +31,7 @@
         <view v-else class="oi-img img-holder"><text class="img-holder-icon">📦</text></view>
         <view class="oi-info">
           <text class="oi-title">{{ c.product.title }}</text>
-          <text class="oi-meta">¥{{ money(c.price ?? c.snapshotPrice) }} × {{ c.quantity }}</text>
+          <text class="oi-meta">¥{{ money(c.price ?? c.snapshotPrice) }} × {{ c.quantity }}<text v-if="c.product && c.product.status !== 'SHELF_ON'" class="oi-off">（已下架）</text></text>
         </view>
         <text class="oi-sub">¥{{ money(c.subtotal) }}</text>
       </view>
@@ -71,7 +71,7 @@ import { formatPrice as money } from '@/utils/format.js'
 
 export default {
   data() {
-    return { items: [], total: 0, address: null, addressList: [], warehouses: [], warehouseId: null, payType: 'PAY_ONLINE', remark: '', submitting: false }
+    return { items: [], total: 0, address: null, addressList: [], warehouses: [], warehouseId: null, payType: 'PAY_ONLINE', remark: '', submitting: false, submitted: false }
   },
   computed: {
     warehouse() { return this.warehouses.find(w => w.id === this.warehouseId) },
@@ -94,6 +94,10 @@ export default {
     ])
     this.items = cartStore.items || []
     this.total = cartStore.total || 0
+    // 已选地址若刚被删除（address 页操作后返回），清除悬挂引用避免提交报"收货人不存在"
+    if (this.address && this.addressList.length && !this.addressList.some(a => a.id === this.address.id)) {
+      this.address = null
+    }
     // 从地址选择页回填选中地址（优先），否则用默认地址兜底
     const picked = uni.getStorageSync('checkout_address')
     if (picked && picked.id) {
@@ -117,6 +121,7 @@ export default {
       this.warehouseId = this.warehouses[idx] && this.warehouses[idx].id
     },
     async submit() {
+      if (this.submitting || this.submitted) return
       if (!this.address) { uni.showToast({ title: '请选择收货地址', icon: 'none' }); return }
       if (!this.warehouseId) { uni.showToast({ title: '请选择发货仓库', icon: 'none' }); return }
       if (!this.items.length) { uni.showToast({ title: '购物车为空', icon: 'none' }); return }
@@ -133,6 +138,8 @@ export default {
         cartStore.items = []
         cartStore.total = 0
         cartStore.count = 0
+        // 置 submitted 防住 600ms 跳转窗口内的二次提交（finally 只复位 submitting）
+        this.submitted = true
         uni.showToast({ title: '下单成功', icon: 'success' })
         setTimeout(() => uni.redirectTo({ url: `/pages/order-detail/order-detail?id=${res.id}` }), 600)
       } catch (e) {
@@ -166,4 +173,8 @@ export default {
 .total-label { font-size: 26rpx; }
 .total-price { font-size: 36rpx; color: #ff4d4f; font-weight: 700; }
 .btn-primary { border-radius: 40rpx; padding: 20rpx 40rpx; }
+</style>
+
+<style>
+.oi-off { color: #ff4d4f; font-size: 22rpx; }
 </style>

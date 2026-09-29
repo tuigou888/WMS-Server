@@ -24,7 +24,7 @@ import { products } from '@/api/market.js'
 import { formatPrice as money } from '@/utils/format.js'
 
 export default {
-  data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false, page: 1, total: 0, loading: false } },
+  data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false, page: 1, total: 0, loading: false, fetchSeq: 0 } },
   onLoad(opt) {
     this.categoryId = (opt && opt.categoryId) || null
     this.categoryName = (opt && opt.name) || ''
@@ -42,19 +42,25 @@ export default {
       await this.fetch(false)
     },
     async fetch(reset) {
-      if (this.loading) return
+      // 请求序号：新搜索覆盖在途请求（原实现直接 return，输入已变却仍显示旧结果）
+      const seq = ++this.fetchSeq
+      if (reset) { this.results = []; this.page = 1 }
       this.loading = true
       try {
         const params = { page: this.page, pageSize: 20 }
         if (this.keyword) params.keyword = this.keyword
         if (this.categoryId) params.categoryId = this.categoryId
         const res = await products.list(params)
+        if (seq !== this.fetchSeq) return
         const rows = (res && res.records) || []
         this.results = reset ? rows : this.results.concat(rows)
         this.total = (res && res.total) || 0
         this.searched = true
-      } catch (e) { uni.showToast({ title: (e && e.message) || '搜索失败', icon: 'none' }) }
-      finally { this.loading = false }
+      } catch (e) {
+        if (seq === this.fetchSeq) uni.showToast({ title: (e && e.message) || '搜索失败', icon: 'none' })
+      } finally {
+        if (seq === this.fetchSeq) this.loading = false
+      }
     },
     goProduct(id) { uni.navigateTo({ url: `/pages/product/product?id=${id}` }) },
   },

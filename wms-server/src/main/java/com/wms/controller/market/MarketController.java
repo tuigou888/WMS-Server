@@ -20,6 +20,7 @@ import org.springframework.data.domain.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 /**
@@ -115,7 +116,7 @@ public class MarketController {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (MarketCart c : list) {
             BigDecimal unit = effective ? service.effectivePriceOf(c) : c.getSnapshotPrice();
-            BigDecimal sub = unit.multiply(BigDecimal.valueOf(c.getQuantity()));
+            BigDecimal sub = unit.multiply(BigDecimal.valueOf(c.getQuantity())).setScale(2, RoundingMode.HALF_UP);
             total = total.add(sub);
             Map<String, Object> row = view(c);
             row.put("price", unit);

@@ -103,6 +103,12 @@ export default {
     this.loadWarehouses()
   },
   onShow() {
+    // 物品详情页经 storage 中转关键词跳入（tabBar 页不支持 query）
+    const handoff = uni.getStorageSync('inventory_keyword')
+    if (handoff) {
+      uni.removeStorageSync('inventory_keyword')
+      this.keyword = handoff
+    }
     // 统一在 onShow 加载并重置到第一页；onLoad 只做初始化，避免双请求竞态与 onShow 自动翻页
     this.search(true)
   },

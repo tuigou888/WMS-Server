@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ class MarketControllerTest {
     @Autowired private MarketService service;
     @Autowired private MarketProductRepository products;
     @Autowired private MarketCartRepository carts;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private MarketCustomerRepository customers;
     @Autowired private MarketOrderRepository orders;
     @Autowired private MarketFavoriteRepository favorites;
@@ -160,6 +163,34 @@ class MarketControllerTest {
             assertNotNull(resp.data().get("items"));
             assertNotNull(resp.data().get("total"));
             assertNotNull(resp.data().get("count"));
+        });
+    }
+
+    /** pricing=effective：快照过期（updated_at 拨回 8 天前）且现价已变时，price/subtotal/total 按现价口径返回。 */
+    @Test
+    void cartPricingEffectiveFallsBackToCurrentPriceForStaleSnapshot() {
+        Map<String, Object> p = createShelfOnProductViaApi();
+        Long productId = ((Number) p.get("id")).longValue();
+        Harness.asAdmin(() -> {
+            marketController.addCart(new MarketCartAddRequest(productId, 2));
+            // 管理员调价 20.00 -> 77.00，并把购物车行 updated_at 拨回 8 天前使 7 天快照过期
+            jdbcTemplate.update("update market_product set sale_price = ? where id = ?", new BigDecimal("77.00"), productId);
+            jdbcTemplate.update("update market_cart set updated_at = ? where product_id = ?", java.time.LocalDateTime.now().minusDays(8), productId);
+            entityManager.clear();
+
+            var effective = marketController.cart("effective");
+            assertEquals(200, effective.code());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> row = (Map<String, Object>) ((List<?>) effective.data().get("items")).get(0);
+            assertEquals(0, new BigDecimal("77.00").compareTo(new BigDecimal(row.get("price").toString())));
+            assertEquals(0, new BigDecimal("154.00").compareTo(new BigDecimal(row.get("subtotal").toString())));
+            assertEquals(0, new BigDecimal("154.00").compareTo(new BigDecimal(effective.data().get("total").toString())));
+
+            // 默认口径保持快照价
+            var legacy = marketController.cart("");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> legacyRow = (Map<String, Object>) ((List<?>) legacy.data().get("items")).get(0);
+            assertEquals(0, new BigDecimal("20.00").compareTo(new BigDecimal(legacyRow.get("price").toString())));
         });
     }
 

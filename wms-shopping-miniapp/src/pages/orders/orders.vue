@@ -11,7 +11,10 @@
       <view class="order-card" v-for="o in list" :key="o.id" @tap="goDetail(o)">
         <view class="order-head">
           <text class="order-no">{{ o.orderNo }}</text>
-          <text class="order-status" :class="'status-'+o.orderStatus.toLowerCase()">{{ statusText(o.orderStatus) }}</text>
+          <view class="order-head-status">
+            <text v-if="o.payStatus === 'REFUNDING' || o.payStatus === 'REFUNDED'" class="order-status status-refunding">{{ o.payStatus === 'REFUNDED' ? '已退款' : '退款中' }}</text>
+            <text class="order-status" :class="'status-'+o.orderStatus.toLowerCase()">{{ statusText(o.orderStatus) }}</text>
+          </view>
         </view>
         <view class="order-item" v-for="it in o.items" :key="it.id">
           <text class="oi-name">{{ it.itemName }} ×{{ it.quantity }}</text>
@@ -49,11 +52,11 @@ export default {
     if (opt && opt.status) this.status = opt.status
   },
   data() {
-    return { status: '', list: [], page: 1, pageSize: 10, hasMore: false }
+    return { status: '', list: [], page: 1, pageSize: 10, hasMore: false, loadSeq: 0 }
   },
   computed: {
     tabs() {
-      return [ { value: '', label: '全部' }, { value: 'PENDING', label: '待付款' }, { value: 'AUDITED', label: '待发货' }, { value: 'SHIPPED', label: '已发货' }, { value: 'COMPLETED', label: '已完成' }, { value: 'CANCELLED', label: '已取消' } ]
+      return [ { value: '', label: '全部' }, { value: 'PENDING', label: '待付款' }, { value: 'AUDITED', label: '待发货' }, { value: 'SHIPPED', label: '已发货' }, { value: 'COMPLETED', label: '已完成' }, { value: 'CANCELLED', label: '已取消' }, { value: 'REJECTED', label: '已拒绝' } ]
     },
     statusText() { return (s) => ({ PENDING: '待付款', AUDITED: '待发货', SHIPPED: '已发货', COMPLETED: '已完成', CANCELLED: '已取消', REJECTED: '已拒绝' }[s] || s) },
   },
@@ -64,9 +67,12 @@ export default {
     money,
     switchTab(v) { this.status = v; this.list = []; this.load(true) },
     async load(reset = false) {
+      // 请求序号：快速切 tab / onShow 重复触发时丢弃过期响应，防旧 tab 数据覆盖新 tab
+      const seq = ++this.loadSeq
       const page = reset ? 1 : this.page + 1
       try {
         const res = await orderApi.list({ page, pageSize: this.pageSize, status: this.status })
+        if (seq !== this.loadSeq) return
         const rows = (res && res.records) || []
         this.list = reset ? rows : this.list.concat(rows)
         this.page = page

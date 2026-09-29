@@ -46,6 +46,7 @@ const permissionLabels = {
   'location:read': '库位查看',
   'market:buy': '商城购买',
   'market:read': '商城信息查看',
+  'market:credit': '商城挂账下单',
   'product:read': '商城商品查看',
   'product:write': '商城商品维护',
   'order:read': '商城订单查看',

@@ -6,7 +6,7 @@
         <view class="user-avatar">{{ userAvatar }}</view>
         <text class="user-name">{{ userStore.user?.displayName || userStore.user?.username }}</text>
         <text class="user-role" :class="userStore.isAdmin ? 'role-admin' : 'role-operator'">
-          {{ userStore.isAdmin ? '系统管理员' : '仓库操作员' }}
+          {{ roleText }}
         </text>
         <view class="user-perms">
           <text v-for="p in userStore.permissions.slice(0, 6)" :key="p" class="perm-tag">{{ permissionLabel(p) }}</text>
@@ -33,7 +33,7 @@
       <view class="card">
         <text class="section-title">功能菜单</text>
         <view class="menu-list">
-          <navigator v-for="item in menus" :key="item.key" :url="item.url" class="menu-item" hover-class="menu-item-hover">
+          <navigator v-for="item in menus" :key="item.key" :url="item.url" :open-type="item.tab ? 'switchTab' : 'navigate'" class="menu-item" hover-class="menu-item-hover">
             <text class="menu-icon">{{ item.icon }}</text>
             <text class="menu-name">{{ item.name }}</text>
             <text class="menu-arrow">▶</text>
@@ -104,7 +104,7 @@ export default {
       contentHeight: 0,
       loggingOut: false,
       menus: [
-        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory' },
+        { key: 'inventory', name: '库存查询', icon: '📦', url: '/pages/inventory/inventory', tab: true },
         { key: 'items', name: '物品查询', icon: '🏷️', url: '/pages/item-list/item-list' },
         { key: 'check', name: '盘点任务', icon: '📋', url: '/pages/check/check' },
         { key: 'documents', name: '单据查看', icon: '📄', url: '/pages/document-list/document-list' },

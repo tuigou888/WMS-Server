@@ -178,7 +178,7 @@
       <view class="card" v-if="actions.length">
         <text class="section-title">操作</text>
         <view class="action-buttons">
-          <button v-for="a in actions" :key="a.key" :class="a.cls" @tap="runAction(a)">{{ a.text }}</button>
+          <button v-for="a in actions" :key="a.key" :class="a.cls" :disabled="actionLoading" @tap="runAction(a)">{{ a.text }}</button>
         </view>
       </view>
     </scroll-view>
@@ -207,7 +207,7 @@ export default {
       const out = []
       if (this.isStocktake) {
         if (s === 'DRAFT') {
-          out.push({ key: 'count', text: '去录入实盘', cls: 'btn-secondary' })
+          if (has('stocktake:write')) out.push({ key: 'count', text: '去录入实盘', cls: 'btn-secondary' })
           if (has('stocktake:review')) {
             out.push({ key: 'approve', text: '审核通过', cls: 'btn-primary' })
             out.push({ key: 'reject', text: '审核驳回', cls: 'btn-danger' })
@@ -229,8 +229,8 @@ export default {
           out.push({ key: 'cancel', text: '取消单据', cls: 'btn-danger' })
         } else if (s === 'APPROVED' && has('document:execute')) {
           out.push({ key: 'complete', text: '执行单据', cls: 'btn-primary' })
-        } else if (s === 'COMPLETED' && has('document:review') && !this.doc.reversalOfDocumentId) {
-          // 红冲单（reversalOfDocumentId 非空）不可再反审/红冲
+        } else if (s === 'COMPLETED' && has('document:review') && !this.doc.reversalOfDocumentId && !this.doc.hasReversal) {
+          // 红冲单自身（reversalOfDocumentId 非空）与已被红冲的原单（hasReversal）都不可再反审/红冲
           out.push({ key: 'uncomplete', text: '反审', cls: 'btn-secondary' })
           out.push({ key: 'reverse', text: '红冲', cls: 'btn-danger' })
         }
@@ -247,6 +247,7 @@ export default {
       contentHeight: 0,
       isStocktake: false,
       isTransfer: false,
+      actionLoading: false,
     }
   },
   onLoad() {
@@ -306,9 +307,16 @@ export default {
       this.refreshing = true
       this.loadDetail()
     },
+    stocktakePendingCount() {
+      return (this.lines || []).filter(l => l.actualQuantity === null || l.actualQuantity === undefined).length
+    },
     runAction(a) {
       if (a.key === 'count') {
         uni.navigateTo({ url: `/pages/check-count/check-count?id=${this.id}` })
+        return
+      }
+      if (this.actionLoading) {
+        uni.showToast({ title: '操作处理中，请稍候', icon: 'none' })
         return
       }
       const kind = this.isStocktake ? 'stocktakes' : this.isTransfer ? 'transfers' : 'documents'
@@ -319,7 +327,9 @@ export default {
         complete: {
           title: a.text,
           content: this.isStocktake
-            ? '执行盘点将按差异生成库存调整并变动库存，确认执行？'
+            ? this.stocktakePendingCount() > 0
+              ? `还有 ${this.stocktakePendingCount()} 行未录入实盘，执行将被后端拒绝；确认继续？`
+              : '执行盘点将按差异生成库存调整并变动库存，确认执行？'
             : '执行单据将实际增减库存，确认执行？',
           editable: false,
         },
@@ -339,6 +349,7 @@ export default {
             uni.showToast({ title: '请填写驳回原因', icon: 'none' })
             return
           }
+          this.actionLoading = true
           try {
             if (a.key === 'approve' || a.key === 'reject') {
               await api.post(`/${kind}/${this.id}/review`, { action: a.key === 'approve' ? 'APPROVE' : 'REJECT', remark: remark || null })
@@ -348,7 +359,11 @@ export default {
             uni.showToast({ title: '操作成功', icon: 'success' })
             this.loadDetail()
           } catch (e) {
+            // 网络超时（code 0）时后端可能已在执行，主动回查一次真实状态
+            if (e && (e.code === 0 || e.code === -1)) this.loadDetail()
             uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
+          } finally {
+            this.actionLoading = false
           }
         },
       })

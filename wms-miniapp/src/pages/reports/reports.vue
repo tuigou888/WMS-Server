@@ -39,7 +39,7 @@
         <view class="card alert-card" v-if="alerts && alerts.length > 0">
           <view class="section-header">
             <text class="section-title">库存预警 ({{ alerts.length }})</text>
-            <navigator url="/pages/inventory/inventory" class="view-all">查看库存</navigator>
+            <navigator url="/pages/inventory/inventory" open-type="switchTab" class="view-all">查看库存</navigator>
           </view>
           <view class="alert-list">
             <view v-for="a in alerts.slice(0, 10)" :key="a.itemId" class="alert-item">
