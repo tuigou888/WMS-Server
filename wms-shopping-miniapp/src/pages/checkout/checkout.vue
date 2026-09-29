@@ -5,7 +5,7 @@
       <block v-if="address">
         <view class="flex justify-between">
           <text class="addr-name">{{ address.name }} <text class="addr-phone">{{ address.phone }}</text></text>
-          <text class="text-muted">默认</text>
+          <text v-if="address.defaultFlag" class="text-muted">默认</text>
         </view>
         <text class="addr-detail">{{ address.address }}</text>
         <view class="min-tip">点击可更换地址</view>
@@ -31,7 +31,7 @@
         <view v-else class="oi-img img-holder"><text class="img-holder-icon">📦</text></view>
         <view class="oi-info">
           <text class="oi-title">{{ c.product.title }}</text>
-          <text class="oi-meta">¥{{ money(c.snapshotPrice) }} × {{ c.quantity }}</text>
+          <text class="oi-meta">¥{{ money(c.price ?? c.snapshotPrice) }} × {{ c.quantity }}</text>
         </view>
         <text class="oi-sub">¥{{ money(c.subtotal) }}</text>
       </view>
@@ -85,11 +85,15 @@ export default {
     },
   },
   async onShow() {
-    await useCartStore().load()
-    this.items = useCartStore().items || []
-    this.total = useCartStore().total || 0
-    await this.loadAddresses()
-    await this.loadWarehouses()
+    const cartStore = useCartStore()
+    // 购物车与地址/仓库并行加载，任一失败不中断其它加载
+    await Promise.all([
+      cartStore.load().catch((e) => uni.showToast({ title: (e && e.message) || '购物车加载失败', icon: 'none' })),
+      this.loadAddresses(),
+      this.loadWarehouses(),
+    ])
+    this.items = cartStore.items || []
+    this.total = cartStore.total || 0
     // 从地址选择页回填选中地址（优先），否则用默认地址兜底
     const picked = uni.getStorageSync('checkout_address')
     if (picked && picked.id) {
@@ -124,7 +128,11 @@ export default {
           payType: this.payType,
           remark: this.remark,
         })
-        await useCartStore().clear()
+        // 后端下单时已清空购物车，这里本地置空即可；远程 clear 失败不应误报"下单失败"
+        const cartStore = useCartStore()
+        cartStore.items = []
+        cartStore.total = 0
+        cartStore.count = 0
         uni.showToast({ title: '下单成功', icon: 'success' })
         setTimeout(() => uni.redirectTo({ url: `/pages/order-detail/order-detail?id=${res.id}` }), 600)
       } catch (e) {

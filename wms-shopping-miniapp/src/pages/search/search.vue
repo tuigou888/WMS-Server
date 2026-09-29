@@ -24,23 +24,37 @@ import { products } from '@/api/market.js'
 import { formatPrice as money } from '@/utils/format.js'
 
 export default {
-  data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false } },
+  data() { return { keyword: '', categoryId: null, categoryName: '', results: [], searched: false, page: 1, total: 0, loading: false } },
   onLoad(opt) {
     this.categoryId = (opt && opt.categoryId) || null
     this.categoryName = (opt && opt.name) || ''
     if (this.categoryId) this.search()
   },
+  onReachBottom() { this.loadMore() },
   methods: {
     money,
     async search() {
+      this.page = 1
+      await this.fetch(true)
+    },
+    async loadMore() {
+      if (!this.searched || this.loading || this.results.length >= this.total) return
+      await this.fetch(false)
+    },
+    async fetch(reset) {
+      if (this.loading) return
+      this.loading = true
       try {
-        const params = {}
+        const params = { page: this.page, pageSize: 20 }
         if (this.keyword) params.keyword = this.keyword
         if (this.categoryId) params.categoryId = this.categoryId
         const res = await products.list(params)
-        this.results = (res && res.records) || []
+        const rows = (res && res.records) || []
+        this.results = reset ? rows : this.results.concat(rows)
+        this.total = (res && res.total) || 0
         this.searched = true
       } catch (e) { uni.showToast({ title: (e && e.message) || '搜索失败', icon: 'none' }) }
+      finally { this.loading = false }
     },
     goProduct(id) { uni.navigateTo({ url: `/pages/product/product?id=${id}` }) },
   },

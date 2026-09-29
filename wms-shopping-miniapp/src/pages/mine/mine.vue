@@ -75,14 +75,14 @@ export default {
     go(url) { uni.navigateTo({ url }) },
     goOrders(status) { uni.navigateTo({ url: `/pages/orders/orders?status=${status}` }) },
     async loadCounts() {
-      try {
-        const res = await orderApi.list({ pageSize: 100 })
-        const rows = (res && res.records) || []
-        this.pendingCount = rows.filter(o => o.orderStatus === 'PENDING').length
-        this.auditedCount = rows.filter(o => o.orderStatus === 'AUDITED').length
-        this.shippedCount = rows.filter(o => o.orderStatus === 'SHIPPED').length
-        this.completedCount = rows.filter(o => o.orderStatus === 'COMPLETED').length
-      } catch (e) {}
+      // 各状态单独取 total（pageSize=1），避免拉全量计数被后端 pageSize 钳制截断
+      const statuses = ['PENDING', 'AUDITED', 'SHIPPED', 'COMPLETED']
+      const results = await Promise.allSettled(statuses.map(s => orderApi.list({ status: s, page: 1, pageSize: 1 })))
+      const totalOf = (i) => (results[i].status === 'fulfilled' && results[i].value) ? (results[i].value.total || 0) : 0
+      this.pendingCount = totalOf(0)
+      this.auditedCount = totalOf(1)
+      this.shippedCount = totalOf(2)
+      this.completedCount = totalOf(3)
     },
     async logout() {
       try { await auth.logout() } catch (e) {}

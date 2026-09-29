@@ -7,8 +7,28 @@
 //    - fail：区分「用户取消」与其他失败
 import { orders as orderApi } from '@/api/market.js'
 
+// 真实模式下 requestPayment success ≠ 后端回调已落单：以轮询查单为准（官方要求），最多确认 attempts 次
+function pollPaid(orderId, attempts = 8, intervalMs = 1500) {
+  return new Promise((resolve) => {
+    let n = 0
+    const tick = () => {
+      n += 1
+      orderApi.detail(orderId).then((o) => {
+        if (o && ['PAID', 'REFUNDING', 'REFUNDED'].includes(o.payStatus)) return resolve(true)
+        if (n >= attempts) return resolve(false)
+        setTimeout(tick, intervalMs)
+      }).catch(() => {
+        if (n >= attempts) return resolve(false)
+        setTimeout(tick, intervalMs)
+      })
+    }
+    tick()
+  })
+}
+
 /**
- * 发起支付。返回 Promise，resolve 表示支付成功（订单已落单），reject 表示失败或取消。
+ * 发起支付。返回 Promise，resolve 表示支付流程完成，reject 表示失败或取消。
+ * resolve 值：{ mock, confirmed }——confirmed=true 表示后端已确认到账；false 表示收银台已成功但落单待确认。
  * @param {number|string} orderId 订单 ID
  */
 export function requestPayment(orderId) {
@@ -16,7 +36,7 @@ export function requestPayment(orderId) {
     if (!params) throw new Error('未获取到支付参数')
     // mock 模式：直接确认支付落单
     if (params.mock === true) {
-      return orderApi.mockPay(orderId).then(() => ({ mock: true }))
+      return orderApi.mockPay(orderId).then(() => ({ mock: true, confirmed: true }))
     }
     // 真实模式：拉起微信收银台
     return new Promise((resolve, reject) => {
@@ -27,7 +47,7 @@ export function requestPayment(orderId) {
         package: params.package,
         signType: params.signType || 'RSA',
         paySign: params.paySign,
-        success: () => resolve({ mock: false }),
+        success: () => pollPaid(orderId).then((confirmed) => resolve({ mock: false, confirmed })),
         fail: (err) => {
           const msg = (err && err.errMsg) || ''
           // 用户取消支付

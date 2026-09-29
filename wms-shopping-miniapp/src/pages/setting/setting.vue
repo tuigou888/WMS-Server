@@ -10,16 +10,36 @@
 
 <script>
 import { getBaseUrl } from '@/api/request.js'
+import { useUserStore } from '@/store/user.js'
 export default {
-  data() { return { baseUrl: '' } },
+  data() { return { baseUrl: '', userStore: null } },
+  onLoad() { this.userStore = useUserStore() },
   onShow() { this.baseUrl = getBaseUrl() },
   methods: {
     editBase() {
-      uni.showModal({ title: '服务器地址', editable: true, placeholderText: getBaseUrl(), content: '', success: (r) => { if (r.content) uni.showToast({ title: '重启后生效', icon: 'none' }) } })
+      const stored = uni.getStorageSync('wms_api_base') || ''
+      uni.showModal({
+        title: '服务器地址',
+        editable: true,
+        placeholderText: getBaseUrl(),
+        content: stored,
+        success: (r) => {
+          if (!r.confirm) return
+          const v = (r.content || '').trim()
+          if (v) uni.setStorageSync('wms_api_base', v)
+          else uni.removeStorageSync('wms_api_base')
+          this.baseUrl = getBaseUrl()
+          uni.showToast({ title: '已保存，重进小程序后生效', icon: 'none' })
+        },
+      })
     },
     clearRedis() {
+      // 保留服务器地址覆盖；同步清内存登录态/购物车，避免"界面仍显示已登录"
+      const apiBase = uni.getStorageSync('wms_api_base')
       uni.clearStorageSync()
-      uni.showToast({ title: '已清除', icon: 'success' })
+      if (apiBase) uni.setStorageSync('wms_api_base', apiBase)
+      this.userStore && this.userStore.logout()
+      uni.reLaunch({ url: '/pages/login/login' })
     },
   },
 }

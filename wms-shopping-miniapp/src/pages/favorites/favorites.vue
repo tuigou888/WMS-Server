@@ -26,6 +26,9 @@ import { formatPrice as money } from '@/utils/format.js'
 export default {
   data() { return { list: [] } },
   onShow() { this.load() },
+  onPullDownRefresh() {
+    this.load().finally(() => uni.stopPullDownRefresh())
+  },
   methods: {
     money,
     async load() {
@@ -43,8 +46,9 @@ export default {
     },
     async removeFav(p) {
       try {
-        await favorites.toggle(p.id)
-        uni.showToast({ title: '已取消收藏', icon: 'none' })
+        // toggle 返回最终状态，提示语以实际结果为准（防并发 toggle 时提示与状态相反）
+        const r = await favorites.toggle(p.id)
+        uni.showToast({ title: r && r.favorited ? '已重新收藏' : '已取消收藏', icon: 'none' })
         this.load()
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '失败', icon: 'none' })

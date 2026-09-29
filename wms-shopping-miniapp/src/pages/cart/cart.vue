@@ -7,7 +7,7 @@
           <view v-else class="item-img img-holder"><text class="img-holder-icon">📦</text></view>
           <view class="item-info">
             <text class="item-title">{{ c.product.title }}</text>
-            <text class="item-meta">¥{{ money(c.snapshotPrice) }}</text>
+            <text class="item-meta">¥{{ money(c.price ?? c.snapshotPrice) }}</text>
           </view>
         </view>
         <view class="item-right">
@@ -40,19 +40,38 @@ import { useCartStore } from '@/store/cart.js'
 import { formatPrice as money } from '@/utils/format.js'
 
 export default {
-  data() { return { items: [], total: 0 } },
+  data() { return { items: [], total: 0, updatingId: null } },
   onShow() { this.$store = useCartStore(); this.load() },
   methods: {
     money,
     async load() {
-      await this.$store.load()
-      this.items = this.$store.items || []
-      this.total = this.$store.total || 0
+      try { await this.$store.load() }
+      catch (e) { uni.showToast({ title: (e && e.message) || '购物车加载失败', icon: 'none' }) }
+      this.sync()
     },
     goProduct(id) { uni.navigateTo({ url: `/pages/product/product?id=${id}` }) },
-    async minus(c) { if (c.quantity <= 1) return; await this.$store.update(c.id, c.quantity - 1); this.sync() },
-    async plus(c) { await this.$store.update(c.id, c.quantity + 1); this.sync() },
-    async remove(c) { uni.showModal({ title: '删除', content: '确认从购物车移除？', success: (b) => { if (b) this.$store.remove([c.id]).then(() => this.sync()) } }) },
+    // in-flight 防抖：同一行更新进行中忽略再点击，避免连点基于旧值发重复 PUT
+    async minus(c) {
+      if (c.quantity <= 1 || this.updatingId === c.id) return
+      this.updatingId = c.id
+      try { await this.$store.update(c.id, c.quantity - 1) }
+      catch (e) { uni.showToast({ title: (e && e.message) || '更新失败', icon: 'none' }) }
+      finally { this.updatingId = null }
+      this.sync()
+    },
+    async plus(c) {
+      if (this.updatingId === c.id) return
+      this.updatingId = c.id
+      try { await this.$store.update(c.id, c.quantity + 1) }
+      catch (e) { uni.showToast({ title: (e && e.message) || '更新失败', icon: 'none' }) }
+      finally { this.updatingId = null }
+      this.sync()
+    },
+    async remove(c) {
+      uni.showModal({ title: '删除', content: '确认从购物车移除？', success: (b) => {
+        if (b) this.$store.remove([c.id]).then(() => this.sync()).catch((e) => uni.showToast({ title: (e && e.message) || '删除失败', icon: 'none' }))
+      } })
+    },
     sync() { this.items = this.$store.items || []; this.total = this.$store.total || 0 },
     goCheckout() { uni.navigateTo({ url: '/pages/checkout/checkout' }) },
   },

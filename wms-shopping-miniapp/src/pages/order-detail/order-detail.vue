@@ -60,12 +60,15 @@
         <view class="info-row"><text class="k">支付方式：</text><text class="v">{{ payTypeText }}</text></view>
         <view class="info-row"><text class="k">支付状态：</text><text class="v">{{ payStatusText }}</text></view>
         <view class="info-row"><text class="k">下单时间：</text><text class="v">{{ fmtDate(order.createdAt) }}</text></view>
+        <view class="info-row" v-if="order.cancelReason"><text class="k">取消/拒绝原因：</text><text class="v">{{ order.cancelReason }}</text></view>
+        <view class="info-row" v-if="order.refundReason"><text class="k">退款原因：</text><text class="v">{{ order.refundReason }}</text></view>
+        <view class="info-row" v-if="order.refundAmount != null"><text class="k">退款金额：</text><text class="v">¥{{ money(order.refundAmount) }}</text></view>
       </view>
 
       <!-- 操作 -->
       <view class="action-bar">
         <button v-if="order.orderStatus==='PENDING'" class="btn-danger" @tap="cancel">取消订单</button>
-        <button v-if="order.orderStatus==='PENDING'" class="btn-primary" @tap="pay">立即支付</button>
+        <button v-if="canPay" class="btn-primary" @tap="pay">立即支付</button>
         <button v-if="order.orderStatus==='SHIPPED'" class="btn-primary" @tap="receive">确认收货</button>
       </view>
     </view>
@@ -87,6 +90,12 @@ export default {
       if (this.order.orderStatus === 'SHIPPED') return '正在运输途中，请留意物流'
       return ''
     },
+    canPay() {
+      if (!this.order) return false
+      // 后端 prepay 允许 PENDING/AUDITED 且 UNPAID；货到付款不走线上收银台
+      return this.order.payType === 'PAY_ONLINE' && this.order.payStatus === 'UNPAID'
+        && (this.order.orderStatus === 'PENDING' || this.order.orderStatus === 'AUDITED')
+    },
     payTypeText() { return this.order ? { PAY_ONLINE: '在线支付', CASH_ON_DELIVERY: '货到付款', CREDIT: '挂账' }[this.order.payType] || this.order.payType : '' },
     payStatusText() { return this.order ? { UNPAID: '未支付', PAID: '已支付', REFUNDING: '退款处理中', REFUNDED: '已退款' }[this.order.payStatus] || this.order.payStatus : '' },
   },
@@ -106,8 +115,8 @@ export default {
     },
     async pay() {
       try {
-        await requestPayment(this.id)
-        uni.showToast({ title: '支付成功', icon: 'success' })
+        const r = await requestPayment(this.id)
+        uni.showToast({ title: r && r.confirmed ? '支付成功' : '支付结果确认中，请稍后刷新查看', icon: r && r.confirmed ? 'success' : 'none' })
         this.load()
       } catch (e) {
         if (e && e.cancelled) {
@@ -118,8 +127,11 @@ export default {
       }
     },
     async receive() {
-      try { await orderApi.receive(this.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load() }
-      catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+      uni.showModal({ title: '确认收货', content: '请确认已收到商品，确认后订单完成且不可恢复', success: async (b) => {
+        if (!b) return
+        try { await orderApi.receive(this.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load() }
+        catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+      } })
     },
     copyLogistics() {
       if (!this.order || !this.order.logisticsNumber) return

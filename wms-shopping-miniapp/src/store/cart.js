@@ -11,21 +11,19 @@ export const useCartStore = defineStore('cart', () => {
   async function load() {
     loading.value = true
     try {
-      const res = await cartApi.list()
+      const res = await cartApi.list({ pricing: 'effective' })
       items.value = res.items || []
       total.value = res.total || 0
       count.value = res.count || 0
+    } catch (e) {
+      // 失败重置为空态，避免残留上一账号/上一次成功加载的脏数据
+      items.value = []
+      total.value = 0
+      count.value = 0
+      throw e
     } finally {
       loading.value = false
     }
-  }
-
-  async function loadCount() {
-    try {
-      const res = await cartApi.list()
-      count.value = res.count || 0
-      total.value = res.total || 0
-    } catch (e) { /* 未登录忽略 */ }
   }
 
   async function add(productId, quantity = 1) {
@@ -50,5 +48,5 @@ export const useCartStore = defineStore('cart', () => {
     count.value = 0
   }
 
-  return { items, total, count, loading, load, loadCount, add, update, remove, clear }
+  return { items, total, count, loading, load, add, update, remove, clear }
 })

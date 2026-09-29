@@ -43,7 +43,7 @@
           <view class="flex">
             <button class="btn-fav" @tap="toggleFav">{{ favorited ? '★ 已收藏' : '☆ 收藏' }}</button>
             <button class="btn-primary" @tap="doAdd" :disabled="addingDisabled">加入购物车</button>
-            <button class="btn-outline" @tap="doBuy" :disabled="addingDisabled">直接购买</button>
+            <button class="btn-outline" @tap="doBuy" :disabled="buyDisabled">直接购买</button>
           </view>
         </view>
       </view>
@@ -69,7 +69,7 @@ import { formatPrice } from '@/utils/format.js'
 
 export default {
     data() {
-      return { product: null, isAdding: false, favorited: false }
+      return { product: null, isAdding: false, isBuying: false, favLoading: false, favorited: false }
     },
   onLoad(opt) {
     const id = opt && opt.id
@@ -93,6 +93,9 @@ export default {
     addingDisabled() {
       return this.isAdding || !this.product || this.product.status !== 'SHELF_ON' || Number(this.product.availableStock || 0) <= 0
     },
+    buyDisabled() {
+      return this.isBuying || this.addingDisabled
+    },
   },
   methods: {
     formatPrice,
@@ -107,17 +110,24 @@ export default {
       } finally { this.isAdding = false }
     },
     async doBuy() {
-      if (this.addingDisabled) return
+      if (this.buyDisabled) return
+      // 结算页按整辆购物车下单，弹窗必须如实说明，避免用户以为只买当前商品
       uni.showModal({
         title: '确认下单',
-        content: `购买「${this.product.title}」× 1（¥${this.formatPrice(this.product.salePrice)}）`,
+        content: `将「${this.product.title}」× 1 加入购物车并前往结算；购物车内其它商品将一并下单`,
         confirmText: '确认购买',
         cancelText: '取消',
-        success: (r) => { if (r && r.confirm) this.goCheckout() },
+        success: (r) => { if (r && r.confirm) this.buyNow() },
       })
     },
-    goCheckout() {
-      uni.navigateTo({ url: '/pages/checkout/checkout' })
+    async buyNow() {
+      this.isBuying = true
+      try {
+        await useCartStore().add(this.product.id, 1)
+        uni.navigateTo({ url: '/pages/checkout/checkout' })
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || '下单失败', icon: 'none' })
+      } finally { this.isBuying = false }
     },
     getStockText(p) {
       const avail = Number(p.availableStock || 0)
@@ -125,14 +135,15 @@ export default {
       return '有货'
     },
     async toggleFav() {
-      if (!this.product) return
+      if (!this.product || this.favLoading) return
+      this.favLoading = true
       try {
         const r = await favorites.toggle(this.product.id)
         this.favorited = !!(r && r.favorited)
         uni.showToast({ title: this.favorited ? '已收藏' : '已取消收藏', icon: 'none' })
       } catch (e) {
         uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
-      }
+      } finally { this.favLoading = false }
     },
   },
 }

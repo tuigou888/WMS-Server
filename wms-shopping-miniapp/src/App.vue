@@ -1,22 +1,10 @@
 <script>
 import { useUserStore } from '@/store/user.js'
-import { useCartStore } from '@/store/cart.js'
 
 export default {
   onLaunch() {
-    console.log('App Launch · 商城小程序')
     const userStore = useUserStore()
     userStore.restore()
-    // 已登录则预拉取购物车数量（用于 tabBar badge）
-    if (userStore.isLoggedIn) {
-      useCartStore().loadCount()
-    }
-  },
-  onShow() {
-    console.log('App Show')
-  },
-  onHide() {
-    console.log('App Hide')
   },
 }
 </script>

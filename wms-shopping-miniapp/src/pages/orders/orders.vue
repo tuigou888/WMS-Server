@@ -19,9 +19,9 @@
         </view>
         <view class="order-foot">
           <text class="order-total">共 {{ o.items.length }} 件，合计 <text class="orange">¥{{ money(o.totalAmount) }}</text></text>
-          <view class="actions" v-if="o.orderStatus==='PENDING'">
-            <button class="btn-mini" @tap.stop="cancelOrder(o)">取消</button>
-            <button class="btn-mini primary" @tap.stop="payOrder(o)">去支付</button>
+          <view class="actions" v-if="o.orderStatus==='PENDING' || (o.orderStatus==='AUDITED' && o.payStatus==='UNPAID' && o.payType==='PAY_ONLINE')">
+            <button v-if="o.orderStatus==='PENDING'" class="btn-mini" @tap.stop="cancelOrder(o)">取消</button>
+            <button v-if="o.payType==='PAY_ONLINE'" class="btn-mini primary" @tap.stop="payOrder(o)">去支付</button>
           </view>
           <view class="actions" v-else-if="o.orderStatus==='SHIPPED'">
             <button class="btn-mini primary" @tap.stop="receiveOrder(o)">确认收货</button>
@@ -44,6 +44,10 @@ import { requestPayment, PaymentCancelled } from '@/utils/pay.js'
 import { formatPrice as money } from '@/utils/format.js'
 
 export default {
+  onLoad(opt) {
+    // mine 页四个状态入口带 ?status= 跳入（此前不接收，参数被无视）
+    if (opt && opt.status) this.status = opt.status
+  },
   data() {
     return { status: '', list: [], page: 1, pageSize: 10, hasMore: false }
   },
@@ -55,6 +59,7 @@ export default {
   },
   onShow() { this.load(true) },
   onReachBottom() { if (this.hasMore) this.load() },
+  onPullDownRefresh() { this.load(true).finally(() => uni.stopPullDownRefresh()) },
   methods: {
     money,
     switchTab(v) { this.status = v; this.list = []; this.load(true) },
@@ -76,8 +81,8 @@ export default {
     },
     async payOrder(o) {
       try {
-        await requestPayment(o.id)
-        uni.showToast({ title: '支付成功', icon: 'success' })
+        const r = await requestPayment(o.id)
+        uni.showToast({ title: r && r.confirmed ? '支付成功' : '支付结果确认中，请稍后下拉刷新', icon: r && r.confirmed ? 'success' : 'none' })
         this.load(true)
       } catch (e) {
         if (e && e.cancelled) {
@@ -88,8 +93,11 @@ export default {
       }
     },
     async receiveOrder(o) {
-      try { await orderApi.receive(o.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load(true) }
-      catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+      uni.showModal({ title: '确认收货', content: '请确认已收到该订单全部商品，确认后订单完成且不可恢复', success: async (b) => {
+        if (!b) return
+        try { await orderApi.receive(o.id); uni.showToast({ title: '已确认收货', icon: 'success' }); this.load(true) }
+        catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+      } })
     },
   },
 }

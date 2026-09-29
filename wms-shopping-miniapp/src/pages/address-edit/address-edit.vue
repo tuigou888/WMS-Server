@@ -35,12 +35,19 @@ export default {
   },
   methods: {
     async load(id) {
-      const list = await customers.list()
-      const cur = list.find(a => a.id == id)
-      if (cur) this.form = { name: cur.name, phone: cur.phone, address: cur.address, defaultFlag: cur.defaultFlag }
+      // 加载失败给提示并退出，避免空白表单被"补全保存"覆盖原地址
+      try {
+        const list = await customers.list()
+        const cur = list.find(a => a.id == id)
+        if (cur) this.form = { name: cur.name, phone: cur.phone, address: cur.address, defaultFlag: cur.defaultFlag }
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
+        setTimeout(() => uni.navigateBack(), 1200)
+      }
     },
     async save() {
       if (!this.form.name || !this.form.phone || !this.form.address) { uni.showToast({ title: '请填写完整', icon: 'none' }); return }
+      if (!/^1[3-9]\d{9}$/.test(String(this.form.phone).trim())) { uni.showToast({ title: '请输入正确的 11 位手机号', icon: 'none' }); return }
       try {
         if (this.id) await customers.update(this.id, this.form)
         else await customers.save(this.form)

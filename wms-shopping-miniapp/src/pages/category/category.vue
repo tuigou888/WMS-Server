@@ -24,7 +24,14 @@ export default {
     return { categories: [] }
   },
   onLoad() {
-    products.categories().then(c => { this.categories = c })
+    products.categories().then(c => { this.categories = c || [] }).catch(e => uni.showToast({ title: (e && e.message) || '加载失败', icon: 'none' }))
+  },
+  onPullDownRefresh() {
+    // 本页无 load 方法，直接重拉分类
+    products.categories()
+      .then(list => { this.categories = list || [] })
+      .catch(() => {})
+      .finally(() => uni.stopPullDownRefresh())
   },
   methods: {
     iconFor(i) { return CATEGORY_ICONS[i % CATEGORY_ICONS.length] },

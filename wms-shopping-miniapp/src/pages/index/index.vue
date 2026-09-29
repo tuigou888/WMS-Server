@@ -77,16 +77,22 @@ export default {
       finally { this.loading = false }
     },
     async loadMore() {
-      if (!this.hasMore) return
-      const next = this.page + 1
-      const res = await productApi.list({ page: next, pageSize: this.pageSize })
-      const more = res.records || []
-      this.products = this.products.concat(more)
-      this.page = next
-      this.hasMore = this.products.length < (res.total || 0)
+      if (!this.hasMore || this.loadingMore) return
+      this.loadingMore = true
+      try {
+        const next = this.page + 1
+        const res = await productApi.list({ page: next, pageSize: this.pageSize })
+        const more = res.records || []
+        this.products = this.products.concat(more)
+        this.page = next
+        this.hasMore = this.products.length < (res.total || 0)
+      } catch (e) {
+        uni.showToast({ title: (e && e.message) || '加载失败', icon: 'none' })
+      } finally { this.loadingMore = false }
     },
     goProduct(id) { uni.navigateTo({ url: `/pages/product/product?id=${id}` }) },
-    goCategory(id, name) { uni.switchTab({ url: '/pages/category/category', fail: () => {} }) },
+    // tabBar 页无法带参，分类点击走搜索页并带分类过滤
+    goCategory(id, name) { uni.navigateTo({ url: `/pages/search/search?categoryId=${id}&name=${encodeURIComponent(name || '')}` }) },
     async addCart(p) {
       if (p.status !== 'SHELF_ON') { uni.showToast({ title: '已下架', icon: 'none' }); return }
       try {

@@ -22,10 +22,12 @@ export const favorites = {
 }
 
 export const cart = {
-  list: () => http.get('/market/cart'),
+  // pricing=effective：与下单扣款同口径（快照 7 天有效、超期回退现价），避免展示金额≠实扣金额
+  list: (params) => http.get('/market/cart', params),
   add: (data) => http.post('/market/cart', data),
   update: (id, data) => http.put(`/market/cart/${id}`, data),
-  remove: (ids) => http.delete('/market/cart', { data: { ids } }),
+  // DELETE body 在部分基础库/真机上会丢失（丢了=整辆清空），ids 同步拼进 query 由后端兜底
+  remove: (ids) => http.delete(`/market/cart?ids=${(ids || []).join(',')}`, { data: { ids } }),
   clear: () => http.delete('/market/cart', {}),
 }
 

@@ -9,15 +9,20 @@ export const useUserStore = defineStore('user', () => {
   function restore() { user.value = getUser() || null }
 
   function login(userData, token) {
-    user.value = userData
-    setUser(userData)
+    // token 单独存 wms_token，避免随 user 对象重复落一份到 wms_user
+    const safe = { ...(userData || {}) }
+    delete safe.token
+    user.value = safe
+    setUser(safe)
     setToken(token)
   }
 
   function setUserInfo(patches) {
     if (!user.value) return
-    user.value = { ...user.value, ...patches }
-    setUser(user.value)
+    const merged = { ...user.value, ...patches }
+    delete merged.token
+    user.value = merged
+    setUser(merged)
   }
 
   function logout() {
