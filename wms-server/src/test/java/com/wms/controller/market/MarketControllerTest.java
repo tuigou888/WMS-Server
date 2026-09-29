@@ -154,7 +154,7 @@ class MarketControllerTest {
         Long productId = ((Number) p.get("id")).longValue();
         Harness.asAdmin(() -> {
             marketController.addCart(new MarketCartAddRequest(productId, 2));
-            var resp = marketController.cart();
+            var resp = marketController.cart("");
             assertEquals(200, resp.code());
             assertNotNull(resp.data());
             assertNotNull(resp.data().get("items"));
@@ -182,10 +182,10 @@ class MarketControllerTest {
         Long productId = ((Number) p.get("id")).longValue();
         Harness.asAdmin(() -> {
             marketController.addCart(new MarketCartAddRequest(productId, 1));
-            var resp = marketController.clearCart(null);
+            var resp = marketController.clearCart(null, null);
             assertEquals(200, resp.code());
             entityManager.clear();
-            var cart = marketController.cart();
+            var cart = marketController.cart("");
             assertEquals(0, cart.data().get("count"));
         });
     }
@@ -198,7 +198,7 @@ class MarketControllerTest {
             Map<String, Object> cart = marketController.addCart(
                     new MarketCartAddRequest(productId, 1)).data();
             Long cartId = ((Number) cart.get("id")).longValue();
-            marketController.clearCart(Map.of("ids", List.of(cartId)));
+            marketController.clearCart(null, Map.of("ids", List.of(cartId)));
             // @Modifying delete 绕过一级缓存，需 clear 后查询
             entityManager.clear();
             assertTrue(carts.findById(cartId).isEmpty());

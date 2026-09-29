@@ -105,16 +105,22 @@ public class MarketController {
     }
 
     @GetMapping("/cart")
-    public ApiResponse<Map<String, Object>> cart() {
+    public ApiResponse<Map<String, Object>> cart(@RequestParam(defaultValue = "") String pricing) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
+        // pricing=effective：按下单同款口径（快照 7 天有效、超期回退现价）计算单价与小计，避免展示金额≠实扣金额
+        boolean effective = "effective".equals(pricing);
         List<MarketCart> list = carts.findByUserIdOrderByIdDesc(user.getId());
         BigDecimal total = BigDecimal.ZERO;
         List<Map<String, Object>> rows = new ArrayList<>();
         for (MarketCart c : list) {
-            BigDecimal sub = c.getSnapshotPrice().multiply(BigDecimal.valueOf(c.getQuantity()));
+            BigDecimal unit = effective ? service.effectivePriceOf(c) : c.getSnapshotPrice();
+            BigDecimal sub = unit.multiply(BigDecimal.valueOf(c.getQuantity()));
             total = total.add(sub);
-            rows.add(view(c));
+            Map<String, Object> row = view(c);
+            row.put("price", unit);
+            if (effective) row.put("subtotal", sub);
+            rows.add(row);
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("items", rows);
@@ -132,11 +138,16 @@ public class MarketController {
     }
 
     @DeleteMapping("/cart")
-    public ApiResponse<Void> clearCart(@RequestBody(required = false) Map<String, List<Long>> body) {
+    public ApiResponse<Void> clearCart(@RequestParam(required = false) List<Long> ids,
+                                       @RequestBody(required = false) Map<String, List<Long>> body) {
         SecurityUtils.require(Permissions.MARKET_BUY);
         UserAccount user = user();
-        if (body != null && body.get("ids") != null && !body.get("ids").isEmpty()) {
-            service.removeCart(user, body.get("ids"));
+        // wx.request 对 DELETE 的 body 支持无保证（部分基础库会丢失），删除单条优先走 query 参数；
+        // body 丢失又无 ids 参数时才是"整辆清空"语义，避免误清整辆购物车
+        List<Long> targetIds = (ids != null && !ids.isEmpty()) ? ids
+                : (body != null && body.get("ids") != null && !body.get("ids").isEmpty() ? body.get("ids") : null);
+        if (targetIds != null) {
+            service.removeCart(user, targetIds);
         } else {
             service.clearCart(user);
         }

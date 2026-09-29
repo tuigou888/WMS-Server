@@ -49,6 +49,8 @@ public final class Permissions {
     public static final String MARKET_BUY = "market:buy";
     /** 小程序：读商品/订单（未登录浏览走 permitAll，登录用户读自有订单/购物车） */
     public static final String MARKET_READ = "market:read";
+    /** 商城：挂账（CREDIT）下单。仅授予 ADMIN——挂账订单审核通过即视为已收款，不能开放给买家自助选择 */
+    public static final String MARKET_CREDIT = "market:credit";
     /** 后台：商品管理读 */
     public static final String PRODUCT_READ = "product:read";
     /** 后台：商品管理写（创建/上下架/改价） */

@@ -18,6 +18,8 @@ import com.wms.service.InventoryCostCalculator;
 import com.wms.service.InventoryReservationGuard;
 import com.wms.service.TransactionType;
 import com.wms.service.WarehouseAccessService;
+import com.wms.security.Permissions;
+import com.wms.security.SecurityUtils;
 import com.wechat.pay.java.service.refund.model.Refund;
 import com.wechat.pay.java.service.refund.model.Status;
 import org.slf4j.Logger;
@@ -283,6 +285,9 @@ public class MarketService {
         return product.getSalePrice() == null ? BigDecimal.ZERO : product.getSalePrice();
     }
 
+    /** 供结算展示用：与下单扣款同一口径，避免"所见金额"与"实扣金额"不一致。 */
+    public BigDecimal effectivePriceOf(MarketCart cart) { return effectivePrice(cart, cart.getProduct()); }
+
     @Transactional
     public MarketOrder createOrder(UserAccount user, MarketOrderCreateRequest req) {
         MarketCustomer customer = customers.findById(req.customerId())
@@ -302,7 +307,10 @@ public class MarketService {
         order.setReceiverPhone(customer.getPhone());
         order.setReceiverAddress(customer.getAddress());
         order.setWarehouse(warehouse);
-        order.setPayType(req.payType() == null ? MarketPayType.PAY_ONLINE : MarketPayType.from(req.payType()));
+        // 挂账订单审核通过即自动记为已收款，只允许具备 market:credit 权限（ADMIN）的账号选择，防买家绕过前端自助挂账
+        MarketPayType payType = req.payType() == null ? MarketPayType.PAY_ONLINE : MarketPayType.from(req.payType());
+        if (payType == MarketPayType.CREDIT) SecurityUtils.require(Permissions.MARKET_CREDIT);
+        order.setPayType(payType);
         order.setRemark(req.remark());
         order.setOrderStatus(MarketOrderStatus.PENDING);
         order.setPayStatus(MarketPayStatus.UNPAID);
@@ -561,7 +569,8 @@ public class MarketService {
         }
         MarketOrder saved = orders.save(order);
         orderLogs.save(new MarketOrderLog(orderId, MarketOrderAction.AUDIT, operator,
-                (approve ? "审核通过" : "审核拒绝") + (remark == null ? "" : "：" + remark)));
+                (approve ? "审核通过" : "审核拒绝") + (remark == null ? "" : "：" + remark)
+                        + (approve && MarketPayType.CREDIT.equals(order.getPayType()) ? "（挂账订单审核确认入账，记为已收款）" : "")));
         return saved;
     }
 
