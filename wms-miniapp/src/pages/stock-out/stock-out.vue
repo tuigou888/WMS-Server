@@ -17,14 +17,14 @@
         <view class="item-specs" v-if="item.specs">{{ item.specs }}</view>
         <view class="item-stats">
           <view class="stat">
-            <text class="stat-label">当前库存</text>
+            <text class="stat-label">{{ scopeLabel }}</text>
             <view class="stat-line">
               <text class="stat-value">{{ formatNum(item.quantity || 0) }}</text>
               <text class="stat-unit">{{ item.unit }}</text>
             </view>
           </view>
           <view class="stat">
-            <text class="stat-label">平均成本 (系统自动)</text>
+            <text class="stat-label">成本单价 (预估)</text>
             <view class="stat-line">
               <text class="stat-value value-green">¥{{ formatMoney(item.avgCost || 0) }}</text>
             </view>
@@ -85,7 +85,7 @@
 
         <view class="input-group">
           <label class="label">批次号</label>
-          <input class="input" v-model="form.batchNo" placeholder="可选" />
+          <input class="input" v-model="form.batchNo" placeholder="可选" @input="recalcScope" />
         </view>
 
         <view class="input-group">
@@ -132,6 +132,7 @@ export default {
       submitting: false,
       scanHistory: [],
       locations: [],
+      stockRows: [],
       selectedLocation: '',
       calcData: {
         unitCost: 0,
@@ -144,6 +145,10 @@ export default {
   },
   computed: {
     userStore() { return useUserStore() },
+    scopeLabel() {
+      // 顶部库存数字按所选 仓库/库位 口径展示，避免误读为全仓合计
+      return this.selectedLocation ? `${this.selectedLocation} 库存` : (this.userStore.warehouseId ? '本仓库存' : '当前库存')
+    },
     currentWarehouse() {
       return this.userStore.warehouses.find(w => w.id === this.userStore.warehouseId)
     },
@@ -210,16 +215,29 @@ export default {
       }
     },
     async loadStockInfo(item) {
+      // 保存按 仓库+库位+批次 维度的库存行，供 recalcScope 按所选口径估算（原为全仓汇总，多仓/多批次时与后端结算口径不符）
       try {
-        const dist = await api.inventoryByItem(item.id)
-        const totalQty = dist.reduce((sum, d) => sum + (parseFloat(d.quantity) || 0), 0)
-        const totalAmt = dist.reduce((sum, d) => sum + (parseFloat(d.totalAmount) || 0), 0)
-        item.quantity = totalQty
-        item.avgCost = totalQty > 0 ? (totalAmt / totalQty) : 0
+        this.stockRows = (await api.inventoryByItem(item.id)) || []
       } catch (e) {
-        item.quantity = 0
-        item.avgCost = 0
+        this.stockRows = []
       }
+      this.recalcScope()
+    },
+    recalcScope() {
+      const wid = this.userStore.warehouseId
+      let rows = this.stockRows.filter(r => Number(r.warehouseId) === Number(wid))
+      if (this.selectedLocation) {
+        rows = rows.filter(r => r.locationCode === this.selectedLocation)
+        const batch = (this.form.batchNo || '').trim()
+        if (batch) rows = rows.filter(r => (r.batchNo || '') === batch)
+      }
+      const qty = rows.reduce((s, d) => s + (parseFloat(d.quantity) || 0), 0)
+      const amt = rows.reduce((s, d) => s + (parseFloat(d.totalAmount) || 0), 0)
+      if (this.item) {
+        this.item.quantity = qty
+        this.item.avgCost = qty > 0 ? (amt / qty) : 0
+      }
+      this.calcProfit && this.calcProfit()
     },
     calcProfit() {
       const qty = parseFloat(this.form.quantity) || 0
@@ -252,6 +270,7 @@ export default {
       this.userStore.setWarehouse(this.userStore.warehouses[idx].id)
       this.selectedLocation = ''
       this.loadLocations()
+      this.recalcScope()
     },
     async showLocationPicker() {
       if (!this.userStore.warehouseId) {
@@ -267,6 +286,7 @@ export default {
       const idx = await chooseIndex(items)
       if (idx < 0) return
       this.selectedLocation = this.locations[idx].code
+      this.recalcScope()
     },
     // 前端硬校验：负数/"12abc" 这类会被 parseFloat 静默截断的输入在提交前拦截
     numericError() {

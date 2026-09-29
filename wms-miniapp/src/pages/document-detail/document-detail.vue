@@ -173,12 +173,21 @@
           </view>
         </view>
       </view>
+
+      <!-- 操作栏：按单据类型 + 状态机 + 当前用户权限渲染 -->
+      <view class="card" v-if="actions.length">
+        <text class="section-title">操作</text>
+        <view class="action-buttons">
+          <button v-for="a in actions" :key="a.key" :class="a.cls" @tap="runAction(a)">{{ a.text }}</button>
+        </view>
+      </view>
     </scroll-view>
   </view>
 </template>
 
 <script>
 import { api } from '@/api/request.js'
+import { useUserStore } from '@/store/user.js'
 import { money as formatMoney, num as formatNum, date as formatDate } from '@/utils/format.js'
 
 const TYPE_MAP = { IN: '采购入库', OUT: '销售出库', RETURN_IN: '退货入库', RETURN_OUT: '退回供应商' }
@@ -187,6 +196,47 @@ export default {
   props: {
     id: { type: [String, Number], required: true },
     type: { type: String, default: 'IN' },
+  },
+  computed: {
+    userStore() { return useUserStore() },
+    // 移动端单据操作入口（此前 request.js 中相关 API 零调用）：WAREHOUSE 持有 *:execute 可执行已审核单据，审核类仅 ADMIN/AUDITOR
+    actions() {
+      if (!this.doc || this.loading) return []
+      const s = this.doc.status
+      const has = (perm) => this.userStore.hasPerm(perm)
+      const out = []
+      if (this.isStocktake) {
+        if (s === 'DRAFT') {
+          out.push({ key: 'count', text: '去录入实盘', cls: 'btn-secondary' })
+          if (has('stocktake:review')) {
+            out.push({ key: 'approve', text: '审核通过', cls: 'btn-primary' })
+            out.push({ key: 'reject', text: '审核驳回', cls: 'btn-danger' })
+          }
+        } else if (s === 'APPROVED' && has('stocktake:execute')) {
+          out.push({ key: 'complete', text: '执行盘点', cls: 'btn-primary' })
+        }
+      } else if (this.isTransfer) {
+        if (s === 'DRAFT' && has('transfer:review')) {
+          out.push({ key: 'approve', text: '审核通过', cls: 'btn-primary' })
+          out.push({ key: 'reject', text: '审核驳回', cls: 'btn-danger' })
+        } else if (s === 'APPROVED' && has('transfer:execute')) {
+          out.push({ key: 'complete', text: '执行调拨', cls: 'btn-primary' })
+        }
+      } else {
+        if (s === 'DRAFT' && has('document:review')) {
+          out.push({ key: 'approve', text: '审核通过', cls: 'btn-primary' })
+          out.push({ key: 'reject', text: '审核驳回', cls: 'btn-danger' })
+          out.push({ key: 'cancel', text: '取消单据', cls: 'btn-danger' })
+        } else if (s === 'APPROVED' && has('document:execute')) {
+          out.push({ key: 'complete', text: '执行单据', cls: 'btn-primary' })
+        } else if (s === 'COMPLETED' && has('document:review') && !this.doc.reversalOfDocumentId) {
+          // 红冲单（reversalOfDocumentId 非空）不可再反审/红冲
+          out.push({ key: 'uncomplete', text: '反审', cls: 'btn-secondary' })
+          out.push({ key: 'reverse', text: '红冲', cls: 'btn-danger' })
+        }
+      }
+      return out
+    },
   },
   data() {
     return {
@@ -255,6 +305,53 @@ export default {
     onRefresh() {
       this.refreshing = true
       this.loadDetail()
+    },
+    runAction(a) {
+      if (a.key === 'count') {
+        uni.navigateTo({ url: `/pages/check-count/check-count?id=${this.id}` })
+        return
+      }
+      const kind = this.isStocktake ? 'stocktakes' : this.isTransfer ? 'transfers' : 'documents'
+      const prompts = {
+        approve: { title: '审核通过', content: '确认审核通过该单据？', editable: false },
+        reject: { title: '审核驳回', content: '驳回后单据终止流转，请填写驳回原因', editable: true },
+        cancel: { title: '取消单据', content: '取消后单据作废，确认取消？', editable: false },
+        complete: {
+          title: a.text,
+          content: this.isStocktake
+            ? '执行盘点将按差异生成库存调整并变动库存，确认执行？'
+            : '执行单据将实际增减库存，确认执行？',
+          editable: false,
+        },
+        uncomplete: { title: '反审', content: '反审将生成反向流水冲销原库存影响，单据退回已审核，确认反审？', editable: false },
+        reverse: { title: '红冲', content: '将生成一张反向红冲单据（直接置为已审核），原单保留，确认红冲？', editable: false },
+      }
+      const p = prompts[a.key]
+      uni.showModal({
+        title: p.title,
+        content: p.content,
+        editable: p.editable,
+        placeholderText: p.editable ? '驳回原因（必填）' : '',
+        success: async (r) => {
+          if (!r || !r.confirm) return
+          const remark = (r.content || '').trim()
+          if (a.key === 'reject' && !remark) {
+            uni.showToast({ title: '请填写驳回原因', icon: 'none' })
+            return
+          }
+          try {
+            if (a.key === 'approve' || a.key === 'reject') {
+              await api.post(`/${kind}/${this.id}/review`, { action: a.key === 'approve' ? 'APPROVE' : 'REJECT', remark: remark || null })
+            } else {
+              await api.post(`/${kind}/${this.id}/${a.key}`)
+            }
+            uni.showToast({ title: '操作成功', icon: 'success' })
+            this.loadDetail()
+          } catch (e) {
+            uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
+          }
+        },
+      })
     },
     statusText(status) {
       const map = { DRAFT: '草稿', APPROVED: '已审核', COMPLETED: '已执行', CANCELLED: '已取消', REJECTED: '已驳回', CONFIRMED: '已确认' }
@@ -338,4 +435,8 @@ export default {
 .qty-diff { font-weight: 600; }
 
 .loading { text-align: center; padding: 80rpx; color: var(--wms-ink-3); }
+
+/* 操作栏：按钮组并排均分 */
+.action-buttons { display: flex; gap: 16rpx; flex-wrap: wrap; }
+.action-buttons button { flex: 1; min-width: 200rpx; margin: 0; font-size: 28rpx; padding-left: 0; padding-right: 0; }
 </style>
