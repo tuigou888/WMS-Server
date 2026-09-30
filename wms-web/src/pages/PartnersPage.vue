@@ -4,6 +4,10 @@ import { Button, Card, Form, Input, Modal, Popconfirm, Select, Switch, Table, Ta
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { normalizeColumns } from '../utils/table'
+import { hasPerm } from '../utils/permission'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const empty = { type: 'SUPPLIER', enabled: true }
 const data = ref([])
@@ -49,11 +53,11 @@ const columns = [
   {
     title: '操作',
     render: (_, r) => h('span', [
-      h(Button, { type: 'link', onClick: () => show(r) }, '编辑'),
-      h(Popconfirm, {
+      hasPerm(auth.user, 'partner:write') ? h(Button, { type: 'link', onClick: () => show(r) }, '编辑') : null,
+      hasPerm(auth.user, 'partner:write') ? h(Popconfirm, {
         title: '确认删除该单位？',
         onConfirm: () => api.deletePartner(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message)),
-      }, { default: () => h(Button, { type: 'link', danger: true }, '删除') }),
+      }, { default: () => h(Button, { type: 'link', danger: true }, '删除') }) : null,
     ]),
   },
 ]
@@ -65,7 +69,7 @@ const columns = [
       <Typography.Title :level="3" class="page-title">供应商 / 客户</Typography.Title>
       <Typography.Text type="secondary">维护采购供应商、销售客户和联系人信息</Typography.Text>
     </div>
-    <Button type="primary" :icon="h(PlusOutlined)" @click="show()">新增单位</Button>
+    <Button v-if="hasPerm(auth.user, 'partner:write')" type="primary" :icon="h(PlusOutlined)" @click="show()">新增单位</Button>
   </div>
 
   <Card class="table-card">

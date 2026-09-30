@@ -71,7 +71,7 @@ const columns = [
         h(Button, { type: 'link', onClick: () => action(() => api.reviewStocktake(r.id, { action: 'APPROVE' })) }, '审核通过'),
         h(Button, { type: 'link', danger: true, onClick: () => action(() => api.reviewStocktake(r.id, { action: 'REJECT' })) }, '驳回'),
       ]) : null,
-      r.status === 'APPROVED' ? h(Popconfirm, { title: '确认执行盘点差异调整？', onConfirm: () => action(() => api.completeStocktake(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行调整') }) : null,
+      r.status === 'APPROVED' && hasPerm(auth.user, 'stocktake:execute') ? h(Popconfirm, { title: '确认执行盘点差异调整？', onConfirm: () => action(() => api.completeStocktake(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行调整') }) : null,
     ]),
   },
 ]
@@ -103,7 +103,7 @@ const detailColumns = [
     </div>
     <Space>
       <a-select v-model:value="warehouseId" style="width: 180px;" :options="warehouses.map((x) => ({ value: x.id, label: x.name }))" />
-      <Button type="primary" :icon="h(PlusOutlined)" :disabled="!warehouseId" @click="action(() => api.createStocktake({ warehouseId }))">发起盘点</Button>
+      <Button v-if="hasPerm(auth.user, 'stocktake:write')" type="primary" :icon="h(PlusOutlined)" :disabled="!warehouseId" @click="action(() => api.createStocktake({ warehouseId }))">发起盘点</Button>
     </Space>
   </div>
 
@@ -115,7 +115,7 @@ const detailColumns = [
     <template v-if="detail">
       <Typography.Paragraph>账面数量与实盘数量的差额将在审核并执行后写入库存流水。</Typography.Paragraph>
       <a-table row-key="id" :pagination="false" :data-source="detail.lines" :columns="normalizeColumns(detailColumns)" />
-      <Button v-if="detail.status === 'DRAFT'" type="primary" style="margin-top: 16px;" @click="saveCounts">保存实盘数量</Button>
+      <Button v-if="detail.status === 'DRAFT' && hasPerm(auth.user, 'stocktake:write')" type="primary" style="margin-top: 16px;" @click="saveCounts">保存实盘数量</Button>
     </template>
   </a-drawer>
 </template>

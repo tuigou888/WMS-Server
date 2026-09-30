@@ -29,9 +29,11 @@ const routes = [
       { path: 'market/orders', name: 'market-orders', component: () => import('../pages/MallOrdersPage.vue'), meta: { title: '商城订单', perm: 'order:read' } },
       { path: 'market/customers', name: 'market-customers', component: () => import('../pages/MallCustomersPage.vue'), meta: { title: '商城客户', perm: 'customer:read' } },
       { path: 'market/dashboard', name: 'market-dashboard', component: () => import('../pages/MallDashboardPage.vue'), meta: { title: '商城概览', perm: 'report:view' } },
+      { path: '403', name: 'forbidden', component: () => import('../pages/ForbiddenPage.vue'), meta: { title: '无权访问' } },
     ],
   },
-  { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+  // R4-14：404 独立页面，不再 redirect /dashboard（无权限用户会被守卫再次弹走形成死循环）
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../pages/NotFoundPage.vue'), meta: { title: '页面不存在' } },
 ]
 
 const router = createRouter({
@@ -39,12 +41,21 @@ const router = createRouter({
   routes,
 })
 
+/** R4-14：找当前用户第一个有权限的业务路由；一个都没有则回登录页（而非自重定向 /dashboard 死循环）。 */
+function firstAllowedPath(auth) {
+  const matched = router.getRoutes()
+    .filter((r) => r.meta && r.meta.perm && hasPerm(auth.user, r.meta.perm))
+    .map((r) => r.path)
+    .sort((a, b) => a.length - b.length)
+  return matched.length ? matched[0] : '/login'
+}
+
 router.beforeEach((to) => {
   const auth = useAuthStore()
   const token = getStorage('wms_token')
   if (to.path !== '/login' && !token) return '/login'
-  if (to.path === '/login' && token) return '/dashboard'
-  if (to.meta.perm && auth.user && !hasPerm(auth.user, to.meta.perm)) return '/dashboard'
+  if (to.path === '/login' && token) return firstAllowedPath(auth)
+  if (to.meta.perm && auth.user && !hasPerm(auth.user, to.meta.perm)) return firstAllowedPath(auth)
   return true
 })
 

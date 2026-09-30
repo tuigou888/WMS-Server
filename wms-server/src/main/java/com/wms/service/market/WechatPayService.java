@@ -126,8 +126,16 @@ public class WechatPayService {
         request.setDescription(buildDescription(order));
         request.setOutTradeNo(order.getOrderNo());
         request.setNotifyUrl(notifyUrl);
-        // 支付有效期 30 分钟（RFC3339），超时后用户无法支付，需关单重新下单
-        request.setTimeExpire(RFC3339.format(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusMinutes(30)));
+        // 支付有效期 30 分钟（RFC3339）。
+        // R4-07：以「下单时刻+30min」为上限（与库存预占 expiresAt 同钟），防止"下单后隔很久才拉起支付"造成
+        // 微信可支付窗口超出预占窗口，付款落在预占过期之后引发资金态悬挂
+        java.time.ZonedDateTime shanghai = java.time.ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
+        java.time.LocalDateTime expireAt = shanghai.toLocalDateTime().plusMinutes(30);
+        if (order.getCreatedAt() != null) {
+            java.time.LocalDateTime reservationCeiling = order.getCreatedAt().plusMinutes(30);
+            if (reservationCeiling.isAfter(shanghai.toLocalDateTime()) && reservationCeiling.isBefore(expireAt)) expireAt = reservationCeiling;
+        }
+        request.setTimeExpire(RFC3339.format(expireAt));
         request.setAttach("orderId:" + order.getId());
         Amount amount = new Amount();
         amount.setTotal(toFen(order.getTotalAmount()));

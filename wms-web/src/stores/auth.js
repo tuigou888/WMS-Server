@@ -25,7 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
     const data = await api.login(values)
     setStorage('wms_token', data.token)
     user.value = data
-    setJson('wms_user', data)
+    const { token: _discard, ...userOnly } = data
+  setJson('wms_user', userOnly)
     return data
   }
 

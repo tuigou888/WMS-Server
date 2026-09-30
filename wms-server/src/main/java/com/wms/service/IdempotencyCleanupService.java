@@ -43,9 +43,16 @@ public class IdempotencyCleanupService {
         }
     }
 
-    /** 删除超过保留期的幂等记录，返回删除行数。 */
-    @Transactional
+    /** R4-11：分批清理——每批独立短事务，避免单条全量 DELETE 长事务持间隙锁。 */
     public int runOnce() {
-        return requests.deleteExpiredBefore(LocalDateTime.now().minusHours(retentionHours));
+        int total = 0;
+        while (true) {
+            java.util.List<Long> ids = requests.findExpiredIds(LocalDateTime.now().minusHours(retentionHours),
+                    org.springframework.data.domain.PageRequest.of(0, 1000));
+            if (ids.isEmpty()) break;
+            total += requests.deleteByIdIn(ids);
+            if (ids.size() < 1000) break;
+        }
+        return total;
     }
 }

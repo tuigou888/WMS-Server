@@ -107,7 +107,11 @@ public class ReportController {
         result.put("todaySalesAmount", sales);
         result.put("alertCount", (long) alerts.size());
         result.put("alerts", alerts);
-        result.put("recentTransactions", transactions.findRecentDetailedLimited(PageRequest.of(0, 8)).stream().map(this::tx).toList());
+        // R4-01：仓库受限用户只能看到授权仓库的最近流水（此前是全类唯一未过滤的流水输出，且被 scope 缓存放大）
+        List<InventoryTransaction> recentTxnsForDashboard = warehouseAccess.isWarehouseScoped()
+                ? transactions.findRecentDetailedByWarehouseIds(warehouseAccess.currentWarehouseIds(), PageRequest.of(0, 8))
+                : transactions.findRecentDetailedLimited(PageRequest.of(0, 8));
+        result.put("recentTransactions", recentTxnsForDashboard.stream().map(this::tx).toList());
         result.put("categoryDistribution", categoryDist);
         result.put("valueByCategory", valueByCategory);
         result.put("dailyTrend", dailyTrend);
@@ -512,6 +516,7 @@ public class ReportController {
     private Map<String, Object> tx(InventoryTransaction t) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", t.getId());
+        m.put("warehouseId", t.getWarehouse().getId());
         m.put("referenceNo", t.getReferenceNo());
         m.put("itemName", t.getItem().getName());
         m.put("itemCode", t.getItem().getCode());

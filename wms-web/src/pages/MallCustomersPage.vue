@@ -4,6 +4,10 @@ import { Button, Card, Input, Modal, Popconfirm, Space, Table, Tag, Typography, 
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
 import { normalizeColumns } from '../utils/table'
+import { hasPerm } from '../utils/permission'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const data = ref([])
 const total = ref(0)
@@ -14,7 +18,8 @@ const modalOpen = ref(false)
 const editing = ref(null)
 const formState = ref({ name: '', phone: '', address: '', defaultFlag: false, remark: '' })
 
-const load = async () => {
+const load = async (reset = false) => {
+  if (reset) page.value = 1
   loading.value = true
   try {
     const res = await api.marketCustomers({ page: page.value, pageSize: 10, keyword: keyword.value || undefined })
@@ -27,6 +32,7 @@ const load = async () => {
     loading.value = false
   }
 }
+const search = () => load(true)
 
 onMounted(() => {
   load()
@@ -62,11 +68,11 @@ const columns = [
   {
     title: '操作', width: 140,
     render: (_, r) => h(Space, [
-      h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑'),
-      h(Popconfirm, {
+      hasPerm(auth.user, 'customer:write') ? h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑') : null,
+      hasPerm(auth.user, 'customer:write') ? h(Popconfirm, {
         title: '确认删除该客户？',
-        onConfirm: () => api.deleteMarketCustomer(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message)),
-      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }),
+        onConfirm: () => api.deleteMarketCustomer(r.id).then(() => { message.success('已删除'); if (data.value.length === 1 && page.value > 1) page.value -= 1; load() }).catch((e) => message.error(e.message)),
+      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }) : null,
     ]),
   },
 ]
@@ -78,13 +84,13 @@ const columns = [
       <Typography.Title :level="3" class="page-title">商城客户</Typography.Title>
       <Typography.Text class="page-subtitle" type="secondary">管理小程序商城客户收货信息</Typography.Text>
     </div>
-    <Button type="primary" :icon="h(PlusOutlined)" @click="open()">新增客户</Button>
+    <Button v-if="hasPerm(auth.user, 'customer:write')" type="primary" :icon="h(PlusOutlined)" @click="open()">新增客户</Button>
   </div>
 
   <Card class="table-card">
     <Space style="margin-bottom: 16px;">
-      <a-input allow-clear placeholder="搜索姓名或电话" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load" />
-      <Button @click="load">查询</Button>
+      <a-input allow-clear placeholder="搜索姓名或电话" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="search" />
+      <Button @click="search">查询</Button>
     </Space>
     <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)"
       :pagination="{ current: page, total, pageSize: 10, onChange: (p) => { page = p; load() }, showTotal: (t) => `共 ${t} 条` }" />

@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface LoginAttemptRepository extends JpaRepository<LoginAttempt, Long> {
@@ -17,4 +19,12 @@ public interface LoginAttemptRepository extends JpaRepository<LoginAttempt, Long
     @Modifying
     @Query("delete from LoginAttempt a where a.windowStart < :before")
     int deleteByWindowStartBefore(@Param("before") LocalDateTime before);
+
+    /** R4-11：分批清理取批次 id。 */
+    @Query("select a.id from LoginAttempt a where a.windowStart < :before")
+    List<Long> findExpiredIds(@Param("before") LocalDateTime before, org.springframework.data.domain.Pageable pageable);
+
+    @Modifying
+    @Query("delete from LoginAttempt a where a.id in :ids")
+    int deleteByIdIn(@Param("ids") java.util.Collection<Long> ids);
 }

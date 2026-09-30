@@ -16,6 +16,7 @@ import javax.sql.DataSource;
  */
 @Configuration
 @EnableSchedulerLock(defaultLockAtMostFor = "PT1H")
+@org.springframework.context.annotation.Profile("!test")
 public class SchedulerLockConfig {
 
     @Bean

@@ -5,6 +5,10 @@ import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant
 import { api } from '../api/wms'
 import { money, number } from '../utils/format'
 import { normalizeColumns } from '../utils/table'
+import { hasPerm } from '../utils/permission'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const emptyForm = { itemId: undefined, title: '', subTitle: '', mainImage: '', gallery: '', salePrice: 0, marketPrice: 0, categoryId: undefined, sortNo: 0 }
 
@@ -25,7 +29,8 @@ const catFormOpen = ref(false)
 const catEditing = ref(null)
 const catForm = ref({ name: '', sortOrder: 0, status: true })
 
-const load = async () => {
+const load = async (reset = false) => {
+  if (reset) page.value = 1
   loading.value = true
   try {
     const res = await api.marketProducts({ page: page.value, pageSize: 10, keyword: keyword.value || undefined, status: statusFilter.value })
@@ -37,6 +42,7 @@ const load = async () => {
     loading.value = false
   }
 }
+const search = () => load(true)
 
 const loadCategories = async () => {
   try {
@@ -108,9 +114,9 @@ const catColumns = [
   {
     title: '操作', width: 140,
     render: (_, r) => h(Space, [
-      h(Button, { type: 'link', size: 'small', icon: h(EditOutlined), onClick: () => openCatForm(r) }, '编辑'),
-      h(Popconfirm, { title: '确认删除该分类？', onConfirm: () => removeCategory(r) },
-        { default: () => h(Button, { type: 'link', size: 'small', danger: true, icon: h(DeleteOutlined) }, '删除') }),
+      hasPerm(auth.user, 'product:write') ? h(Button, { type: 'link', size: 'small', icon: h(EditOutlined), onClick: () => openCatForm(r) }, '编辑') : null,
+      hasPerm(auth.user, 'product:write') ? h(Popconfirm, { title: '确认删除该分类？', onConfirm: () => removeCategory(r) },
+        { default: () => h(Button, { type: 'link', size: 'small', danger: true, icon: h(DeleteOutlined) }, '删除') }) : null,
     ]),
   },
 ]
@@ -152,12 +158,12 @@ const columns = [
   {
     title: '操作', width: 220,
     render: (_, r) => h(Space, [
-      h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑'),
-      h(Button, { type: 'link', onClick: () => toggleShelf(r) }, r.status === 'SHELF_ON' ? '下架' : '上架'),
-      h(Popconfirm, {
+      hasPerm(auth.user, 'product:write') ? h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑') : null,
+      hasPerm(auth.user, 'product:write') ? h(Button, { type: 'link', onClick: () => toggleShelf(r) }, r.status === 'SHELF_ON' ? '下架' : '上架') : null,
+      hasPerm(auth.user, 'product:write') ? h(Popconfirm, {
         title: '确认删除该商品？',
-        onConfirm: () => api.deleteMarketProduct(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message)),
-      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }),
+        onConfirm: () => api.deleteMarketProduct(r.id).then(() => { message.success('已删除'); if (data.value.length === 1 && page.value > 1) page.value -= 1; load() }).catch((e) => message.error(e.message)),
+      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }) : null,
     ]),
   },
 ]
@@ -171,15 +177,15 @@ const columns = [
     </div>
     <Space>
       <Button @click="openCatManager">管理分类</Button>
-      <Button type="primary" :icon="h(PlusOutlined)" @click="open()">新增商品</Button>
+      <Button v-if="hasPerm(auth.user, 'product:write')" type="primary" :icon="h(PlusOutlined)" @click="open()">新增商品</Button>
     </Space>
   </div>
 
   <Card class="table-card">
     <Space style="margin-bottom: 16px;">
-      <a-input allow-clear placeholder="搜索标题或物品编码" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load" />
-      <a-select v-model:value="statusFilter" allow-clear placeholder="状态" style="width: 120px;" :options="[{ value: 'SHELF_ON', label: '上架' }, { value: 'SHELF_OFF', label: '下架' }]" @change="load" />
-      <Button @click="load">查询</Button>
+      <a-input allow-clear placeholder="搜索标题或物品编码" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="search" />
+      <a-select v-model:value="statusFilter" allow-clear placeholder="状态" style="width: 120px;" :options="[{ value: 'SHELF_ON', label: '上架' }, { value: 'SHELF_OFF', label: '下架' }]" @change="search" />
+      <Button @click="search">查询</Button>
     </Space>
     <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)"
       :pagination="{ current: page, total, pageSize: 10, onChange: (p) => { page = p; load() }, showTotal: (t) => `共 ${t} 条` }" />

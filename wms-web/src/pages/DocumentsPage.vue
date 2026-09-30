@@ -93,7 +93,7 @@ const columns = [
         h(Button, { type: 'link', onClick: () => review(r, 'APPROVE') }, '审核通过'),
         h(Button, { type: 'link', danger: true, onClick: () => review(r, 'REJECT') }, '驳回'),
       ]) : null,
-      r.status === 'APPROVED' ? h(Popconfirm, {
+      r.status === 'APPROVED' && hasPerm(auth.user, 'document:execute') ? h(Popconfirm, {
         title: '执行后将产生库存流水，确认继续？',
         onConfirm: () => action(() => api.completeDocument(r.id)),
       }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
@@ -158,7 +158,7 @@ const setDetail = (d) => { detail.value = d }
           </template>
           <a-space-compact style="width: 100%;">
             <a-form-item :name="['lines', index, 'itemCode']" :rules="[{ required: true }]" style="width: 32%;">
-              <a-select v-model:value="line.itemCode" show-search placeholder="物品" :options="itemOptions" />
+              <a-select v-model:value="line.itemCode" show-search option-filter-prop="label" placeholder="物品" :options="itemOptions" />
             </a-form-item>
             <a-form-item :name="['lines', index, 'locationCode']" :rules="[{ required: true }]" style="width: 22%;">
               <a-input v-model:value="line.locationCode" placeholder="库位" />

@@ -23,6 +23,8 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -122,6 +124,20 @@ class WechatPayNotifyControllerTest {
         assertEquals("TX_A", second.getTransactionId());
     }
 
+    /** R4-20：回调时间戳超过 10 分钟时效即拒收（防重放），不再进入验签流程。 */
+    @Test
+    void notify_rejectsStaleTimestamp() {
+        WechatPayService pay = mock(WechatPayService.class);
+        when(pay.isMock()).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Wechatpay-Timestamp", String.valueOf(java.time.Instant.now().getEpochSecond() - 3600));
+        ResponseEntity<Map<String, Object>> response =
+                new WechatPayNotifyController(pay, mock(MarketService.class)).notify(request, "{}");
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("回调时间戳超时", response.getBody().get("message"));
+        verify(pay, never()).handleNotify(any(), any(), any(), any(), any());
+    }
+
     /** 回调接口免鉴权：异常细节（订单号、SQL、验签内部信息）只能进日志，不能回给调用方。 */
     @Test
     void notify_doesNotEchoExceptionDetail() {
@@ -130,8 +146,11 @@ class WechatPayNotifyControllerTest {
         when(pay.handleNotify(any(), any(), any(), any(), any())).thenThrow(
                 new IllegalStateException("更新失败 order_no=CKD20260923001 sql=update market_order set ..."));
 
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        // R4-20：时效校验放行合法时间戳，本用例验证的是异常不回显
+        request.addHeader("Wechatpay-Timestamp", String.valueOf(java.time.Instant.now().getEpochSecond()));
         ResponseEntity<Map<String, Object>> response =
-                new WechatPayNotifyController(pay, mock(MarketService.class)).notify(new MockHttpServletRequest(), "{}");
+                new WechatPayNotifyController(pay, mock(MarketService.class)).notify(request, "{}");
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode(), "5xx 才能触发微信重试");
         assertEquals("支付回调处理失败", response.getBody().get("message"));

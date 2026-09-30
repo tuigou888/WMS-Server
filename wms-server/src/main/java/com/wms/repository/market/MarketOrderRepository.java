@@ -71,6 +71,8 @@ public interface MarketOrderRepository extends JpaRepository<MarketOrder, Long> 
     @Query("select o.id from MarketOrder o where o.orderStatus = 'CANCELLED' and o.payStatus = 'PAID' and o.payType = 'PAY_ONLINE'")
     List<Long> findCancelledPaidOnlineOrderIds();
 
+    List<MarketOrder> findByPayStatus(MarketPayStatus payStatus);
+
     @Query("select count(o) from MarketOrder o where o.user.id = :userId and o.orderStatus not in ('CANCELLED')")
     long countActiveByUserId(@Param("userId") Long userId);
 

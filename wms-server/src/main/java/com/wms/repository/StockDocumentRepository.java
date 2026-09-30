@@ -11,4 +11,7 @@ public interface StockDocumentRepository extends JpaRepository<StockDocument,Lon
  boolean existsByPartnerId(Long partnerId);
  boolean existsByDocumentNo(String documentNo);
  boolean existsByReversalOfDocumentId(Long reversalOfDocumentId);
+ /** R4-16：列表页批量回填 hasReversal，替代逐行 exists 的 N+1。 */
+ @org.springframework.data.jpa.repository.Query("select d.reversalOfDocumentId from StockDocument d where d.reversalOfDocumentId in :ids")
+ List<Long> findReversalIdsBySourceIds(@Param("ids") List<Long> ids);
 }

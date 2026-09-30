@@ -28,6 +28,11 @@ const topColumns = [
 onMounted(() => {
   api.marketStats().then((res) => { data.value = res }).catch((e) => message.error(e.message))
 })
+const statusWidth = (cnt) => {
+  const counts = Object.values(data.statusCounts || {})
+  const max = Math.max(1, ...counts.map(Number))
+  return Math.min(100, Math.round((Number(cnt) / max) * 100))
+}
 </script>
 
 <template>
@@ -47,7 +52,7 @@ onMounted(() => {
           <div class="metric-icon" style="background:#e6f4ff;color:#1677ff;"><DollarOutlined /></div>
           <div class="metric-body">
             <div class="metric-label">累计销售额</div>
-            <div class="metric-value">¥{{ money(data.totalSales) }}</div>
+            <div class="metric-value">{{ money(data.totalSales) }}</div>
             <div class="metric-sub">已完成订单合计</div>
           </div>
         </Card>
@@ -58,7 +63,7 @@ onMounted(() => {
           <div class="metric-body">
             <div class="metric-label">今日订单</div>
             <div class="metric-value">{{ number(data.todayOrders) }}</div>
-            <div class="metric-sub">今日销售额 ¥{{ money(data.todaySales) }}</div>
+            <div class="metric-sub">今日销售额 {{ money(data.todaySales) }}</div>
           </div>
         </Card>
       </Col>
@@ -92,7 +97,7 @@ onMounted(() => {
             <Tag :color="statusColors[status] || 'default'">{{ statusLabels[status] || status }}</Tag>
             <span class="status-count">{{ number(cnt) }} 单</span>
             <div class="status-bar-bg">
-              <div class="status-bar" :style="{ width: Math.min(100, Number(cnt) * 5) + '%', background: statusColors[status] || '#999' }"></div>
+              <div class="status-bar" :style="{ width: statusWidth(cnt) + '%', background: statusColors[status] || '#999' }"></div>
             </div>
           </div>
         </Card>
@@ -119,7 +124,7 @@ onMounted(() => {
 .metric-value { font-size: 28px; font-weight: 700; color: #333; margin: 4px 0; }
 .metric-sub { font-size: 12px; color: #bbb; }
 .table-card { border-radius: 12px; }
-.status-row { display: flex; align-items: center; padding: 12rpx 0; margin-bottom: 16px; }
+.status-row { display: flex; align-items: center; padding: 12px 0; margin-bottom: 16px; }
 .status-count { font-size: 14px; color: #333; font-weight: 600; margin: 0 12px; min-width: 60px; }
 .status-bar-bg { flex: 1; height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
 .status-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }

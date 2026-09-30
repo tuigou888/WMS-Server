@@ -6,6 +6,9 @@ import { api } from '../api/wms'
 import { money, number, dateTime } from '../utils/format'
 import { actionLabel } from '../utils/labels'
 import { normalizeColumns } from '../utils/table'
+import { useAuthStore } from '../stores/auth'
+import { hasPerm } from '../utils/permission'
+const auth = useAuthStore()
 
 const data = ref([])
 const page = ref(1)
@@ -27,7 +30,8 @@ const refundReason = ref('')
 // 操作目标订单 id，与 currentOrder（详情展示）解耦，避免异步竞态污染
 const actionTargetId = ref(null)
 
-const load = async () => {
+const load = async (reset = false) => {
+  if (reset) page.value = 1
   loading.value = true
   try {
     const res = await api.marketOrders({ page: page.value, pageSize: 10, keyword: keyword.value || undefined, status: statusFilter.value })
@@ -40,6 +44,7 @@ const load = async () => {
     loading.value = false
   }
 }
+const search = () => load(true)
 
 onMounted(() => {
   load()
@@ -181,12 +186,12 @@ const columns = [
     title: '操作', width: 240,
     render: (_, r) => h(Space, [
       h(Button, { type: 'link', onClick: () => openDetail(r) }, '详情'),
-      r.orderStatus === 'PENDING' ? h(Button, { type: 'link', icon: h(CheckCircleOutlined), style: { color: '#52c41a' }, onClick: () => { actionTargetId.value = r.id; openAudit(true) } }, '通过') : '',
-      r.orderStatus === 'PENDING' ? h(Button, { type: 'link', danger: true, icon: h(CloseCircleOutlined), onClick: () => { actionTargetId.value = r.id; openAudit(false) } }, '驳回') : '',
-      r.orderStatus === 'AUDITED' ? h(Button, { type: 'link', icon: h(SendOutlined), style: { color: '#1890ff' }, onClick: () => { actionTargetId.value = r.id; openShip() } }, '发货') : '',
-      r.orderStatus === 'SHIPPED' ? h(Button, { type: 'link', icon: h(CheckCircleOutlined), style: { color: '#52c41a' }, onClick: () => { actionTargetId.value = r.id; confirmComplete() } }, '完成') : '',
-      r.payStatus === 'PAID' ? h(Button, { type: 'link', icon: h(RollbackOutlined), style: { color: '#722ed1' }, onClick: () => { actionTargetId.value = r.id; openRefund() } }, '退款') : '',
-      r.orderStatus !== 'COMPLETED' && r.orderStatus !== 'CANCELLED' && r.orderStatus !== 'REJECTED' ? h(Button, { type: 'link', danger: true, onClick: () => { actionTargetId.value = r.id; openCancel() } }, '取消') : '',
+      r.orderStatus === 'PENDING' && hasPerm(auth.user, 'order:review') ? h(Button, { type: 'link', icon: h(CheckCircleOutlined), style: { color: '#52c41a' }, onClick: () => { actionTargetId.value = r.id; openAudit(true) } }, '通过') : '',
+      r.orderStatus === 'PENDING' && hasPerm(auth.user, 'order:review') ? h(Button, { type: 'link', danger: true, icon: h(CloseCircleOutlined), onClick: () => { actionTargetId.value = r.id; openAudit(false) } }, '驳回') : '',
+      r.orderStatus === 'AUDITED' && hasPerm(auth.user, 'order:execute') ? h(Button, { type: 'link', icon: h(SendOutlined), style: { color: '#1890ff' }, onClick: () => { actionTargetId.value = r.id; openShip() } }, '发货') : '',
+      r.orderStatus === 'SHIPPED' && hasPerm(auth.user, 'order:execute') ? h(Button, { type: 'link', icon: h(CheckCircleOutlined), style: { color: '#52c41a' }, onClick: () => { actionTargetId.value = r.id; confirmComplete() } }, '完成') : '',
+      r.payStatus === 'PAID' && hasPerm(auth.user, 'order:review') ? h(Button, { type: 'link', icon: h(RollbackOutlined), style: { color: '#722ed1' }, onClick: () => { actionTargetId.value = r.id; openRefund() } }, '退款') : '',
+      r.orderStatus !== 'COMPLETED' && r.orderStatus !== 'CANCELLED' && r.orderStatus !== 'REJECTED' && hasPerm(auth.user, 'order:review') ? h(Button, { type: 'link', danger: true, onClick: () => { actionTargetId.value = r.id; openCancel() } }, '取消') : '',
     ].filter(Boolean)),
   },
 ]
@@ -202,9 +207,9 @@ const columns = [
 
   <Card class="table-card">
     <Space style="margin-bottom: 16px;">
-      <a-input allow-clear placeholder="搜索订单号或收货人" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="load" />
-      <a-select v-model:value="statusFilter" allow-clear placeholder="订单状态" style="width: 140px;" :options="Object.keys(statusLabel).map((k) => ({ value: k, label: statusLabel[k] }))" @change="load" />
-      <Button @click="load">查询</Button>
+      <a-input allow-clear placeholder="搜索订单号或收货人" :prefix="h(SearchOutlined)" v-model:value="keyword" style="width: 250px;" @press-enter="search" />
+      <a-select v-model:value="statusFilter" allow-clear placeholder="订单状态" style="width: 140px;" :options="Object.keys(statusLabel).map((k) => ({ value: k, label: statusLabel[k] }))" @change="search" />
+      <Button @click="search">查询</Button>
     </Space>
       <a-table row-key="id" :loading="loading" :data-source="data" :columns="normalizeColumns(columns)"
         :pagination="{ current: page, total, pageSize: 10, onChange: (p) => { page = p; load() }, showTotal: (t) => `共 ${t} 条` }" />
@@ -246,11 +251,11 @@ const columns = [
       </a-timeline>
       <div style="margin-top: 24px; text-align: right;">
         <Space>
-          <Button v-if="currentOrder.orderStatus === 'PENDING'" type="primary" @click="actionTargetId = currentOrder.id; openAudit(true)">审核通过</Button>
-          <Button v-if="currentOrder.orderStatus === 'PENDING'" danger @click="actionTargetId = currentOrder.id; openAudit(false)">驳回</Button>
-          <Button v-if="currentOrder.orderStatus === 'AUDITED'" type="primary" @click="actionTargetId = currentOrder.id; openShip">发货</Button>
-          <Button v-if="currentOrder.orderStatus === 'SHIPPED'" type="primary" @click="actionTargetId = currentOrder.id; confirmComplete">确认完成</Button>
-          <Button v-if="currentOrder.orderStatus !== 'COMPLETED' && currentOrder.orderStatus !== 'CANCELLED' && currentOrder.orderStatus !== 'REJECTED'" danger @click="actionTargetId = currentOrder.id; openCancel">取消订单</Button>
+          <Button v-if="currentOrder.orderStatus === 'PENDING' && hasPerm(auth.user, 'order:review')" type="primary" @click="actionTargetId = currentOrder.id; openAudit(true)">审核通过</Button>
+          <Button v-if="currentOrder.orderStatus === 'PENDING' && hasPerm(auth.user, 'order:review')" danger @click="actionTargetId = currentOrder.id; openAudit(false)">驳回</Button>
+          <Button v-if="currentOrder.orderStatus === 'AUDITED' && hasPerm(auth.user, 'order:execute')" type="primary" @click="actionTargetId = currentOrder.id; openShip">发货</Button>
+          <Button v-if="currentOrder.orderStatus === 'SHIPPED' && hasPerm(auth.user, 'order:execute')" type="primary" @click="actionTargetId = currentOrder.id; confirmComplete">确认完成</Button>
+          <Button v-if="currentOrder.orderStatus !== 'COMPLETED' && currentOrder.orderStatus !== 'CANCELLED' && currentOrder.orderStatus !== 'REJECTED' && hasPerm(auth.user, 'order:review')" danger @click="actionTargetId = currentOrder.id; openCancel">取消订单</Button>
         </Space>
       </div>
     </template>

@@ -73,7 +73,7 @@ const columns = [
         h(Button, { type: 'link', onClick: () => review(r, 'APPROVE') }, '审核通过'),
         h(Button, { type: 'link', danger: true, onClick: () => review(r, 'REJECT') }, '驳回'),
       ]) : null,
-      r.status === 'APPROVED' ? h(Popconfirm, { title: '执行后将调整库存，确认继续？', onConfirm: () => act(() => api.completeAdjustment(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
+      r.status === 'APPROVED' && hasPerm(auth.user, 'adjustment:execute') ? h(Popconfirm, { title: '执行后将调整库存，确认继续？', onConfirm: () => act(() => api.completeAdjustment(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
     ]),
   },
 ]
@@ -119,7 +119,7 @@ const detailCols = [
           </template>
           <a-space-compact style="width: 100%;">
             <a-form-item :name="['lines', index, 'itemCode']" :rules="[{ required: true }]" style="width: 50%;">
-              <a-select v-model:value="line.itemCode" show-search placeholder="物品" :options="items.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))" />
+              <a-select v-model:value="line.itemCode" show-search option-filter-prop="label" placeholder="物品" :options="items.map((x) => ({ value: x.code, label: `${x.code} · ${x.name}` }))" />
             </a-form-item>
             <a-form-item :name="['lines', index, 'locationCode']" :rules="[{ required: true }]" style="width: 30%;">
               <a-input v-model:value="line.locationCode" placeholder="库位" />

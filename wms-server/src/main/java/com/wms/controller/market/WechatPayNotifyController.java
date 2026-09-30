@@ -62,6 +62,12 @@ public class WechatPayNotifyController {
             log.warn("mock 模式收到回调请求，已忽略");
             return fail(HttpStatus.BAD_REQUEST, "mock 模式不接收回调");
         }
+        // R4-20：回调时间戳时效校验（官方建议 5 分钟，放宽到 10 分钟容忍时钟漂移）——超时拒收，防重放
+        java.time.LocalDateTime tsTime = parseWechatTimestamp(timestamp);
+        if (tsTime == null || java.time.Duration.between(tsTime, java.time.LocalDateTime.now()).abs().toMinutes() > 10) {
+            log.warn("支付回调时间戳超时或非法：timestamp={}", timestamp);
+            return fail(HttpStatus.BAD_REQUEST, "回调时间戳超时");
+        }
         try {
             Transaction tx = wechatPay.handleNotify(serial, nonce, timestamp, signature, body);
             if (tx == null || tx.getOutTradeNo() == null) {
@@ -172,5 +178,17 @@ public class WechatPayNotifyController {
         body.put("code", "FAIL");
         body.put("message", message == null ? "处理失败" : message);
         return ResponseEntity.status(status).body(body);
+    }
+
+    /** R4-20：微信回调 timestamp 为 Unix 秒；非法格式返回 null。 */
+    private static java.time.LocalDateTime parseWechatTimestamp(String timestamp) {
+        if (timestamp == null || timestamp.isBlank()) return null;
+        try {
+            return java.time.LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochSecond(Long.parseLong(timestamp.trim())),
+                    java.time.ZoneId.of("Asia/Shanghai"));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

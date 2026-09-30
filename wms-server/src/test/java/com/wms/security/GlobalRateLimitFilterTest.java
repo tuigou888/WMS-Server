@@ -37,15 +37,28 @@ class GlobalRateLimitFilterTest {
     }
 
     @Test
-    void differentIpsCountSeparatelyViaXff() throws Exception {
+    void differentIpsCountSeparatelyViaXffLastSegment() throws Exception {
         GlobalRateLimitFilter filter = new GlobalRateLimitFilter(true, 1, 60);
         MockHttpServletRequest a = new MockHttpServletRequest("GET", "/x");
-        a.addHeader("X-Forwarded-For", "1.1.1.1, 10.0.0.1");
+        a.addHeader("X-Forwarded-For", "10.0.0.1, 1.1.1.1");
         MockHttpServletRequest b = new MockHttpServletRequest("GET", "/x");
-        b.addHeader("X-Forwarded-For", "2.2.2.2, 10.0.0.1");
+        b.addHeader("X-Forwarded-For", "10.0.0.1, 2.2.2.2");
         assertEquals(200, run(filter, a).getStatus());
         assertEquals(200, run(filter, b).getStatus());
-        assertEquals(429, run(filter, a).getStatus(), "各 IP 独立计数，1.1.1.1 第二次应被限");
+        assertEquals(429, run(filter, a).getStatus(), "各 IP 独立计数，末段 1.1.1.1 第二次应被限");
+    }
+
+    /** R4-02：追加式反代下客户端伪造的 XFF 首段不影响限流归属——末段（可信代理写入）才是计数键。 */
+    @Test
+    void forgedXffFirstSegmentDoesNotEvadeRateLimit() throws Exception {
+        GlobalRateLimitFilter filter = new GlobalRateLimitFilter(true, 1, 60);
+        // 同一真实来源（末段相同），每请求换伪造首段：必须仍计入同一桶并被限流
+        for (int i = 0; i < 3; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest("GET", "/x");
+            req.addHeader("X-Forwarded-For", "10.0.0." + i + ", 9.9.9.9");
+            assertEquals(i == 0 ? 200 : 429, run(filter, req).getStatus(),
+                    "伪造首段不得绕过限流（第 " + (i + 1) + " 次请求）");
+        }
     }
 
     @Test

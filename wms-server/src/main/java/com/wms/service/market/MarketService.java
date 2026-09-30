@@ -185,8 +185,17 @@ public class MarketService {
 
     @Transactional(readOnly = true)
     public BigDecimal available(Long itemId, Long warehouseId) {
+        if (warehouseId == null) return availableAllWarehouses(itemId);
         BigDecimal physical = inventories.availableQty(itemId, warehouseId);
         BigDecimal held = reservations.sumHeldQuantity(itemId, warehouseId, LocalDateTime.now());
+        return physical.subtract(held).max(BigDecimal.ZERO);
+    }
+
+    /** R4-19：未指定仓库时按全部仓库聚合（原 availableQty 对 null 仓库等值匹配恒返回 0，导致详情页误显示售罄）。 */
+    @Transactional(readOnly = true)
+    public BigDecimal availableAllWarehouses(Long itemId) {
+        BigDecimal physical = inventories.sumQuantityByItem(itemId);
+        BigDecimal held = reservations.sumHeldQuantityByItem(itemId, LocalDateTime.now());
         return physical.subtract(held).max(BigDecimal.ZERO);
     }
 
@@ -404,6 +413,25 @@ public class MarketService {
             throw new BusinessException("订单已拒绝，支付回调需人工核实退款");
         }
         List<InventoryReservation> held=reservations.findByOrderIdOrderByIdAsc(order.getId());
+        // R4-07：支付回调落在"预占已过期、expireReservations 尚未扫描"的竞态窗口时，按超时取消语义收编进
+        // CANCELLED 分支登记退款（复用既有资金安全路径），而非抛错让微信按天重试
+        if ((MarketOrderStatus.PENDING.equals(st)||MarketOrderStatus.AUDITED.equals(st))&&MarketPayStatus.UNPAID.equals(order.getPayStatus())
+                &&held.stream().anyMatch(r->InventoryReservationStatus.HELD.equals(r.getStatus())&&!r.getExpiresAt().isAfter(LocalDateTime.now()))){
+            order.setOrderStatus(MarketOrderStatus.CANCELLED);
+            order.setCancelReason("支付时库存预占已过期，款项将原路退回");
+            order.setCancelledAt(LocalDateTime.now());
+            orders.save(order);
+            st=MarketOrderStatus.CANCELLED;
+        }
+        if (MarketOrderStatus.CANCELLED.equals(st)) {
+            // 与既有 CANCELLED 分支共用：登记 PAID 资金事实 + 自动退款（不扣已释放库存）
+            order.setPayStatus(MarketPayStatus.PAID); order.setTransactionId(transactionId); order.setPaidAt(LocalDateTime.now());
+            order.setRefundReason("订单取消后收到支付回调，等待自动退款");
+            MarketOrder saved=orders.save(order);
+            orderLogs.save(new MarketOrderLog(saved.getId(),MarketOrderAction.PAY,operator,"取消后支付，未扣库存，等待自动退款，交易号："+transactionId));
+            log.warn("订单 {} 预占过期后收到支付回调，已登记退款任务", order.getId());
+            return saved;
+        }
         assertReservationPayable(order,held,LocalDateTime.now());
         deductStock(order, "支付扣库存");
         held=reservations.findByOrderIdForUpdate(order.getId());
@@ -456,6 +484,8 @@ public class MarketService {
 
     private MarketOrder prepareRefundRequest(Long orderId, String reason, String operator, boolean mock) {
         MarketOrder order = orders.findForUpdateById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        // R4-08：审核/取消/退款与 ship/complete 同样受仓库数据边界约束，防 scoped 用户跨仓操作资金
+        warehouseAccess.require(order.getWarehouse().getId());
         if (MarketPayStatus.REFUNDING.equals(order.getPayStatus())) throw new BusinessException("退款处理中，请勿重复发起");
         if (MarketPayStatus.REFUNDED.equals(order.getPayStatus())) throw new BusinessException("订单已退款");
         if (!MarketPayStatus.PAID.equals(order.getPayStatus())) throw new BusinessException("订单未支付，无法退款");
@@ -540,6 +570,8 @@ public class MarketService {
     @Transactional
     public MarketOrder audit(Long orderId, boolean approve, String remark, String operator) {
         MarketOrder order = orders.findForUpdateById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        // R4-08：审核/取消/退款与 ship/complete 同样受仓库数据边界约束，防 scoped 用户跨仓操作资金
+        warehouseAccess.require(order.getWarehouse().getId());
         if (!MarketOrderStatus.PENDING.equals(order.getOrderStatus())) throw new BusinessException("当前订单状态不可审核");
         // P0-1：在线支付订单的库存由支付回调 markPaid 扣减，人工审核不应重复扣库存；
         // 仅货到付款等非在线支付订单走审核扣库存路径。
@@ -622,6 +654,8 @@ public class MarketService {
     @Transactional
     public MarketOrder forceCancel(Long orderId, String reason, String operator) {
         MarketOrder order = orders.findForUpdateById(orderId).orElseThrow(() -> new BusinessException("订单不存在"));
+        // R4-08：审核/取消/退款与 ship/complete 同样受仓库数据边界约束，防 scoped 用户跨仓操作资金
+        warehouseAccess.require(order.getWarehouse().getId());
         if (MarketOrderStatus.COMPLETED.equals(order.getOrderStatus()) || MarketOrderStatus.CANCELLED.equals(order.getOrderStatus())) {
             throw new BusinessException("订单已完成或已取消");
         }
@@ -656,9 +690,32 @@ public class MarketService {
     private void consumeReservations(List<InventoryReservation> held){LocalDateTime now=LocalDateTime.now();for(InventoryReservation r:held){r.setStatus(InventoryReservationStatus.CONSUMED);r.setConsumedAt(now);}}
     private void releaseReservations(List<InventoryReservation> held,InventoryReservationStatus target){LocalDateTime now=LocalDateTime.now();for(InventoryReservation r:held)if(InventoryReservationStatus.HELD.equals(r.getStatus())){r.setStatus(target);r.setReleasedAt(now);}}
     /** 到期订单不再占用可售库存；支付窗口已过的未支付订单同时关闭。 */
-    @Scheduled(fixedDelayString="${market.reservation.expire-scan-ms:60000}") @Transactional public void expireReservations(){LocalDateTime now=LocalDateTime.now();for(InventoryReservation candidate:reservations.findExpiredHeld(now)){MarketOrder order=orders.findForUpdateById(candidate.getOrder().getId()).orElse(null);if(order==null)continue;List<InventoryReservation> held=reservations.findByOrderIdForUpdate(order.getId());boolean hasExpired=held.stream().anyMatch(r->InventoryReservationStatus.HELD.equals(r.getStatus())&&!r.getExpiresAt().isAfter(now));if(!hasExpired)continue;releaseReservations(held,InventoryReservationStatus.EXPIRED);if(MarketPayStatus.UNPAID.equals(order.getPayStatus())&&(MarketOrderStatus.PENDING.equals(order.getOrderStatus())||MarketOrderStatus.AUDITED.equals(order.getOrderStatus()))){order.setOrderStatus(MarketOrderStatus.CANCELLED);order.setCancelReason("支付超时，库存预占已释放");order.setCancelledAt(now);orders.save(order);orderLogs.save(new MarketOrderLog(order.getId(),MarketOrderAction.CANCEL,"system","支付超时取消并释放库存预占"));}}}
+    @Scheduled(fixedDelayString="${market.reservation.expire-scan-ms:60000}") @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name="market-reservation-expire",lockAtMostFor="PT5M") @Transactional public void expireReservations(){LocalDateTime now=LocalDateTime.now();for(InventoryReservation candidate:reservations.findExpiredHeld(now)){MarketOrder order=orders.findForUpdateById(candidate.getOrder().getId()).orElse(null);if(order==null)continue;List<InventoryReservation> held=reservations.findByOrderIdForUpdate(order.getId());boolean hasExpired=held.stream().anyMatch(r->InventoryReservationStatus.HELD.equals(r.getStatus())&&!r.getExpiresAt().isAfter(now));if(!hasExpired)continue;releaseReservations(held,InventoryReservationStatus.EXPIRED);if(MarketPayStatus.UNPAID.equals(order.getPayStatus())&&(MarketOrderStatus.PENDING.equals(order.getOrderStatus())||MarketOrderStatus.AUDITED.equals(order.getOrderStatus()))){order.setOrderStatus(MarketOrderStatus.CANCELLED);order.setCancelReason("支付超时，库存预占已释放");order.setCancelledAt(now);orders.save(order);orderLogs.save(new MarketOrderLog(order.getId(),MarketOrderAction.CANCEL,"system","支付超时取消并释放库存预占"));}}}
     /** 取消后到达的线上支付回调会先登记 PAID，再由该任务安全发起退款；失败保留 PAID 以便重试。 */
-    @Scheduled(fixedDelayString="${market.cancelled-payment-refund-scan-ms:30000}",initialDelayString="${market.cancelled-payment-refund-initial-delay-ms:60000}") public void refundCancelledPaidOrders(){for(Long id:orders.findCancelledPaidOnlineOrderIds())try{refund(id,"订单取消后支付自动退款","system");}catch(RuntimeException e){log.error("取消后支付订单自动退款失败，稍后重试：orderId={}",id,e);}}
+    @Scheduled(fixedDelayString="${market.cancelled-payment-refund-scan-ms:30000}",initialDelayString="${market.cancelled-payment-refund-initial-delay-ms:60000}") @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name="market-cancelled-refund",lockAtMostFor="PT10M") public void refundCancelledPaidOrders(){for(Long id:orders.findCancelledPaidOnlineOrderIds())try{refund(id,"订单取消后支付自动退款","system");}catch(RuntimeException e){int n=refundFailureCount.merge(id,1,Integer::sum);if(n>=5)log.error("取消后支付订单自动退款连续 {} 次失败，需人工介入：orderId={}",n,id,e);else log.error("取消后支付订单自动退款失败（第 {} 次），稍后重试：orderId={}",n,id,e);}}
+
+    private final java.util.concurrent.ConcurrentMap<Long,Integer> refundFailureCount=new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** R4-06：退款对账——REFUNDING 单此前仅靠微信回调收敛，回调丢失即永久悬挂。定时向微信查单按终态收敛。 */
+    @Scheduled(fixedDelayString="${market.refund.reconcile-scan-ms:300000}", initialDelayString="${market.refund.reconcile-initial-delay-ms:180000}")
+    @net.javacrumbs.shedlock.spring.annotation.SchedulerLock(name = "market-refund-reconcile", lockAtMostFor = "PT10M")
+    public void reconcileStuckRefunds() {
+        if (wechatPay.isMock()) return; // mock 退款同步落终态，不存在悬挂 REFUNDING
+        for (MarketOrder order : orders.findByPayStatus(MarketPayStatus.REFUNDING)) {
+            try {
+                wechatPay.queryRefundByOutRefundNo(order.getRefundNo()).ifPresent(refund -> {
+                    Status st = refund.getStatus();
+                    if (Status.SUCCESS.equals(st)) {
+                        finalizeRefundByNo(order.getRefundNo(), refund.getRefundId(), "refund-reconcile");
+                    } else if (Status.CLOSED.equals(st) || Status.ABNORMAL.equals(st)) {
+                        markRefundFailedByNo(order.getRefundNo(), "refund-reconcile", "微信侧退款终态：" + st);
+                    }
+                });
+            } catch (Exception e) {
+                log.warn("退款对账失败，下轮重试：orderId={}, refundNo={}", order.getId(), order.getRefundNo(), e);
+            }
+        }
+    }
 
     // ======================== 库存扣减/回滚（内部） ========================
 
@@ -674,8 +731,9 @@ public class MarketService {
                 if (remaining.signum() <= 0) break;
                 BigDecimal take = inv.getQuantity().min(remaining);
                 BigDecimal newQty = inv.getQuantity().subtract(take);
-                BigDecimal newAmount = inv.getAvgCost().multiply(newQty);
                 BigDecimal cost = inv.getAvgCost().multiply(take);
+                // R4-12：与 InventoryService.stockOut 同口径（总-成本，钳零，2 位 HALF_UP），防商城扣减与 WMS 出库账面漂移
+                BigDecimal newAmount = inv.getTotalAmount().subtract(cost).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
                 inv.setQuantity(newQty);
                 inv.setTotalAmount(newAmount);
                 inventories.save(inv);
@@ -703,7 +761,8 @@ public class MarketService {
         Map<Long, java.util.LinkedList<InventoryTransaction>> outTxByItem = outTxs.stream()
                 .collect(java.util.stream.Collectors.groupingBy(
                         t -> t.getItem().getId(), java.util.stream.Collectors.toCollection(java.util.LinkedList::new)));
-        for (MarketOrderItem oi : order.getItems()) {
+        // R4-04：按 itemId 升序加锁，与 deductStock/单据执行同锁序，防与并发单据执行/反审 AB-BA 死锁
+        for (MarketOrderItem oi : order.getItems().stream().sorted(java.util.Comparator.comparing(x -> x.getItem().getId())).toList()) {
             java.util.LinkedList<InventoryTransaction> itemOutTxs = outTxByItem.get(oi.getItem().getId());
             BigDecimal remaining = oi.getQuantity();
             if (itemOutTxs == null) throw new BusinessException("订单缺少原始出库流水，无法回滚库存：" + oi.getItemCode());

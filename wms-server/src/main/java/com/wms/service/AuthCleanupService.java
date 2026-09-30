@@ -56,13 +56,34 @@ public class AuthCleanupService {
         }
     }
 
-    /** 清理超保留期的限速计数、已过期绑定票据与已过期登录会话。 */
-    @Transactional
+    /** 清理超保留期的限速计数、已过期绑定票据与已过期登录会话。R4-11：改为分批短事务删除。 */
     public Result runOnce() {
-        int attemptsDeleted = attempts.deleteByWindowStartBefore(LocalDateTime.now().minusHours(loginAttemptRetentionHours));
-        int ticketsDeleted = tickets.deleteExpiredBefore(LocalDateTime.now());
-        long sessionsDeleted = sessions.deleteByExpiresAtBefore(LocalDateTime.now());
-        return new Result(attemptsDeleted, ticketsDeleted, sessionsDeleted);
+        return new Result(
+                deleteInBatches(ids -> attempts.deleteByIdIn(ids),
+                        before -> attempts.findExpiredIds(before, org.springframework.data.domain.PageRequest.of(0, BATCH_SIZE)),
+                        LocalDateTime.now().minusHours(loginAttemptRetentionHours)),
+                deleteInBatches(ids -> tickets.deleteByIdIn(ids),
+                        now -> tickets.findExpiredIds(now, org.springframework.data.domain.PageRequest.of(0, BATCH_SIZE)),
+                        LocalDateTime.now()),
+                deleteInBatches(ids -> sessions.deleteByIdIn(ids),
+                        now -> sessions.findExpiredIds(now, org.springframework.data.domain.PageRequest.of(0, BATCH_SIZE)),
+                        LocalDateTime.now()));
+    }
+
+    private static final int BATCH_SIZE = 1000;
+
+    /** R4-11：通用分批删除——每批"取 id → 删"，批间经 repository 自身事务独立提交，避免单条全量 DELETE 长事务。 */
+    private int deleteInBatches(java.util.function.Function<java.util.Collection<Long>, Integer> deleter,
+                                java.util.function.Function<LocalDateTime, java.util.List<Long>> finder,
+                                LocalDateTime cutoff) {
+        int total = 0;
+        while (true) {
+            java.util.List<Long> ids = finder.apply(cutoff);
+            if (ids.isEmpty()) break;
+            total += deleter.apply(ids);
+            if (ids.size() < BATCH_SIZE) break;
+        }
+        return total;
     }
 
     public record Result(int attemptsDeleted, int ticketsDeleted, long sessionsDeleted) {}

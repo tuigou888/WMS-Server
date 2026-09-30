@@ -87,7 +87,7 @@ const columns = [
         h(Button, { type: 'link', onClick: () => act(() => api.reviewTransfer(r.id, { action: 'APPROVE' })) }, '审核通过'),
         h(Button, { type: 'link', danger: true, onClick: () => act(() => api.reviewTransfer(r.id, { action: 'REJECT' })) }, '驳回'),
       ]) : null,
-      r.status === 'APPROVED' ? h(Popconfirm, { title: '确认执行调拨？', onConfirm: () => act(() => api.completeTransfer(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
+      r.status === 'APPROVED' && hasPerm(auth.user, 'transfer:execute') ? h(Popconfirm, { title: '确认执行调拨？', onConfirm: () => act(() => api.completeTransfer(r.id)) }, { default: () => h(Button, { type: 'primary' }, '执行') }) : null,
     ]),
   },
 ]

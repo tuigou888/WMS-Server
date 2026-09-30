@@ -17,7 +17,8 @@ function requestIdentity(config) {
   let a = 2166136261, b = 2246822519
   for (let i = 0; i < input.length; i++) { const code = input.charCodeAt(i); a = Math.imul(a ^ code, 16777619); b = Math.imul(b ^ code, 3266489917) }
   const scope = `${method}:${config.url}:${(a >>> 0).toString(36)}${(b >>> 0).toString(36)}`
-  const pending = JSON.parse(sessionStorage.getItem(IDEMPOTENCY_CACHE_KEY) || '{}')
+  let pending
+try { pending = JSON.parse(sessionStorage.getItem(IDEMPOTENCY_CACHE_KEY) || '{}') } catch { pending = {} }
   let key = pending[scope]
   if (!key) { key = `wms-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`; pending[scope] = key; sessionStorage.setItem(IDEMPOTENCY_CACHE_KEY, JSON.stringify(pending)) }
   return { scope, key }
@@ -25,7 +26,8 @@ function requestIdentity(config) {
 
 function clearRequestIdentity(identity) {
   if (!identity) return
-  const pending = JSON.parse(sessionStorage.getItem(IDEMPOTENCY_CACHE_KEY) || '{}')
+  let pending
+try { pending = JSON.parse(sessionStorage.getItem(IDEMPOTENCY_CACHE_KEY) || '{}') } catch { pending = {} }
   delete pending[identity.scope]
   sessionStorage.setItem(IDEMPOTENCY_CACHE_KEY, JSON.stringify(pending))
 }

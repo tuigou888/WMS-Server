@@ -55,17 +55,28 @@ public class GlobalRateLimitFilter extends OncePerRequestFilter {
             response.getWriter().write("{\"code\":429,\"message\":\"请求过于频繁，请稍后再试\",\"data\":null}");
             return;
         }
-        if (counters.size() > CLEANUP_THRESHOLD) counters.entrySet().removeIf(e -> now - e.getValue()[0] >= windowMillis);
+        if (counters.size() > CLEANUP_THRESHOLD && now - lastCleanupAt >= CLEANUP_MIN_INTERVAL_MILLIS) {
+            lastCleanupAt = now;
+            counters.entrySet().removeIf(e -> now - e.getValue()[0] >= windowMillis);
+        }
         chain.doFilter(request, response);
     }
 
-    /** 反代场景取 XFF 首段（最原始客户端）以区分真实来源；无 XFF 时退回 remoteAddr，兜底与 LoginRateLimiter 的 IP 维度一致。 */
-    private String clientIp(HttpServletRequest request) {
+    /** 清理节流：距上次清理不足 60s 时跳过，防止键数恒超阈值时每请求全表扫描（CPU 放大 DoS）。 */
+    private static final long CLEANUP_MIN_INTERVAL_MILLIS = 60_000L;
+    private volatile long lastCleanupAt = 0L;
+
+    /**
+     * R4-02：取 XFF <b>末段</b>——nginx `$proxy_add_x_forwarded_for` 是追加语义，客户端可伪造首段，
+     * 而末段恒为最近一跳可信代理写入的真实来源；无 XFF（直连）时退回 remoteAddr。
+     * 需配合 deploy/nginx-wms.conf 的覆盖式 X-Forwarded-For 传递。
+     */
+    public static String clientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");
         if (xff != null && !xff.isBlank()) {
-            int comma = xff.indexOf(',');
-            String first = (comma > 0 ? xff.substring(0, comma) : xff).trim();
-            if (!first.isEmpty()) return first;
+            int comma = xff.lastIndexOf(',');
+            String last = (comma >= 0 ? xff.substring(comma + 1) : xff).trim();
+            if (!last.isEmpty()) return last;
         }
         return request.getRemoteAddr() == null ? "unknown" : request.getRemoteAddr();
     }

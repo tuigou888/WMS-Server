@@ -3,6 +3,10 @@ import { h, onMounted, ref } from 'vue'
 import { Button, Card, Col, Form, Image, Row, Select, Typography, Upload, message } from 'ant-design-vue'
 import { DownloadOutlined, QrcodeOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { api } from '../api/wms'
+import { hasPerm } from '../utils/permission'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const items = ref([])
 const qr = ref(null)
@@ -89,8 +93,8 @@ const upload = async ({ file, onSuccess, onError }) => {
     <Col :xs="24" :lg="12">
       <Card title="物品档案电子表格">
         <Typography.Paragraph>导出当前物品档案，或上传按相同列顺序编辑后的 .xlsx 文件进行新增/更新。</Typography.Paragraph>
-        <Button :icon="h(DownloadOutlined)" :loading="exportLoading" @click="download">导出物品档案</Button>
-        <a-upload accept=".xlsx" :show-upload-list="false" :custom-request="upload" style="margin-left: 12px; display: inline-block;">
+        <Button v-if="hasPerm(auth.user, 'excel:read')" :icon="h(DownloadOutlined)" :loading="exportLoading" @click="download">导出物品档案</Button>
+        <a-upload v-if="hasPerm(auth.user, 'excel:write')" accept=".xlsx" :show-upload-list="false" :custom-request="upload" style="margin-left: 12px; display: inline-block;">
           <Button :icon="h(UploadOutlined)">导入电子表格</Button>
         </a-upload>
       </Card>

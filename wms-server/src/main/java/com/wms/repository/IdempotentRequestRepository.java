@@ -9,13 +9,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface IdempotentRequestRepository extends JpaRepository<IdempotentRequest, Long> {
-    /** 超保留期记录的批量清理：响应重放窗口之外的数据没有保留价值。 */
+    /** R4-11：分批清理——先取批次 id 再按 id 删，避免单条全量 DELETE 长事务持间隙锁。 */
+    @Query("select r.id from IdempotentRequest r where r.createdAt < :before")
+    List<Long> findExpiredIds(@Param("before") LocalDateTime before, org.springframework.data.domain.Pageable pageable);
+
     @Modifying
-    @Query("delete from IdempotentRequest r where r.createdAt < :before")
-    int deleteExpiredBefore(@Param("before") LocalDateTime before);
+    @Query("delete from IdempotentRequest r where r.id in :ids")
+    int deleteByIdIn(@Param("ids") java.util.Collection<Long> ids);
 
     @Modifying
     @Query(value = "insert into idempotent_requests (username, scope, request_key, request_hash, created_at, updated_at) "

@@ -44,7 +44,7 @@ import com.wms.common.*; import com.wms.dto.LoginRequest; import com.wms.dto.Use
   private void ensureAdmin(){SecurityUtils.require(Permissions.USER_MANAGE);}
   /** 限速键：客户端 IP + 用户名，避免恶意锁定他人账号（同 IP 不同用户互不影响）。 */
   private String rateKey(HttpServletRequest http,String username){String ip=http==null?"unknown":clientIp(http);return ip+"|"+normalizeUsername(username).toLowerCase(Locale.ROOT);}
-  private String clientIp(HttpServletRequest http){return http.getRemoteAddr()==null?"unknown":http.getRemoteAddr();}
+  private String clientIp(HttpServletRequest http){return http==null?"unknown":com.wms.security.GlobalRateLimitFilter.clientIp(http);}
   private String normalizeUsername(String username){if(username==null||username.trim().isBlank())throw new BusinessException("用户名不能为空");return username.trim();}
   private String validRole(String role){if(!RolePermissions.roles().containsKey(role))throw new BusinessException("角色不受支持");return role;}
   private String ticketOpenid(String ticket){try{return bindTickets.peek(ticket);}catch(IllegalArgumentException e){throw new BusinessException(e.getMessage());}}

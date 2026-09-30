@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.math.BigDecimal;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -51,6 +52,9 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     List<Inventory> findFifoForOut(@Param("itemId") Long itemId, @Param("warehouseId") Long warehouseId);
 
     /** 商城下单预校验：某 item 在指定仓库的总可用库存。 */
+    @Query("select coalesce(sum(i.quantity),0) from Inventory i where i.item.id = :itemId")
+    BigDecimal sumQuantityByItem(@Param("itemId") Long itemId);
+
     @Query("select coalesce(sum(i.quantity),0) from Inventory i where i.item.id = :itemId and i.warehouse.id = :warehouseId")
     java.math.BigDecimal availableQty(@Param("itemId") Long itemId, @Param("warehouseId") Long warehouseId);
 

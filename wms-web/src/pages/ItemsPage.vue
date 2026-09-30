@@ -5,6 +5,10 @@ import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined } from '@ant
 import { api } from '../api/wms'
 import { money, number } from '../utils/format'
 import { normalizeColumns } from '../utils/table'
+import { hasPerm } from '../utils/permission'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const empty = { unit: '个', safetyStock: 0, maxStock: 0, minStock: 0, status: true }
 
@@ -93,11 +97,11 @@ const columns = [
   {
     title: '操作', width: 130,
     render: (_, r) => h(Space, [
-      h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑'),
-      h(Popconfirm, {
+      hasPerm(auth.user, 'item:write') ? h(Button, { type: 'link', icon: h(EditOutlined), onClick: () => open(r) }, '编辑') : null,
+      hasPerm(auth.user, 'item:write') ? h(Popconfirm, {
         title: '确认删除该物品？',
-        onConfirm: () => api.deleteItem(r.id).then(() => { message.success('已删除'); load() }).catch((e) => message.error(e.message)),
-      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }),
+        onConfirm: () => api.deleteItem(r.id).then(() => { message.success('已删除'); if (data.value.length === 1 && page.value > 1) page.value -= 1; load() }).catch((e) => message.error(e.message)),
+      }, { default: () => h(Button, { type: 'link', danger: true, icon: h(DeleteOutlined) }, '删除') }) : null,
     ]),
   },
 ]
@@ -109,7 +113,7 @@ const columns = [
       <Typography.Title :level="3" class="page-title">物品档案</Typography.Title>
       <Typography.Text class="page-subtitle" type="secondary">维护物品编码、规格与安全库存</Typography.Text>
     </div>
-    <Button type="primary" :icon="h(PlusOutlined)" @click="open()">新增物品</Button>
+    <Button v-if="hasPerm(auth.user, 'item:write')" type="primary" :icon="h(PlusOutlined)" @click="open()">新增物品</Button>
   </div>
 
   <Card class="table-card">
