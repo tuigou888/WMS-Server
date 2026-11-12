@@ -24,3 +24,6 @@ test-artifacts/__pycache__/
 test-artifacts/*.png
 test-artifacts/api-results*.json
 test-artifacts/ui-results*.json
+
+# Claude Code 本地权限配置
+.claude/settings.local.json
