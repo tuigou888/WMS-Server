@@ -29,12 +29,21 @@ const load = async (resetPage = false) => {
   if (resetPage) page.value = 1
   loading.value = true
   try {
-    const [items, inv] = await Promise.all([
+    const [items] = await Promise.all([
       api.items({ page: page.value, pageSize: pageSize.value, keyword: keyword.value || undefined }),
-      api.inventory(),
     ])
     data.value = items.records
     total.value = items.total
+    // GET /inventory 是服务端分页对象 {records,total,...}，pageSize 钳制 1..200，翻页拉全量
+    let inv = []
+    let invPage = 1
+    while (invPage <= 50) {
+      const result = await api.inventory({ page: invPage, pageSize: 200 })
+      if (!result || !Array.isArray(result.records) || result.records.length === 0) break
+      inv = inv.concat(result.records)
+      if (inv.length >= result.total) break
+      invPage++
+    }
     const map = {}
     inv.forEach((x) => {
       const id = x.itemId
