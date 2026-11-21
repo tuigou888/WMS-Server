@@ -65,25 +65,33 @@ onMounted(() => {
       <a-form-item name="itemCode" label="物品编码 / 扫码结果" :rules="[{ required: true, message: '请输入或扫描物品编码' }]">
         <a-input v-model:value="formState.itemCode" autofocus placeholder="如 ITEM-001" />
       </a-form-item>
-      <a-space-compact style="width: 100%;">
-        <a-form-item name="warehouseId" label="仓库" :rules="[{ required: true, message: '请选择仓库' }]" style="width: 50%;">
-          <a-select v-model:value="formState.warehouseId" :options="warehouses.map(w => ({ value: w.id, label: w.name }))" />
-        </a-form-item>
-        <a-form-item name="locationCode" label="库位" :rules="[{ required: true, message: '请输入库位' }]" style="width: 50%;">
-          <a-input v-model:value="formState.locationCode" placeholder="如 A-01-01" />
-        </a-form-item>
-      </a-space-compact>
-      <a-space-compact style="width: 100%;">
-        <a-form-item name="quantity" :label="inbound ? '入库数量' : '出库数量'" :rules="[{ required: true }]" style="width: 50%;">
-          <a-input-number v-model:value="formState.quantity" :min="0.0001" :precision="4" style="width: 100%;" />
-        </a-form-item>
-        <a-form-item v-if="inbound" name="unitCost" label="入库单价" :rules="[{ required: true }]" style="width: 50%;">
-          <a-input-number v-model:value="formState.unitCost" :min="0" :precision="4" prefix="¥" style="width: 100%;" />
-        </a-form-item>
-        <a-form-item v-else name="salePrice" label="售出价" :rules="[{ required: true }]" style="width: 50%;">
-          <a-input-number v-model:value="formState.salePrice" :min="0" :precision="4" prefix="¥" style="width: 100%;" />
-        </a-form-item>
-      </a-space-compact>
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-form-item name="warehouseId" label="仓库" :rules="[{ required: true, message: '请选择仓库' }]">
+            <a-select v-model:value="formState.warehouseId" :options="warehouses.map(w => ({ value: w.id, label: w.name }))" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item name="locationCode" label="库位" :rules="[{ required: true, message: '请输入库位' }]">
+            <a-input v-model:value="formState.locationCode" placeholder="如 A-01-01" />
+          </a-form-item>
+        </a-col>
+      </a-row>
+      <a-row :gutter="16">
+        <a-col :span="12">
+          <a-form-item name="quantity" :label="inbound ? '入库数量' : '出库数量'" :rules="[{ required: true }]">
+            <a-input-number v-model:value="formState.quantity" :min="0.0001" :precision="4" style="width: 100%;" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item v-if="inbound" name="unitCost" label="入库单价" :rules="[{ required: true }]">
+            <a-input-number v-model:value="formState.unitCost" :min="0" :precision="4" prefix="¥" style="width: 100%;" />
+          </a-form-item>
+          <a-form-item v-else name="salePrice" label="售出价" :rules="[{ required: true }]">
+            <a-input-number v-model:value="formState.salePrice" :min="0" :precision="4" prefix="¥" style="width: 100%;" />
+          </a-form-item>
+        </a-col>
+      </a-row>
       <a-form-item name="batchNo" label="批次号">
         <a-input v-model:value="formState.batchNo" placeholder="如 BATCH-20260718">
           <template v-if="inbound && ocrEnabled" #addonBefore>
