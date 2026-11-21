@@ -1,11 +1,17 @@
+# 单容器部署：Java 后端 + nginx 前端在同一个容器内（前端静态资源 + /api/v1 反代由容器内 nginx 完成）。
+# 服务器上只需要 docker compose up -d 拉起 wms-app 一个容器。
 services:
-  wms-server:
+  wms-app:
     build:
-      context: ./wms-server
+      context: .
       args:
         MAVEN_MIRROR_URL: ${MAVEN_MIRROR_URL:-https://maven.aliyun.com/repository/public}
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     restart: unless-stopped
-    ports: ["${WMS_API_BIND:-127.0.0.1:8088}:8088", "${WMS_MGMT_BIND:-127.0.0.1:9089}:9089"]
+    # 80 = 页面 + API 单入口（外层 TLS 反代指到这里）；9089 = management（仅本机排查用）
+    ports:
+      - "${WMS_WEB_BIND:-127.0.0.1:3100}:80"
+      - "${WMS_MGMT_BIND:-127.0.0.1:9089}:9089"
     volumes: ["wms-logs:/app/logs"]
     # 服务器宿主机自建 MySQL：容器内用 host.docker.internal 访问（Linux 必须显式映射 host-gateway）
     extra_hosts: ["host.docker.internal:host-gateway"]
@@ -42,29 +48,13 @@ services:
         target: wechat_pay_private_key
       - source: wechat_pay_public_key
         target: wechat_pay_public_key
-    # 就绪探针连真实数据库（DB 挂 → /health/ready 返回 503 → 容器判 unhealthy）；
-    # wms-web 依赖此状态，避免 server 起来但库不可用时反代全 5xx。
+    # 就绪探针经 nginx 打到 Java 的 /api/v1/health/ready（真连库，DB 挂 → 503 → unhealthy）
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8088/api/v1/health/ready"]
+      test: ["CMD", "curl", "-fsS", "http://localhost/api/v1/health/ready"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 90s
-  wms-web:
-    build:
-      context: ./wms-web
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
-    restart: unless-stopped
-    ports: ["${WMS_WEB_BIND:-127.0.0.1:3100}:80"]
-    depends_on:
-      wms-server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 # 备份范围（宿主机职责，compose 不做快照）：
 #  1) MySQL 数据 —— 本部署用宿主机自建 MySQL，走宿主备份方案（mysqldump/xtrabackup）；
 #  2) wms-logs 卷 —— 含审计归档 CSV（AUDIT_ARCHIVE_DIR）；卷显式命名，便于备份脚本按名引用；
